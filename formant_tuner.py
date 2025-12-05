@@ -188,12 +188,9 @@ class MicAnalyzer:
         self.stream.start()
 
 
-def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor'):
+def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=False):
     vowels = FORMANTS[voice_type]
     fig, (ax_chart, ax_spec) = plt.subplots(1, 2, figsize=(12, 6))
-
-    # Reserve a left-side control panel from the start
-    plt.subplots_adjust(left=0.38, bottom=0.25)
 
     # --- Vowel chart ---
     points = {}
@@ -216,11 +213,16 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor'):
 
     # --- Live text overlay on the spectrum axis ---
     live_text = ax_spec.text(
-        0.05, 0.85,
-        "Measured: F1=?, F2=?, F3=? | Vowel=--, Resonance=--, Overall=--",
-        transform=ax_spec.transAxes, fontsize=10, color='purple', verticalalignment='top'
+        0.01, 0.95,
+        "Measured: F1=?, F2=?, F3=? |\nVowel=--, Resonance=--, Overall=--",
+        transform=ax_spec.transAxes,
+        fontsize=10,
+        color='purple',
+        verticalalignment='top',
+        wrap=True
     )
     ax_spec._measured_lines = []
+    fig.canvas.draw_idle()
 
     def current_target_formants():
         F1, F2, F3, FS = current_formants
@@ -271,15 +273,31 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor'):
 
         nonlocal live_text
         prev_msg = getattr(live_text, 'get_text', lambda: None)() or \
-                   "Measured: F1=?, F2=?, F3=? | Vowel=--, Resonance=--, Overall=--"
+                   "Measured: F1=?, F2=?, F3=? |\n Vowel=--, Resonance=--, Overall=--"
         prev_color = getattr(live_text, 'get_color', lambda: 'purple')()
         live_text = ax_spec.text(0.05, 0.85, prev_msg, transform=ax_spec.transAxes,
                                  fontsize=10, color=prev_color, verticalalignment='top')
         ax_spec._measured_lines = []
 
+        # reset all markers to default blue
+        for pt, (vname, _) in points.items():
+            try:
+                pt.set_facecolor('blue')
+            except Exception:
+                pt.set_facecolors(['blue'])
+
+        # then highlight the selected vowel
         for pt, (vname, _) in points.items():
             if vname == vowel:
-                pt.set_facecolor('green' if score >= 80 else 'yellow' if score >= 50 else 'red')
+                color = 'green' if score >= 80 else 'yellow' if score >= 50 else 'red'
+                try:
+                    pt.set_facecolor(color)
+                except Exception:
+                    pt.set_facecolors([color])
+
+        for ax in (ax_pitch_ctrl, ax_tol_ctrl):
+            for t in ax.texts:
+                t.set_fontsize(9)
 
         fig.canvas.draw_idle()
 
@@ -298,84 +316,16 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor'):
         mf_disp = [f"{int(x)}" if x is not None else "?" for x in aligned]
 
         live_text.set_text(
-            f"Measured: F1={mf_disp[0]}, F2={mf_disp[1]}, F3={mf_disp[2]} | "
+            f"Measured: F1={mf_disp[0]}, F2={mf_disp[1]}, F3={mf_disp[2]} | \n"
             f"Vowel={vowel_score}, Resonance={resonance_score}, Overall={overall_score}"
         )
         live_text.set_color("green" if overall_score >= 80 else "orange" if overall_score >= 50 else "red")
         fig.canvas.draw_idle()
 
-    # --- Control panel layout ---
-    control_left = 0.05
-    control_width = 0.30
-    control_height = 0.05
-
-    # Voice type radio buttons
-    rax = plt.axes([control_left, 0.80, control_width, 0.15])
-    radio = RadioButtons(rax, list(FORMANTS.keys()))
-
-    # Sliders (single, authoritative set)
-    ax_pitch_ctrl = plt.axes([control_left, 0.72, control_width, control_height])
-    pitch_slider = Slider(ax_pitch_ctrl, 'Pitch (Hz)', 100, 600, valinit=initial_pitch, valstep=0.1)
-
-    ax_tol_ctrl = plt.axes([control_left, 0.65, control_width, control_height])
-    tol_slider = Slider(ax_tol_ctrl, 'Tolerance (Hz)', 10, 200, valinit=50, valstep=1)
-
-    # Instantiate mic AFTER sliders exist (providers read these slider values)
-    mic = MicAnalyzer(
-        vowel_provider=lambda: current_formants,
-        tol_provider=lambda: tol_slider.val,
-        pitch_provider=lambda: pitch_slider.val
-    )
-
-    # Buttons
-    ax_start = plt.axes([control_left, 0.55, control_width, control_height])
-    btn_start = Button(ax_start, 'Start Mic')
-    btn_start.on_clicked(lambda e: mic.start())
-
-    ax_stop = plt.axes([control_left, 0.48, control_width, control_height])
-    btn_stop = Button(ax_stop, 'Stop Mic')
-    btn_stop.on_clicked(lambda e: mic.stop())
-
-    ax_play = plt.axes([control_left, 0.41, control_width, control_height])
-    btn_play = Button(ax_play, 'Play Pitch')
-    btn_play.on_clicked(lambda e: play_pitch(pitch_slider.val))
-
-    ax_btn_spec = plt.axes([control_left, 0.34, control_width, control_height])  # renamed to avoid clobbering ax_spec
-    btn_spec = Button(ax_btn_spec, 'Show Spectrogram')
-
-    def show_spectrogram(event=None):
-        if mic is None or len(mic.buffer) < 1000:
-            print("Not enough audio captured for spectrogram.")
-            return
-        sig = np.array(mic.buffer)
-        f, t, Sxx = spectrogram(sig, fs=mic.sample_rate, nperseg=1024, noverlap=512)
-        fig2, ax2 = plt.subplots(figsize=(8, 4))
-        pcm = ax2.pcolormesh(t, f, 10*np.log10(Sxx+1e-12), shading='gouraud')
-        ax2.set_ylim(0, 4000)
-        ax2.set_title("Spectrogram of captured audio")
-        fig2.colorbar(pcm, ax=ax2, label='Power (dB)')
-        plt.show()
-
-    btn_spec.on_clicked(show_spectrogram)
-
-    # Slider callbacks
-    pitch_slider.on_changed(lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val))
-    tol_slider.on_changed(lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val))
-
-    # Chart pick selection
-    def on_pick(event):
-        artist = event.artist
-        if artist in points:
-            vname, formants = points[artist]
-            nonlocal current_vowel_name, current_formants
-            current_vowel_name = vname
-            current_formants = formants
-            update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
-    fig.canvas.mpl_connect('pick_event', on_pick)
-
-    # Voice type change
     def update_voice(label):
-        nonlocal vowels, points, current_vowel_name, current_formants
+        # we reassign these outer variables, so declare nonlocal
+        nonlocal vowels, points, current_vowel_name, current_formants, voice_type
+        voice_type = label
         vowels = FORMANTS[label]
         ax_chart.clear()
         points.clear()
@@ -392,12 +342,122 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor'):
         ax_chart.invert_xaxis()
         ax_chart.invert_yaxis()
 
-        current_vowel_name = 'a'
-        current_formants = vowels['a']
-
+        # sensible default after switching voice type
+        current_vowel_name = 'a' if 'a' in vowels else next(iter(vowels))
+        current_formants = vowels[current_vowel_name]
         update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
         fig.canvas.draw_idle()
 
+
+    # --- Control panel layout (single authoritative block) ---
+    plt.subplots_adjust(left=0.36, bottom=0.25)
+    control_left = 0.02
+    control_width = 0.28
+    control_height = 0.05
+
+    # Voice type radio buttons
+    rax = plt.axes([control_left, 0.80, control_width, 0.15])
+    radio = RadioButtons(rax, list(FORMANTS.keys()))
+
+    control_height = 0.05
+    label_offset = 1.12  # label y-position in axis coords (slightly above the slider)
+
+    # Pitch slider (no built-in label)
+    ax_pitch_ctrl = plt.axes([control_left, 0.72, control_width, control_height])
+    pitch_slider = Slider(ax_pitch_ctrl, '', 100, 600, valinit=initial_pitch, valstep=0.1)
+    # place the visible label above the slider
+    ax_pitch_ctrl.text(0.0, label_offset, "Pitch (Hz)", transform=ax_pitch_ctrl.transAxes,
+                       fontsize=9, ha='left', va='bottom')
+
+    # Tolerance slider (no built-in label)
+    ax_tol_ctrl = plt.axes([control_left, 0.65, control_width, control_height])
+    tol_slider = Slider(ax_tol_ctrl, '', 10, 200, valinit=50, valstep=1)
+    ax_tol_ctrl.text(0.0, label_offset, "Tolerance (Hz)", transform=ax_tol_ctrl.transAxes,
+                     fontsize=9, ha='left', va='bottom')
+
+    # Pitch <-> MIDI helpers and snapping (single definitions)
+    def freq_to_midi(f):
+        return 69.0 + 12.0 * np.log2(f / 440.0)
+
+    def midi_to_freq(m):
+        return 440.0 * 2.0 ** ((m - 69.0) / 12.0)
+
+    def snap_pitch_to_semitone(val):
+        m_cont = freq_to_midi(val)
+        m_round = int(round(m_cont))
+        f_snap = midi_to_freq(m_round)
+        pitch_slider.eventson = False
+        pitch_slider.set_val(f_snap)
+        pitch_slider.eventson = True
+        update_spectrum(current_vowel_name, current_formants, f_snap, tol_slider.val)
+
+    def show_note_name(val):
+        m = int(round(freq_to_midi(val)))
+        note = freq_to_note_name(midi_to_freq(m))
+        ax_spec.set_title(f"Spectrum /{current_vowel_name}/ ({voice_type}, {note} {val:.2f} Hz, Score=--)")
+        fig.canvas.draw_idle()
+
+    # Wire pitch slider callbacks (snap first, then update title)
+    pitch_slider.on_changed(snap_pitch_to_semitone)
+    pitch_slider.on_changed(show_note_name)
+
+    # Optional: draw MIDI tick markers once
+    m_min = int(np.floor(freq_to_midi(pitch_slider.valmin)))
+    m_max = int(np.ceil(freq_to_midi(pitch_slider.valmax)))
+    tick_freqs = [midi_to_freq(m) for m in range(m_min, m_max + 1)]
+    for f in tick_freqs:
+        # position in axis coordinates (0..1)
+        pos = (f - pitch_slider.valmin) / (pitch_slider.valmax - pitch_slider.valmin)
+        ax_pitch_ctrl.axvline(pos, color='k', alpha=0.12, linewidth=0.4)
+
+    # Instantiate mic AFTER sliders exist
+    mic = MicAnalyzer(
+        vowel_provider=lambda: current_formants,
+        tol_provider=lambda: tol_slider.val,
+        pitch_provider=lambda: pitch_slider.val
+    )
+
+    def show_spectrogram(event=None):
+        # mic is instantiated later; guard if not ready
+        if 'mic' not in locals() and 'mic' not in globals():
+            print("Mic not instantiated yet.")
+            return
+        if mic is None or len(mic.buffer) < 1000:
+            print("Not enough audio captured for spectrogram.")
+            return
+        sig = np.array(mic.buffer)
+        f, t, Sxx = spectrogram(sig, fs=mic.sample_rate, nperseg=1024, noverlap=512)
+        fig2, ax2 = plt.subplots(figsize=(8, 4))
+        pcm = ax2.pcolormesh(t, f, 10 * np.log10(Sxx + 1e-12), shading='gouraud')
+        ax2.set_ylim(0, 4000)
+        ax2.set_title("Spectrogram of captured audio")
+        fig2.colorbar(pcm, ax=ax2, label='Power (dB)')
+        plt.show()
+
+    # Buttons (use clear names for axes)
+    ax_btn_start = plt.axes([control_left, 0.55, control_width, control_height])
+    btn_start = Button(ax_btn_start, 'Start Mic')
+    btn_start.on_clicked(lambda e: mic.start())
+
+    ax_btn_stop = plt.axes([control_left, 0.48, control_width, control_height])
+    btn_stop = Button(ax_btn_stop, 'Stop Mic')
+    btn_stop.on_clicked(lambda e: mic.stop())
+
+    ax_btn_play = plt.axes([control_left, 0.41, control_width, control_height])
+    btn_play = Button(ax_btn_play, 'Play Pitch')
+    btn_play.on_clicked(lambda e: play_pitch(pitch_slider.val))
+
+    ax_btn_spec = plt.axes([control_left, 0.34, control_width, control_height])
+    btn_spec = Button(ax_btn_spec, 'Show Spectrogram')
+    btn_spec.on_clicked(show_spectrogram)
+
+    # Single slider-driven spectrum updates (no duplicates)
+    pitch_slider.on_changed(
+        lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val))
+    tol_slider.on_changed(
+        lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val))
+
+    # Single radio handler
     radio.on_clicked(update_voice)
 
     # Animation loop: consume results from queue in main thread
@@ -405,13 +465,142 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor'):
         while not results_queue.empty():
             measured, vowel_score, resonance_score, overall = results_queue.get()
             update_live_ui(measured, vowel_score, resonance_score, overall)
+    # --- Diagnostics: run quick checks and optionally LPC debug ---
+    def run_diagnostics(lpc_debug=False):
+        # uses outer-scope names: mic, live_text, ax_spec, pitch_slider
+        nonlocal mic, live_text
 
-    ani = animation.FuncAnimation(fig, poll_queue, interval=100, cache_frame_data=False)
+        # guard: ensure we have audio
+        if mic is None:
+            msg = "Diagnostics: mic not instantiated."
+            live_text.set_text(msg)
+            live_text.set_color("orange")
+            fig.canvas.draw_idle()
+            return
+
+        sig = np.array(mic.buffer)
+        if sig.size == 0:
+            msg = "Diagnostics: no audio captured yet."
+            live_text.set_text(msg)
+            live_text.set_color("orange")
+            fig.canvas.draw_idle()
+            return
+
+        sr = mic.sample_rate
+        duration = sig.size / sr
+        sig_min, sig_max = float(sig.min()), float(sig.max())
+
+        # spectrogram dominant frequency (quick)
+        try:
+            f, t, Sxx = spectrogram(sig, fs=sr, nperseg=1024, noverlap=512)
+            idx = np.argmax(Sxx, axis=0)
+            dominant_freqs = f[idx]
+            dom_median = float(np.median(dominant_freqs))
+            dom_first = float(dominant_freqs[0]) if dominant_freqs.size else 0.0
+        except Exception as e:
+            dom_median = None
+            dom_first = None
+            spect_err = str(e)
+        else:
+            spect_err = None
+
+        # LPC quick test on a steady slice (100-500 ms)
+        lpc_result = None
+        lpc_err = None
+        if lpc_debug:
+            try:
+                start, end = int(0.1 * sr), int(0.5 * sr)
+                frame = sig[start:end] if sig.size >= end else sig
+
+                # use a safer LPC variant: regularized solve + magnitude filter
+                def estimate_formants_safe(signal, sample_rate=sr, lpc_order=12, fmin=50, fmax=5000):
+                    preemph = lfilter([1, -0.97], 1, signal)
+                    win = preemph * hamming(len(preemph))
+                    win = win - np.mean(win)
+                    r = np.correlate(win, win, mode='full')[len(win) - 1:]
+                    R = np.array([r[i:i + lpc_order] for i in range(lpc_order)])
+                    rhs = -r[1:lpc_order + 1]
+                    eps = 1e-6 * np.eye(R.shape[0])
+                    a, _, _, _ = lstsq(R + eps, rhs, rcond=None)
+                    a = np.concatenate(([1.0], a))
+                    roots = np.roots(a)
+                    roots = roots[np.imag(roots) > 0]
+                    angs = np.angle(roots)
+                    formants = angs * (sample_rate / (2 * np.pi))
+                    # magnitude filter and f-range clamp
+                    formants = [f for r, f in zip(roots, formants) if np.abs(r) > 0.01 and fmin < f < fmax]
+                    return sorted(formants)
+
+                lpc_result = estimate_formants_safe(frame, sample_rate=sr, lpc_order=12)
+            except Exception as e:
+                lpc_err = str(e)
+
+        # Build a compact multi-line diagnostic message
+        lines = []
+        lines.append(f"SR={sr}  len={sig.size}  dur={duration:.2f}s  min={sig_min:.3g} max={sig_max:.3g}")
+        if spect_err:
+            lines.append(f"Spectrogram: ERROR: {spect_err}")
+        else:
+            lines.append(f"Spectrogram dominant median={dom_median:.1f} Hz  first={dom_first:.1f} Hz")
+        if lpc_debug:
+            if lpc_err:
+                lines.append(f"LPC: ERROR: {lpc_err}")
+            else:
+                if lpc_result:
+                    fdisp = ", ".join(str(int(x)) for x in lpc_result[:3])
+                    lines.append(f"LPC formants (top3): {fdisp}")
+                else:
+                    lines.append("LPC formants: none detected")
+        else:
+            lines.append("LPC debug: off (click Diagnostics ▶ to enable)")
+
+        # Update the live_text overlay (wrap to two lines if long)
+        diag_text = " | ".join(lines)
+        # If too long, break into two lines for readability
+        if len(diag_text) > 120:
+            # split roughly in half at a separator
+            half = len(diag_text) // 2
+            sep = diag_text.rfind(" | ", 0, half)
+            if sep == -1:
+                sep = diag_text.find(" | ", half)
+            if sep != -1:
+                diag_text = diag_text[:sep] + "\n" + diag_text[sep + 3:]
+        live_text.set_text(diag_text)
+        live_text.set_color("green" if (lpc_result and len(lpc_result) >= 2) else "orange")
+        fig.canvas.draw_idle()
+
+        # default: run quick checks without heavy LPC debug; hold Shift-click to enable LPC debug
+        def _diag_click(event):
+            # If user wants LPC debug, call with lpc_debug=True; here we always run quick checks.
+            run_diagnostics(lpc_debug=False)
+
+        btn_diag.on_clicked(_diag_click)
+
+        live_text.set_text(diag_text)
+        live_text.set_color("green" if (lpc_result and len(lpc_result) >= 2) else "orange")
+        fig.canvas.draw_idle()
+        return diag_text  # <-- return for tests
+
+    ax_btn_diag = plt.axes([control_left, 0.27, control_width, control_height])
+    btn_diag = Button(ax_btn_diag, 'Diagnostics ▶')
+    btn_diag.on_clicked(lambda e: run_diagnostics(lpc_debug=False))
+
+    ax_btn_diag_full = plt.axes([control_left, 0.20, control_width, control_height])
+    btn_diag_full = Button(ax_btn_diag_full, 'Diagnostics (LPC)')
+    btn_diag_full.on_clicked(lambda e: run_diagnostics(lpc_debug=True))
+
+    if not headless:
+        ani = animation.FuncAnimation(fig, poll_queue, interval=100, cache_frame_data=False)
 
     # Initial spectrum
     update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
+    if headless:
+        # return the key objects tests need
+        return fig, mic, live_text, run_diagnostics
 
     plt.show()
+    return None
+
 
 
 if __name__ == "__main__":

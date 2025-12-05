@@ -8,6 +8,7 @@ from formant_tuner import (
     resonance_tuning_score,
     overall_rating
 )
+from formant_tuner import interactive_vowel_chart, MicAnalyzer
 
 
 class TestRatings(unittest.TestCase):
@@ -36,6 +37,7 @@ class TestRatings(unittest.TestCase):
         print("Vowel:", vowel_score, "Resonance:", resonance_score, "Overall:", overall)
         self.assertGreaterEqual(overall, 50)
 
+
 class TestFormants(unittest.TestCase):
     def test_sine_wave(self):
         import numpy as np
@@ -54,6 +56,7 @@ class TestFormants(unittest.TestCase):
         print("Score:", score)
         self.assertGreaterEqual(score, 80)
 
+
 class TestMic(unittest.TestCase):
     def test_record_and_estimate(self):
         sr = 44100
@@ -65,6 +68,39 @@ class TestMic(unittest.TestCase):
         formants = estimate_formants_lpc(audio[:,0], sample_rate=sr)
         print("Measured formants:", formants)
         self.assertTrue(len(formants) > 0, "No formants detected")
+
+
+class TestDiagnostics(unittest.TestCase):
+    def test_run_diagnostics_synthetic(self):
+        # Create the UI once in headless/test mode
+        fig_objs = interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=True)
+        # interactive_vowel_chart should return references for testing:
+        # (fig, mic, live_text, run_diagnostics) or similar. If not, adapt accordingly.
+        fig, mic, live_text, run_diagnostics = fig_objs
+
+        # Fill mic.buffer with a synthetic vowel-like signal (A3-ish)
+        sr = mic.sample_rate
+        duration = 0.6
+        t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+        f0 = 220.0
+        sig = np.zeros_like(t)
+        for h in range(1, 20):
+            sig += 0.05 * np.sin(2*np.pi*h*f0*t)
+        mic.buffer = sig.tolist()
+
+        # Run diagnostics (no heavy LPC)
+        run_diagnostics(lpc_debug=False)
+
+        # Read the live_text overlay and assert it contains expected substrings
+        txt = live_text.get_text()
+        self.assertIn("SR=", txt)
+        self.assertIn("Spectrogram dominant", txt)
+
+        # Run full LPC diagnostics and assert formants reported or a safe message
+        run_diagnostics(lpc_debug=True)
+        txt2 = live_text.get_text()
+        self.assertTrue("LPC formants" in txt2 or "LPC: ERROR" in txt2)
+
 
 if __name__ == "__main__":
     unittest.main()
