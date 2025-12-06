@@ -94,7 +94,7 @@ class TestDiagnostics(unittest.TestCase):
         # Read the live_text overlay and assert it contains expected substrings
         txt = live_text.get_text()
         self.assertIn("SR=", txt)
-        self.assertIn("Spectrogram dominant", txt)
+        self.assertIn("Spectrogram median", txt)
 
         # Run full LPC diagnostics and assert formants reported or a safe message
         run_diagnostics(lpc_debug=True)
