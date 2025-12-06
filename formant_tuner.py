@@ -1,6 +1,5 @@
 import matplotlib
 matplotlib.use("TkAgg")  # GUI backend
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RadioButtons, Slider, Button
@@ -11,13 +10,8 @@ import sounddevice as sd
 from scipy.signal import lfilter, spectrogram
 from numpy.linalg import lstsq
 import queue
-
-
-
-FORMANTS = { 'tenor': { 'i': (320, 2290, 3000, 3500), 'e': (580, 2000, 3000, 3300), 'a': (800, 1200, 2800, 3200), 'o': (640, 1000, 2700, 3100), 'u': (350, 950, 2600, 3000), 'æ': (700, 1800, 2800, 3200), 'ʌ': (680, 1300, 2700, 3100), 'ɔ': (540, 800, 2600, 3000) }, 'soprano': { 'i': (400, 2700, 3500, 3800), 'e': (650, 2300, 3300, 3600), 'a': (950, 1500, 3100, 3400), 'o': (750, 1200, 3000, 3300), 'u': (420, 1100, 2900, 3200), 'æ': (800, 2000, 3100, 3400), 'ʌ': (780, 1450, 3000, 3300), 'ɔ': (600, 950, 2900, 3200) } }
-
-NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-
+from vowel_data import FORMANTS, VOWEL_MAP, NOTE_NAMES
+from collections import deque
 
 
 def harmonic_series(f0, num_harmonics=12):
@@ -165,6 +159,22 @@ def overall_rating(measured_formants, target_formants, pitch, tolerance=50):
     return vowel_score, resonance_score, int(0.5 * vowel_score + 0.5 * resonance_score)
 
 
+def robust_guess(measured_formants, VOWEL_MAP):
+    if len(measured_formants) < 2:
+        return None, None, None
+    f1, f2 = sorted(measured_formants)[:2]
+    dists = []
+    for v, (tf1, tf2) in VOWEL_MAP.items():
+        # weight F1 more heavily
+        d = 2*(f1 - tf1)**2 + (f2 - tf2)**2
+        dists.append((v, d))
+    dists.sort(key=lambda x: x[1])
+    best, d1 = dists[0]
+    second, d2 = dists[1] if len(dists) > 1 else (None, float('inf'))
+    confidence = d2 / max(d1, 1e-6)
+    return best, second, confidence
+
+
 results_queue = queue.Queue()
 
 
@@ -253,23 +263,32 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
     freq_axis = np.linspace(0, 4000, 1000)
     current_vowel_name = 'a'
     current_formants = vowels[current_vowel_name]
-
+    formant_history = deque(maxlen=7) 
     # --- Live text overlay on the spectrum axis ---
-    live_text = ax_spec.text(
-        0.01, 0.95,
+    # --- Persistent info text in figure margin ---
+    info_text = fig.text(
+        0.02, 0.02,
         "Measured: F1=?, F2=?, F3=? |\nVowel=--, Resonance=--, Overall=--",
-        transform=ax_spec.transAxes,
+        ha='left', va='bottom',
         fontsize=10,
-        color='purple',
-        verticalalignment='top',
-        wrap=True
+        color='purple'
     )
-    ax_spec._measured_lines = []
+    fig._info_text = info_text
     fig.canvas.draw_idle()
+
+
+    def smooth_formants(new_formants):
+        cleaned = [np.nan if f is None else f for f in new_formants]
+        formant_history.append(cleaned)
+        arr = np.array(formant_history, dtype=float)
+        # nanmedian ignores np.nan values
+        return np.nanmedian(arr, axis=0)
+
 
     def current_target_formants():
         F1, F2, F3, FS = current_formants
         return (F1, F2, F3)
+
 
     # --- Spectrum redraw ---
     def update_spectrum(vowel, formants, pitch, tolerance):
@@ -278,7 +297,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         # compute harmonics and keep only those inside the x-axis limits
         harmonics = harmonic_series(pitch, num_harmonics=12)
         hs = [h for h in harmonics if 0 <= h <= 4000]
-
         # if no harmonics fall in range, avoid plotting mismatch
         if not hs:
             ax_spec.cla()
@@ -286,7 +304,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
             ax_spec.set_ylim(0, 1)
             ax_spec.set_title("No harmonics in range")
             return
-
         # compute amplitudes aligned with hs
         amplitudes = []
         for h in hs:
@@ -295,16 +312,12 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
                 if abs(h - f) <= tolerance:
                     boost += 2.0
             amplitudes.append(boost)
-
         amplitudes = np.array(amplitudes)
-
         # plot stems using hs and amplitudes (same length)
         ax_spec.stem(hs, amplitudes, linefmt='gray', markerfmt='o', basefmt=" ")
-
         ax_spec.plot(freq_axis, spectral_envelope(target, freq_axis), 'r-', linewidth=2, label="Filter Envelope")
         for f in target:
             ax_spec.axvline(f, color='blue', linestyle='--', alpha=0.5)
-
         score = score_vowel_pitch(target, pitch, tolerance)
         note_name = freq_to_note_name(pitch)
         ax_spec.set_xlim(0, 4000)
@@ -313,22 +326,12 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         ax_spec.set_xlabel("Frequency (Hz)")
         ax_spec.set_ylabel("Amplitude (a.u.)")
         ax_spec.legend(loc='upper right')
-
-        nonlocal live_text
-        prev_msg = getattr(live_text, 'get_text', lambda: None)() or \
-                   "Measured: F1=?, F2=?, F3=? |\n Vowel=--, Resonance=--, Overall=--"
-        prev_color = getattr(live_text, 'get_color', lambda: 'purple')()
-        live_text = ax_spec.text(0.05, 0.85, prev_msg, transform=ax_spec.transAxes,
-                                 fontsize=10, color=prev_color, verticalalignment='top')
-        ax_spec._measured_lines = []
-
         # reset all markers to default blue
         for pt, (vname, _) in points.items():
             try:
                 pt.set_facecolor('blue')
             except Exception:
                 pt.set_facecolors(['blue'])
-
         # then highlight the selected vowel
         for pt, (vname, _) in points.items():
             if vname == vowel:
@@ -337,49 +340,60 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
                     pt.set_facecolor(color)
                 except Exception:
                     pt.set_facecolors([color])
-
         for ax in (ax_pitch_ctrl, ax_tol_ctrl):
             for t in ax.texts:
                 t.set_fontsize(9)
-
         fig.canvas.draw_idle()
 
+
     def update_live_ui(measured_formants, vowel_score, resonance_score, overall_score):
-        # Clear previous measured lines
+        # Clear previous lines
         for line in getattr(ax_spec, "_measured_lines", []):
             try: line.remove()
             except Exception: pass
         ax_spec._measured_lines = []
-
         # Plot measured formants in red
         for f in measured_formants:
-            ax_spec._measured_lines.append(
-                ax_spec.axvline(f, color='red', linestyle='-', alpha=0.7)
-            )
-
+            ax_spec._measured_lines.append(ax_spec.axvline(f, color='red', linestyle='-', alpha=0.7))
         # Plot target formants in blue dashed lines
         target_formants = current_target_formants()
         for f in target_formants:
-            ax_spec._measured_lines.append(
-                ax_spec.axvline(f, color='blue', linestyle='--', alpha=0.4)
-            )
-
+            ax_spec._measured_lines.append(ax_spec.axvline(f, color='blue', linestyle='--', alpha=0.4))
         # Align measured to target
         aligned = align_formants_to_targets(measured_formants, target_formants)
-        mf_disp = [f"{int(x)}" if x is not None else "?" for x in aligned]
-
-        # Update overlay text
-        live_text.set_text(
-            f"Measured: F1={mf_disp[0]}, F2={mf_disp[1]}, F3={mf_disp[2]} |\n"
-            f"Vowel=/{current_vowel_name}/, Score={vowel_score}, Resonance={resonance_score}, Overall={overall_score}"
-        )
-        live_text.set_color(
+        # Apply smoothing
+        smoothed = smooth_formants(aligned)
+        # Reject implausible jumps (>500 Hz from previous median)
+        if len(formant_history) > 1:
+            prev = np.median(np.array(formant_history)[:-1], axis=0)
+            smoothed = [
+                prev[i] if abs(smoothed[i] - prev[i]) > 500 else smoothed[i]
+                for i in range(len(smoothed))
+            ]
+        mf_disp = [f"{int(x)}" if not np.isnan(x) else "?" for x in smoothed]
+        # Robust vowel guess
+        guessed, second, conf = robust_guess(measured_formants, VOWEL_MAP)
+        # base string
+        guessed_str = f"/{guessed}/" if guessed else "?"
+        # mark uncertain if confidence is low
+        if conf is None or conf < 1.2:
+            guessed_str = f"{guessed_str} (uncertain)"
+        second_str = f"/{second}/" if second else "?"
+        conf_str = f"{conf:.2f}" if conf is not None else "n/a"
+        color = (
             "green" if overall_score >= 80 else
             "orange" if overall_score >= 50 else
             "red"
         )
-
+        info_str = (
+            f"F1={mf_disp[0]}, F2={mf_disp[1]}, F3={mf_disp[2]}\n"
+            f"Target=/{current_vowel_name}/, Guessed={guessed_str} (conf={conf_str}), Next={second_str}\n"
+            f"Score={vowel_score}, Resonance={resonance_score}, Overall={overall_score}"
+        )
+        fig._info_text.set_text(info_str)
+        fig._info_text.set_color(color)
         fig.canvas.draw_idle()
+
 
     def update_voice(label):
         # we reassign these outer variables, so declare nonlocal
@@ -388,58 +402,53 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         vowels = FORMANTS[label]
         ax_chart.clear()
         points.clear()
-
         for v, (F1, F2, F3, FS) in vowels.items():
             pt = ax_chart.scatter(F2, F1, label=f"/{v}/", picker=True, s=100, c='blue')
             points[pt] = (v, (F1, F2, F3, FS))
             ax_chart.text(F2 + 50, F1 + 30, f"/{v}/", fontsize=10)
             ax_chart.add_patch(Ellipse((F2, F1), width=200, height=100, alpha=0.2, color='blue'))
-
         ax_chart.set_title(f"Vowel Chart ({label})")
         ax_chart.set_xlabel("F2 (Hz)")
         ax_chart.set_ylabel("F1 (Hz)")
         ax_chart.invert_xaxis()
         ax_chart.invert_yaxis()
-
         # sensible default after switching voice type
         current_vowel_name = 'a' if 'a' in vowels else next(iter(vowels))
         current_formants = vowels[current_vowel_name]
         update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
         fig.canvas.draw_idle()
 
-
     # --- Control panel layout (single authoritative block) ---
     plt.subplots_adjust(left=0.36, bottom=0.25)
     control_left = 0.02
     control_width = 0.28
     control_height = 0.05
-
     # Voice type radio buttons
     rax = plt.axes([control_left, 0.80, control_width, 0.15])
     radio = RadioButtons(rax, list(FORMANTS.keys()))
-
     control_height = 0.05
     label_offset = 1.12  # label y-position in axis coords (slightly above the slider)
-
     # Pitch slider (no built-in label)
     ax_pitch_ctrl = plt.axes([control_left, 0.72, control_width, control_height])
     pitch_slider = Slider(ax_pitch_ctrl, '', 100, 600, valinit=initial_pitch, valstep=0.1)
     # place the visible label above the slider
     ax_pitch_ctrl.text(0.0, label_offset, "Pitch (Hz)", transform=ax_pitch_ctrl.transAxes,
                        fontsize=9, ha='left', va='bottom')
-
     # Tolerance slider (no built-in label)
     ax_tol_ctrl = plt.axes([control_left, 0.65, control_width, control_height])
     tol_slider = Slider(ax_tol_ctrl, '', 10, 200, valinit=50, valstep=1)
     ax_tol_ctrl.text(0.0, label_offset, "Tolerance (Hz)", transform=ax_tol_ctrl.transAxes,
                      fontsize=9, ha='left', va='bottom')
 
+
     # Pitch <-> MIDI helpers and snapping (single definitions)
     def freq_to_midi(f):
         return 69.0 + 12.0 * np.log2(f / 440.0)
 
+
     def midi_to_freq(m):
         return 440.0 * 2.0 ** ((m - 69.0) / 12.0)
+
 
     def snap_pitch_to_semitone(val):
         m_cont = freq_to_midi(val)
@@ -450,16 +459,17 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         pitch_slider.eventson = True
         update_spectrum(current_vowel_name, current_formants, f_snap, tol_slider.val)
 
+
     def show_note_name(val):
         m = int(round(freq_to_midi(val)))
         note = freq_to_note_name(midi_to_freq(m))
         ax_spec.set_title(f"Spectrum /{current_vowel_name}/ ({voice_type}, {note} {val:.2f} Hz, Score=--)")
         fig.canvas.draw_idle()
 
+
     # Wire pitch slider callbacks (snap first, then update title)
     pitch_slider.on_changed(snap_pitch_to_semitone)
     pitch_slider.on_changed(show_note_name)
-
     # Optional: draw MIDI tick markers once
     m_min = int(np.floor(freq_to_midi(pitch_slider.valmin)))
     m_max = int(np.ceil(freq_to_midi(pitch_slider.valmax)))
@@ -468,7 +478,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         # position in axis coordinates (0..1)
         pos = (f - pitch_slider.valmin) / (pitch_slider.valmax - pitch_slider.valmin)
         ax_pitch_ctrl.axvline(pos, color='k', alpha=0.12, linewidth=0.4)
-
     # Instantiate mic AFTER sliders exist
     mic = MicAnalyzer(
         vowel_provider=lambda: current_formants,
@@ -477,6 +486,7 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         sample_rate=44100,
         frame_ms=80  # was 500
     )
+
 
     def show_spectrogram(event=None):
         # mic is instantiated later; guard if not ready
@@ -511,16 +521,13 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
     ax_btn_spec = plt.axes([control_left, 0.34, control_width, control_height])
     btn_spec = Button(ax_btn_spec, 'Show Spectrogram')
     btn_spec.on_clicked(show_spectrogram)
-
     # Single slider-driven spectrum updates (no duplicates)
     pitch_slider.on_changed(
         lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val))
     tol_slider.on_changed(
         lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val))
-
     # Single radio handler
     radio.on_clicked(update_voice)
-
     # Animation loop: consume results from queue in main thread
     def poll_queue(_frame):
         updated = False
@@ -534,17 +541,16 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
         if updated:
             fig.canvas.draw_idle()
 
+
     # --- Diagnostics: run quick checks and optionally LPC debug ---
     def run_diagnostics(lpc_debug=False):
-        nonlocal mic, live_text
-
+        nonlocal mic
         if mic is None:
             msg = "Diagnostics: mic not instantiated."
             live_text.set_text(msg)
             live_text.set_color("orange")
             fig.canvas.draw_idle()
             return msg
-
         sig = np.array(mic.buffer)
         if sig.size == 0:
             msg = "Diagnostics: no audio captured yet."
@@ -552,11 +558,9 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
             live_text.set_color("orange")
             fig.canvas.draw_idle()
             return msg
-
         sr = mic.sample_rate
         duration = sig.size / sr
         sig_min, sig_max = float(sig.min()), float(sig.max())
-
         # Spectrogram summary (compute once)
         spect_err = None
         try:
@@ -569,7 +573,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
             spect_err = str(e)
             dom_median = None
             dom_first = None
-
         # LPC on a short steady slice
         mid = len(sig) // 2
         frame_len = int(0.04 * sr)
@@ -584,8 +587,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
             f = estimate_formants_lpc(frame_ds, sample_rate=sr_ds, lpc_order=12, fmin=100, fmax=4000)
             allf.extend(f)
         formants = sorted([f for f in allf if 100 <= f <= 4000])[:3]
-
-
         # Optional deeper LPC debug on a longer slice
         lpc_result = None
         lpc_err = None
@@ -596,7 +597,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
                 lpc_result = estimate_formants_lpc(frame2, sample_rate=sr, lpc_order=12)
             except Exception as e:
                 lpc_err = str(e)
-
         # Build diagnostic message
         lines = []
         lines.append(f"SR={sr} len={sig.size} dur={duration:.2f}s min={sig_min:.3g} max={sig_max:.3g}")
@@ -615,7 +615,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
                     lines.append("LPC formants: none detected")
         else:
             lines.append("LPC debug: off")
-
         diag_text = " | ".join(lines)
         if len(diag_text) > 120:
             half = len(diag_text) // 2
@@ -624,13 +623,14 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
                 sep = diag_text.find(" | ", half)
             if sep != -1:
                 diag_text = diag_text[:sep] + "\n" + diag_text[sep + 3:]
-
         # Update overlay; do not overwrite measured text logic here
-        live_text.set_text(diag_text)
-        live_text.set_color("green" if (formants and len(formants) >= 2) else "orange")
+        current_text = fig._info_text.get_text()
+        fig._info_text.set_text(f"{current_text}\nDiagnostics: {diag_text}")
+        fig._info_text.set_color("green" if (formants and len(formants) >= 2) else "orange")
         fig.canvas.draw_idle()
 
         return diag_text
+
 
     ax_btn_diag = plt.axes([control_left, 0.27, control_width, control_height])
     btn_diag = Button(ax_btn_diag, 'Diagnostics ▶')
@@ -642,7 +642,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
 
     if not headless:
         ani = animation.FuncAnimation(fig, poll_queue, interval=100, cache_frame_data=False)
-
     # Initial spectrum
     update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
     if headless:
@@ -651,7 +650,6 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
 
     plt.show()
     return None
-
 
 
 if __name__ == "__main__" or True:
