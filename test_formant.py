@@ -1,4 +1,3 @@
-
 import sounddevice as sd
 import numpy as np
 import unittest
@@ -8,8 +7,8 @@ from formant_tuner import (
     resonance_tuning_score,
     overall_rating
 )
-from formant_tuner import interactive_vowel_chart, MicAnalyzer
-
+from formant_tuner import interactive_vowel_chart, MicAnalyzer, robust_guess
+from vowel_data import VOWEL_MAP
 
 class TestRatings(unittest.TestCase):
     def test_resonance_tuning_score_perfect(self):
@@ -100,6 +99,42 @@ class TestDiagnostics(unittest.TestCase):
         run_diagnostics(lpc_debug=True)
         txt2 = live_text.get_text()
         self.assertTrue("LPC formants" in txt2 or "LPC: ERROR" in txt2)
+
+
+class TestVowelGuessing(unittest.TestCase):
+    def test_guess_a_clear(self):
+        measured = [800, 1200, 2500]  # canonical /a/
+        guess, conf, second = robust_guess(measured, VOWEL_MAP)
+        print("Guess /a/:", guess, "Conf:", conf)
+        self.assertEqual(guess, "/a/")
+        self.assertGreater(conf, 1.0)
+
+    def test_guess_i_clear(self):
+        measured = [300, 2500, 3200]  # canonical /i/
+        guess, conf, second = robust_guess(measured, VOWEL_MAP)
+        print("Guess /i/:", guess, "Conf:", conf)
+        self.assertEqual(guess, "/i/")
+        self.assertGreater(conf, 1.0)
+
+    def test_guess_missing_F3(self):
+        measured = [700, 1300, None]  # missing F3
+        guess, conf, second = robust_guess(measured, VOWEL_MAP)
+        print("Guess missing F3:", guess, "Conf:", conf)
+        self.assertEqual(guess, "/a/")
+        self.assertGreater(conf, 0.5)
+
+    def test_guess_uncertain(self):
+        measured = [900, 2900, 3300]  # high F2/F3, ambiguous
+        guess, conf, second = robust_guess(measured, VOWEL_MAP)
+        print("Guess uncertain:", guess, "Conf:", conf)
+        self.assertTrue(guess is None or conf < 1.2)
+
+    def test_guess_tie(self):
+        measured = [500, 1500, 2500]  # near /e/ and /ʌ/
+        guess, conf, second = robust_guess(measured, VOWEL_MAP)
+        print("Guess tie:", guess, "Second:", second, "Conf:", conf)
+        self.assertNotEqual(guess, second)
+        self.assertGreater(conf, 0.5)
 
 
 if __name__ == "__main__":

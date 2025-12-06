@@ -1,8 +1,18 @@
 # vowel_data.py
 # Central repository for vowel formant targets, maps, and voice types
 
-# Average formant frequencies for tenor and soprano voices
+# Average formant frequencies for different voice types
 FORMANTS = {
+    'bass': {
+        'i': (250, 2200, 2800, 3200),
+        'e': (500, 1900, 2700, 3100),
+        'a': (700, 1100, 2500, 2900),
+        'o': (500, 900, 2400, 2800),
+        'u': (300, 800, 2300, 2700),
+        'æ': (600, 1700, 2600, 3000),
+        'ʌ': (600, 1200, 2400, 2800),
+        'ɔ': (450, 700, 2300, 2700),
+    },
     'tenor': {
         'i': (320, 2290, 3000, 3500),
         'e': (580, 2000, 3000, 3300),
@@ -12,6 +22,16 @@ FORMANTS = {
         'æ': (700, 1800, 2800, 3200),
         'ʌ': (680, 1300, 2700, 3100),
         'ɔ': (540, 800, 2600, 3000),
+    },
+    'alto': {
+        'i': (350, 2400, 3200, 3600),
+        'e': (600, 2100, 3100, 3400),
+        'a': (850, 1300, 2900, 3300),
+        'o': (700, 1100, 2800, 3200),
+        'u': (380, 1000, 2700, 3100),
+        'æ': (750, 1900, 2900, 3300),
+        'ʌ': (720, 1350, 2800, 3200),
+        'ɔ': (560, 850, 2700, 3100),
     },
     'soprano': {
         'i': (400, 2700, 3500, 3800),
@@ -26,6 +46,7 @@ FORMANTS = {
 }
 
 # Simplified vowel map for guessing mode (F1, F2 only)
+# These are "neutral" averages, not voice-type specific
 VOWEL_MAP = {
     'i': (300, 2200),
     'e': (500, 2000),
@@ -40,3 +61,6 @@ VOWEL_MAP = {
 # Note names for pitch display
 NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F',
               'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+# Available voice types for UI toggle buttons
+VOICE_TYPES = list(FORMANTS.keys())
