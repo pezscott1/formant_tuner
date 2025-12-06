@@ -1,15 +1,15 @@
-
 import matplotlib
-matplotlib.use("TkAgg")
+matplotlib.use("TkAgg")  # GUI backend
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RadioButtons, Slider, Button
 from matplotlib.patches import Ellipse
+import matplotlib.animation as animation
+
 import sounddevice as sd
 from scipy.signal import lfilter, spectrogram
-from scipy.signal.windows import hamming
 from numpy.linalg import lstsq
-import matplotlib.animation as animation
 import queue
 
 
@@ -58,28 +58,59 @@ def play_pitch(frequency, duration=2.0, sample_rate=44100):
     sd.wait()
 
 
-def estimate_formants_lpc(signal, sample_rate=44100, lpc_order=12, fmin=200, fmax=4000):
+def estimate_formants_lpc(signal, sample_rate=44100, lpc_order=12, fmin=100, fmax=4000):
+    import numpy as np
+    from scipy.signal import lfilter
+
+    n = len(signal)
+    if n < lpc_order + 1:
+        return []
+
+    # Pre-emphasis and window
     preemph = lfilter([1, -0.97], 1, signal)
-    win = preemph * hamming(len(preemph))
-    win = win - np.mean(win)
-    r = np.correlate(win, win, mode='full')[len(win) - 1:]
-    R = np.array([r[i:i + lpc_order] for i in range(lpc_order)])
-    rhs = -r[1:lpc_order + 1]
-    a, _, _, _ = lstsq(R, rhs, rcond=None)
+    windowed = preemph * np.hamming(n)
+    windowed = windowed - np.mean(windowed)
+
+    # Normalize to unit peak to improve conditioning
+    peak = np.max(np.abs(windowed))
+    if peak > 0:
+        windowed = windowed / peak
+
+    # Autocorrelation
+    r = np.correlate(windowed, windowed, mode='full')[n-1:]
+    if len(r) < lpc_order + 1:
+        return []
+
+    # Yule–Walker Toeplitz system
+    T = np.empty((lpc_order, lpc_order), dtype=np.float64)
+    for i in range(lpc_order):
+        for j in range(lpc_order):
+            T[i, j] = r[abs(i - j)]
+    rhs = -r[1:lpc_order+1]
+
+    # Regularize and solve
+    eps = 1e-6
+    try:
+        a = np.linalg.solve(T + eps * np.eye(lpc_order), rhs)
+    except np.linalg.LinAlgError:
+        return []
     a = np.concatenate(([1.0], a))
+
+    # Roots and frequencies
     roots = np.roots(a)
-    roots = roots[np.imag(roots) >= 0]
-    angs = np.arctan2(np.imag(roots), np.real(roots))
-    formants = sorted(angs * (sample_rate / (2 * np.pi)))
-    formants = [f for f in formants if fmin < f < fmax]
+    roots = roots[np.imag(roots) > 0]
+    angs = np.angle(roots)
+    freqs = angs * (sample_rate / (2 * np.pi))
 
-    # Enforce minimal spacing
-    filtered = []
-    for f in formants:
-        if not filtered or min(abs(f - g) for g in filtered) > 150:
-            filtered.append(f)
-    return filtered[:3]
+    # Filter by pole magnitude and frequency range
+    formants = [f for r, f in zip(roots, freqs) if np.abs(r) > 0.01 and fmin <= f <= fmax]
 
+    print("All root freqs:", np.round(freqs, 2))
+    print("Filtered formants:", np.round(formants, 2))
+
+    # Return the lowest three
+    return sorted(formants)[:3]
+     
 
 def align_formants_to_targets(measured, target):
     measured = list(measured or [])  # tolerate None -> []
@@ -154,19 +185,25 @@ class MicAnalyzer:
         mono = indata[:, 0]
         if np.max(np.abs(mono)) < 2e-3:
             return
+
         try:
             self.buffer.extend(mono.tolist())
-            measured = estimate_formants_lpc(mono, sample_rate=self.sample_rate)  # always list (possibly empty)
+
+            # Downsample the frame for better conditioning (optional but recommended)
+            ds = 2  # try 2 or 3
+            mono_ds = mono[::ds]
+            sr_ds = self.sample_rate // ds
+
+            measured = estimate_formants_lpc(mono_ds, sample_rate=sr_ds, lpc_order=12, fmin=100, fmax=4000)
+
             F1, F2, F3, FS = self.get_vowel()
             target = (F1, F2, F3)
             tol = self.get_tol()
             pitch = self.get_pitch()
 
-            # If no formants detected in this frame, still push a safe payload
             vowel_score, resonance_score, overall = overall_rating(measured, target, pitch, tol)
             results_queue.put((measured, vowel_score, resonance_score, overall))
         except Exception as e:
-            # Optional: log minimal info; never crash the audio thread
             print(f"Audio callback error: {e}")
             return
 
@@ -191,7 +228,13 @@ class MicAnalyzer:
 def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=False):
     vowels = FORMANTS[voice_type]
     fig, (ax_chart, ax_spec) = plt.subplots(1, 2, figsize=(12, 6))
-
+    mic = MicAnalyzer(
+    sample_rate=44100,
+    frame_ms=500,
+    vowel_provider=lambda: current_vowel_name,
+    tol_provider=lambda: tol_slider.val,
+    pitch_provider=lambda: pitch_slider.val
+    )
     # --- Vowel chart ---
     points = {}
     for v, (F1, F2, F3, FS) in vowels.items():
@@ -301,25 +344,41 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
 
         fig.canvas.draw_idle()
 
-    # --- Live UI updater ---
     def update_live_ui(measured_formants, vowel_score, resonance_score, overall_score):
+        # Clear previous measured lines
         for line in getattr(ax_spec, "_measured_lines", []):
-            try:
-                line.remove()
-            except Exception:
-                pass
+            try: line.remove()
+            except Exception: pass
         ax_spec._measured_lines = []
-        for f in measured_formants:
-            ax_spec._measured_lines.append(ax_spec.axvline(f, color='red', linestyle='-', alpha=0.7))
 
-        aligned = align_formants_to_targets(measured_formants, current_target_formants())
+        # Plot measured formants in red
+        for f in measured_formants:
+            ax_spec._measured_lines.append(
+                ax_spec.axvline(f, color='red', linestyle='-', alpha=0.7)
+            )
+
+        # Plot target formants in blue dashed lines
+        target_formants = current_target_formants()
+        for f in target_formants:
+            ax_spec._measured_lines.append(
+                ax_spec.axvline(f, color='blue', linestyle='--', alpha=0.4)
+            )
+
+        # Align measured to target
+        aligned = align_formants_to_targets(measured_formants, target_formants)
         mf_disp = [f"{int(x)}" if x is not None else "?" for x in aligned]
 
+        # Update overlay text
         live_text.set_text(
-            f"Measured: F1={mf_disp[0]}, F2={mf_disp[1]}, F3={mf_disp[2]} | \n"
-            f"Vowel={vowel_score}, Resonance={resonance_score}, Overall={overall_score}"
+            f"Measured: F1={mf_disp[0]}, F2={mf_disp[1]}, F3={mf_disp[2]} |\n"
+            f"Vowel=/{current_vowel_name}/, Score={vowel_score}, Resonance={resonance_score}, Overall={overall_score}"
         )
-        live_text.set_color("green" if overall_score >= 80 else "orange" if overall_score >= 50 else "red")
+        live_text.set_color(
+            "green" if overall_score >= 80 else
+            "orange" if overall_score >= 50 else
+            "red"
+        )
+
         fig.canvas.draw_idle()
 
     def update_voice(label):
@@ -414,7 +473,9 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
     mic = MicAnalyzer(
         vowel_provider=lambda: current_formants,
         tol_provider=lambda: tol_slider.val,
-        pitch_provider=lambda: pitch_slider.val
+        pitch_provider=lambda: pitch_slider.val,
+        sample_rate=44100,
+        frame_ms=80  # was 500
     )
 
     def show_spectrogram(event=None):
@@ -462,21 +523,27 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
 
     # Animation loop: consume results from queue in main thread
     def poll_queue(_frame):
-        while not results_queue.empty():
-            measured, vowel_score, resonance_score, overall = results_queue.get()
+        updated = False
+        while True:
+            try:
+                measured, vowel_score, resonance_score, overall = results_queue.get_nowait()
+            except queue.Empty:
+                break
             update_live_ui(measured, vowel_score, resonance_score, overall)
+            updated = True
+        if updated:
+            fig.canvas.draw_idle()
+
     # --- Diagnostics: run quick checks and optionally LPC debug ---
     def run_diagnostics(lpc_debug=False):
-        # uses outer-scope names: mic, live_text, ax_spec, pitch_slider
         nonlocal mic, live_text
 
-        # guard: ensure we have audio
         if mic is None:
             msg = "Diagnostics: mic not instantiated."
             live_text.set_text(msg)
             live_text.set_color("orange")
             fig.canvas.draw_idle()
-            return
+            return msg
 
         sig = np.array(mic.buffer)
         if sig.size == 0:
@@ -484,64 +551,59 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
             live_text.set_text(msg)
             live_text.set_color("orange")
             fig.canvas.draw_idle()
-            return
+            return msg
 
         sr = mic.sample_rate
         duration = sig.size / sr
         sig_min, sig_max = float(sig.min()), float(sig.max())
 
-        # spectrogram dominant frequency (quick)
+        # Spectrogram summary (compute once)
+        spect_err = None
         try:
             f, t, Sxx = spectrogram(sig, fs=sr, nperseg=1024, noverlap=512)
             idx = np.argmax(Sxx, axis=0)
             dominant_freqs = f[idx]
-            dom_median = float(np.median(dominant_freqs))
+            dom_median = float(np.median(dominant_freqs)) if dominant_freqs.size else 0.0
             dom_first = float(dominant_freqs[0]) if dominant_freqs.size else 0.0
         except Exception as e:
+            spect_err = str(e)
             dom_median = None
             dom_first = None
-            spect_err = str(e)
-        else:
-            spect_err = None
 
-        # LPC quick test on a steady slice (100-500 ms)
+        # LPC on a short steady slice
+        mid = len(sig) // 2
+        frame_len = int(0.04 * sr)
+        offsets = [0, frame_len//2, frame_len]
+        allf = []
+        for off in offsets:
+            frame = sig[mid+off:mid+off+frame_len]
+            # Optional decimation
+            ds = 2
+            frame_ds = frame[::ds]
+            sr_ds = sr // ds
+            f = estimate_formants_lpc(frame_ds, sample_rate=sr_ds, lpc_order=12, fmin=100, fmax=4000)
+            allf.extend(f)
+        formants = sorted([f for f in allf if 100 <= f <= 4000])[:3]
+
+
+        # Optional deeper LPC debug on a longer slice
         lpc_result = None
         lpc_err = None
         if lpc_debug:
             try:
                 start, end = int(0.1 * sr), int(0.5 * sr)
-                frame = sig[start:end] if sig.size >= end else sig
-
-                # use a safer LPC variant: regularized solve + magnitude filter
-                def estimate_formants_safe(signal, sample_rate=sr, lpc_order=12, fmin=50, fmax=5000):
-                    preemph = lfilter([1, -0.97], 1, signal)
-                    win = preemph * hamming(len(preemph))
-                    win = win - np.mean(win)
-                    r = np.correlate(win, win, mode='full')[len(win) - 1:]
-                    R = np.array([r[i:i + lpc_order] for i in range(lpc_order)])
-                    rhs = -r[1:lpc_order + 1]
-                    eps = 1e-6 * np.eye(R.shape[0])
-                    a, _, _, _ = lstsq(R + eps, rhs, rcond=None)
-                    a = np.concatenate(([1.0], a))
-                    roots = np.roots(a)
-                    roots = roots[np.imag(roots) > 0]
-                    angs = np.angle(roots)
-                    formants = angs * (sample_rate / (2 * np.pi))
-                    # magnitude filter and f-range clamp
-                    formants = [f for r, f in zip(roots, formants) if np.abs(r) > 0.01 and fmin < f < fmax]
-                    return sorted(formants)
-
-                lpc_result = estimate_formants_safe(frame, sample_rate=sr, lpc_order=12)
+                frame2 = sig[start:end] if sig.size >= end else sig
+                lpc_result = estimate_formants_lpc(frame2, sample_rate=sr, lpc_order=12)
             except Exception as e:
                 lpc_err = str(e)
 
-        # Build a compact multi-line diagnostic message
+        # Build diagnostic message
         lines = []
-        lines.append(f"SR={sr}  len={sig.size}  dur={duration:.2f}s  min={sig_min:.3g} max={sig_max:.3g}")
+        lines.append(f"SR={sr} len={sig.size} dur={duration:.2f}s min={sig_min:.3g} max={sig_max:.3g}")
         if spect_err:
             lines.append(f"Spectrogram: ERROR: {spect_err}")
         else:
-            lines.append(f"Spectrogram dominant median={dom_median:.1f} Hz  first={dom_first:.1f} Hz")
+            lines.append(f"Spectrogram median={dom_median:.1f} Hz first={dom_first:.1f} Hz")
         if lpc_debug:
             if lpc_err:
                 lines.append(f"LPC: ERROR: {lpc_err}")
@@ -552,34 +614,23 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
                 else:
                     lines.append("LPC formants: none detected")
         else:
-            lines.append("LPC debug: off (click Diagnostics ▶ to enable)")
+            lines.append("LPC debug: off")
 
-        # Update the live_text overlay (wrap to two lines if long)
         diag_text = " | ".join(lines)
-        # If too long, break into two lines for readability
         if len(diag_text) > 120:
-            # split roughly in half at a separator
             half = len(diag_text) // 2
             sep = diag_text.rfind(" | ", 0, half)
             if sep == -1:
                 sep = diag_text.find(" | ", half)
             if sep != -1:
                 diag_text = diag_text[:sep] + "\n" + diag_text[sep + 3:]
+
+        # Update overlay; do not overwrite measured text logic here
         live_text.set_text(diag_text)
-        live_text.set_color("green" if (lpc_result and len(lpc_result) >= 2) else "orange")
+        live_text.set_color("green" if (formants and len(formants) >= 2) else "orange")
         fig.canvas.draw_idle()
 
-        # default: run quick checks without heavy LPC debug; hold Shift-click to enable LPC debug
-        def _diag_click(event):
-            # If user wants LPC debug, call with lpc_debug=True; here we always run quick checks.
-            run_diagnostics(lpc_debug=False)
-
-        btn_diag.on_clicked(_diag_click)
-
-        live_text.set_text(diag_text)
-        live_text.set_color("green" if (lpc_result and len(lpc_result) >= 2) else "orange")
-        fig.canvas.draw_idle()
-        return diag_text  # <-- return for tests
+        return diag_text
 
     ax_btn_diag = plt.axes([control_left, 0.27, control_width, control_height])
     btn_diag = Button(ax_btn_diag, 'Diagnostics ▶')
@@ -603,7 +654,5 @@ def interactive_vowel_chart(initial_pitch=261.63, voice_type='tenor', headless=F
 
 
 
-if __name__ == "__main__":
-    interactive_vowel_chart(261.63, 'tenor')
-
-
+if __name__ == "__main__" or True:
+    interactive_vowel_chart()
