@@ -1,0 +1,204 @@
+import unittest
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")  # headless backend
+import matplotlib.pyplot as plt
+import collections
+from formant_utils import (
+    simple_estimate_formants_lpc,
+    estimate_pitch,
+    overall_rating,
+    directional_feedback,
+    live_score_formants,
+    resonance_tuning_score, 
+    robust_guess
+    )
+
+from voice_analysis import Analyzer, MedianSmoother
+from vowel_data import FORMANTS
+
+# --- helpers for StableTracker ---
+def enforce_order(f1, f2):
+    if f1 is None or f2 is None:
+        return f1, f2
+    if f1 > f2:
+        return f2, f1
+    return f1, f2
+
+def valid_f0(f0):
+    return f0 is not None and 50 <= f0 <= 500
+
+def valid_f1(f1):
+    return f1 is not None and 150 <= f1 <= 900
+
+def valid_f2(f2):
+    return f2 is not None and 200 <= f2 <= 2500
+
+
+class StableTracker:
+    def __init__(self, window=5):
+        self.f0_buf = collections.deque(maxlen=window)
+        self.f1_buf = collections.deque(maxlen=window)
+        self.f2_buf = collections.deque(maxlen=window)
+
+    def update(self, status_dict):
+        f0 = status_dict.get("f0")
+        f1, f2, _ = status_dict.get("formants", (None, None, None))
+
+        if not valid_f0(f0):
+            f0 = None
+        if not valid_f1(f1):
+            f1 = None
+        if not valid_f2(f2):
+            f2 = None
+
+        f1, f2 = enforce_order(f1, f2)
+
+        if f0 is not None: self.f0_buf.append(f0)
+        if f1 is not None: self.f1_buf.append(f1)
+        if f2 is not None: self.f2_buf.append(f2)
+
+        f0_med = np.median(self.f0_buf) if self.f0_buf else None
+        f1_med = np.median(self.f1_buf) if self.f1_buf else None
+        f2_med = np.median(self.f2_buf) if self.f2_buf else None
+        return {"f0": f0_med, "formants": (f1_med, f2_med)}
+
+
+# --- Unit tests ---
+class TestMic(unittest.TestCase):
+    def test_record_and_estimate(self):
+        sr = 44100
+        duration = 0.5
+        t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+        sig = np.sin(2*np.pi*500*t).astype(np.float32)
+        formants = simple_estimate_formants_lpc(sig, sample_rate=sr)
+        print("Measured formants (synthetic):", formants)
+        self.assertTrue(isinstance(formants, list))
+
+
+class TestVowelGuessing(unittest.TestCase):
+    def test_guess_a_clear(self):
+        measured = [800, 1200, 2500]
+        guess, conf, second = robust_guess(measured, voice_type="bass")
+        print("Guess /a/:", guess, "Conf:", conf)
+        self.assertEqual(guess, "a")
+
+    def test_guess_i_clear(self):
+        measured = [300, 2500, 3200]
+        guess, conf, second = robust_guess(measured, voice_type="bass")
+        print("Guess /i/:", guess, "Conf:", conf)
+        self.assertEqual(guess, "i")
+
+    def test_guess_missing_F3(self):
+        measured = [700, 1300, None]
+        guess, conf, second = robust_guess(measured, voice_type="bass")
+        print("Guess missing F3:", guess, "Conf:", conf)
+        self.assertEqual(guess, "ʌ")
+
+    def test_guess_uncertain(self):
+        measured = [900, 2900, 3300]
+        guess, conf, second = robust_guess(measured, voice_type="bass")
+        print("Guess uncertain:", guess, "Conf:", conf)
+        self.assertTrue(guess is None or conf < 1.2)
+
+    def test_guess_tie(self):
+        measured = [500, 1500, 2500]
+        guess, conf, second = robust_guess(measured, voice_type="bass")
+        print("Guess tie:", guess, "Second:", second, "Conf:", conf)
+        self.assertNotEqual(guess, second)
+
+
+class TestMedianSmoother(unittest.TestCase):
+    def test_update_returns_median(self):
+        sm = MedianSmoother(size=3)
+        sm.update(100, 200, 300)
+        sm.update(110, 210, 310)
+        sm.update(120, 220, 320)
+        f1, f2, f3 = sm.update(130, 230, 330)
+        self.assertEqual(f1, 120.0)
+        self.assertEqual(f2, 220.0)
+        self.assertEqual(f3, 320.0)
+
+
+class TestAnalyzer(unittest.TestCase):
+    def setUp(self):
+        self.analyzer = Analyzer(voice_type="bass")
+
+    def test_process_frame_returns_dict(self):
+        dummy_audio = np.zeros(100)
+        status = self.analyzer.process_frame(dummy_audio, sr=44100, target_pitch_hz=220)
+        self.assertEqual(status["status"], "ok")
+        self.assertIn("formants", status)
+
+    def test_render_status_text_runs(self):
+        fig, ax = plt.subplots()
+        status = {"status":"ok","f0":220,"formants":(500,1500,2500),"guess":"a","conf":0.9}
+        self.analyzer.render_status_text(ax, status)
+
+    def test_render_vowel_chart_runs(self):
+        fig, ax = plt.subplots()
+        ranked = [("a", 0.1), ("e", 0.2)]
+        self.analyzer.render_vowel_chart(ax, "bass", 700, 1200, ranked)
+
+    def test_render_spectrum_runs(self):
+        fig, ax = plt.subplots()
+        freqs = np.linspace(0, 5000, 500)
+        mags = np.abs(np.sin(freqs/500))
+        self.analyzer.render_spectrum(ax, freqs, mags, (500,1500,2500))
+
+    def test_render_diagnostics_runs(self):
+        fig, ax = plt.subplots()
+        status = {"status":"ok","f0":220,"formants":(500,1500,2500),
+                  "guess":"a","conf":0.9,"next":"e","resonance":50,
+                  "overall":75,"penalty":0.0}
+        self.analyzer.render_diagnostics(ax, status, sr=44100, frame_len_samples=1024)
+
+    def test_vowel_targets_contains_bass(self):
+        self.assertIn("bass", FORMANTS)
+        self.assertIn("a", FORMANTS["bass"])
+
+
+class TestScoring(unittest.TestCase):
+    def test_live_score_formants(self):
+        target = (800, 1200, 2800)
+        measured = (810, 1190, 2790)
+        score = live_score_formants(target, measured, tolerance=50)
+        print("Live score:", score)
+        self.assertGreaterEqual(score, 80)
+
+    def test_resonance_tuning_score(self):
+        pitch = 200
+        measured = [400, 600, 800]
+        score = resonance_tuning_score(measured, pitch, tolerance=50)
+        print("Resonance score:", score)
+        self.assertEqual(score, 100)
+
+    def test_overall_rating(self):
+        target = (800, 1200, 2800)
+        measured = (810, 1190, 2790)
+        pitch = 200
+        tol = 50
+        vowel_score, resonance_score, overall = overall_rating(measured, target, pitch, tol)
+        print("Overall rating:", vowel_score, resonance_score, overall)
+        self.assertGreaterEqual(overall, 50)
+
+
+class TestStableTracker(unittest.TestCase):
+    def test_rejects_bad_values_and_returns_median(self):
+        tracker = StableTracker(window=3)
+        stream = [
+            {"status":"ok","f0":135.6,"formants":(215.3,236.8,None)},
+            {"status":"ok","f0":14700.0,"formants":(2067.1,2088.7,None)},  # rejected
+            {"status":"ok","f0":134.8,"formants":(236.8,258.3,None)},
+        ]
+        for s in stream:
+            stable = tracker.update(s)
+        print("Stable output:", stable)
+        self.assertTrue(50 <= stable["f0"] <= 500)
+        f1, f2 = stable["formants"]
+        self.assertTrue(150 <= f1 <= 900)
+        self.assertTrue(200 <= f2 <= 2500)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
