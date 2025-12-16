@@ -19,8 +19,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'   # or whatever version you use locally
-
+          python-version: '3.12'
+      - name: Install package
+        run: pip install -e .
       # Install dependencies
       - name: Install dependencies
         run: |
@@ -39,4 +40,4 @@ jobs:
       # Run tests
       - name: Run pytest
         run: |
-          pytest
+          PYTHONPATH=. pytest
