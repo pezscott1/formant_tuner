@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import json
 import traceback
 import numpy as np
 import logging
@@ -50,35 +49,46 @@ PROFILES_DIR = "profiles"
 os.makedirs(PROFILES_DIR, exist_ok=True)
 
 
-def profile_display_name(base: str) -> str:
-    return base.replace("_", " ")
+class ProfileManager:
+    def __init__(self, profiles_dir, analyzer):
+        self.profiles_dir = profiles_dir
+        self.analyzer = analyzer
+        self.active_profile_name = None
 
+    def list_profiles(self):
+        return sorted(
+            fn[:-len("_profile.json")]
+            for fn in os.listdir(self.profiles_dir)
+            if fn.endswith("_profile.json") and fn != "active_profile.json"
+        )
 
-def profile_files():
-    return sorted(
-        [
-            fn[: -len("_profile.json")]
-            for fn in os.listdir(PROFILES_DIR)
-            if fn.endswith("_profile.json")
-        ]
-    )
+    @staticmethod
+    def display_name(base):
+        return base.replace("_", " ")
 
+    @staticmethod
+    def base_from_display(display):
+        if display.startswith("➕"):
+            return None
+        return display.replace(" ", "_")
 
-def profile_base_from_display(display: str):
-    if display.startswith("➕"):
-        return None
-    return display.replace(" ", "_")
+    def delete_profile(self, base):
+        """Delete a profile JSON file by base name."""
+        path = os.path.join(self.profiles_dir, f"{base}_profile.json")
+        if os.path.exists(path):
+            os.remove(path)
+        # also remove model file if present
+        model_path = path.replace("_profile.json", "_model.pkl")
+        if os.path.exists(model_path):
+            os.remove(model_path)
 
-
-def freq_to_note_name(freq: float) -> str:
-    if not freq or freq <= 0:
-        return "N/A"
-    midi = int(round(69 + 12 * np.log2(freq / 440.0)))
-    if midi < 0 or midi >= 128:
-        return "N/A"
-    name = NOTE_NAMES[midi % 12]
-    octave = midi // 12 - 1
-    return f"{name}{octave}"
+    def apply_profile(self, base):
+        """Set the given profile as active and load it into the analyzer."""
+        self.active_profile_name = base
+        profile_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
+        model_path = profile_path.replace("_profile.json", "_model.pkl")
+        self.analyzer.load_profile(profile_path, model_path=model_path)
+        return base  # return the active profile name for UI to display
 
 
 class FormantTunerApp(QMainWindow):
@@ -131,7 +141,7 @@ class FormantTunerApp(QMainWindow):
         profile_layout = QVBoxLayout(profile_container)
         profile_layout.setContentsMargins(0, 0, 0, 0)
         profile_layout.setSpacing(6)
-
+        self.profile_manager = ProfileManager(PROFILES_DIR, analyzer)
         self.profile_list = QListWidget()
         self.profile_list.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Expanding
@@ -189,7 +199,7 @@ class FormantTunerApp(QMainWindow):
 
         left_layout.addStretch()
 
-        self.active_label = QLabel("Active: —")
+        self.active_label = QLabel("Active: None")
         self.active_label.setAlignment(Qt.AlignCenter)
         self.active_label.setFixedHeight(150)
         self.active_label.setStyleSheet(
@@ -356,6 +366,7 @@ class FormantTunerApp(QMainWindow):
         threading.Thread(target=_play, daemon=True).start()
 
     # ----------------- Profiles -----------------
+
     def refresh_profiles(self):
         self.profile_list.clear()
         new_item = QListWidgetItem("➕ New Profile")
@@ -363,77 +374,56 @@ class FormantTunerApp(QMainWindow):
         new_item.setFont(QFont("Consolas", 11, QFont.Bold))
         self.profile_list.addItem(new_item)
 
-        for base in profile_files():
-            self.profile_list.addItem(profile_display_name(base))
+        for base in self.profile_manager.list_profiles():
+            self.profile_list.addItem(self.profile_manager.display_name(base))
 
     def get_selected_profile_base(self):
         item = self.profile_list.currentItem()
         if not item:
             return None
-        return profile_base_from_display(item.text())
+        return self.profile_manager.base_from_display(item.text())
 
     def delete_profile(self):
-        base = self.get_selected_profile_base()
+        base = self.profile_manager.base_from_display(self.get_selected_profile_base())
         if not base:
-            QMessageBox.information(
-                self, "Delete", "Select a profile to delete."
-            )
+            QMessageBox.information(self, "Delete", "Select a profile to delete.")
             return
-        display = profile_display_name(base)
-        path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
+        display = self.profile_manager.display_name(base)
         ok = QMessageBox.question(
-            self,
-            "Delete",
-            f"Delete profile {display}?",
+            self, "Delete", f"Delete profile {display}?",
             QMessageBox.Yes | QMessageBox.No,
         )
         if ok == QMessageBox.Yes:
             try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception:  # noqa: E722
+                self.profile_manager.delete_profile(base)
+            except Exception:
                 traceback.print_exc()
-                QMessageBox.critical(
-                    self, "Error", "Failed to delete profile."
-                )
+                QMessageBox.critical(self, "Error", "Failed to delete profile.")
         self.refresh_profiles()
 
     def apply_selected_profile(self):
         item = self.profile_list.currentItem()
-        if not item:
-            QMessageBox.information(
-                self, "Apply", "Please select a profile to apply."
-            )
+        if not item or item.text().startswith("➕"):
+            QMessageBox.information(self, "Apply", "Please select a profile to apply.")
             return
-        if item.text().startswith("➕"):
-            QMessageBox.information(
-                self, "New Profile", "Click Calibrate to create a new profile."
-            )
-            return
-        base = profile_base_from_display(item.text())
 
-        with open(
-            os.path.join(PROFILES_DIR, "active_profile.json"),
-            "w",
-            encoding="utf-8",
-        ) as fh:
-            json.dump({"active": base}, fh)
-
-        profile_path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
-        model_path = profile_path.replace("_profile.json", "_model.pkl")
+        base = self.profile_manager.base_from_display(item.text())
         try:
-            self.analyzer.load_profile(profile_path, model_path=model_path)
-        except Exception:  # noqa: E722
+            active = self.profile_manager.apply_profile(base)
+        except Exception:
             traceback.print_exc()
+            return
 
+        # Update UI to show active profile
+        self.active_label.setText(f"Active: {self.profile_manager.display_name(active)}")
+
+        # Update analyzer state
         self.voice_type = self.analyzer.voice_type or self.voice_type
         vowels_map = FORMANTS.get(self.voice_type, FORMANTS["bass"])
-        self.current_vowel_name = (
-            "a" if "a" in vowels_map else next(iter(vowels_map))
-        )
+        self.current_vowel_name = "a" if "a" in vowels_map else next(iter(vowels_map))
         self.current_formants = vowels_map[self.current_vowel_name]
-        self.active_label.setText(f"Active: {profile_display_name(base)}")
 
+        # Refresh charts
         self.build_vowel_chart()
         self.update_spectrum(
             self.current_vowel_name,
@@ -452,18 +442,14 @@ class FormantTunerApp(QMainWindow):
                 name, voice_type = dlg.get_values()
                 if not name:
                     name = "user1"
-                self.calib_win = CalibrationWindow(
-                    self.analyzer, name, voice_type
-                )
+                self.calib_win = CalibrationWindow(self.analyzer, name, voice_type)
                 self.calib_win.show()
                 self.calib_win.destroyed.connect(self.refresh_profiles)
         else:
             base = self.get_selected_profile_base()
             if base:
                 voice_type = self.analyzer.voice_type or "bass"
-                self.calib_win = CalibrationWindow(
-                    self.analyzer, base, voice_type
-                )
+                self.calib_win = CalibrationWindow(self.analyzer, base, voice_type)
                 self.calib_win.show()
                 self.calib_win.destroyed.connect(self.refresh_profiles)
 
@@ -618,6 +604,17 @@ class FormantTunerApp(QMainWindow):
         except Exception:  # noqa: E722
             logger.exception("Error during shutdown")
         event.accept()
+
+
+def freq_to_note_name(freq: float) -> str:
+    if not freq or freq <= 0:
+        return "N/A"
+    midi = int(round(69 + 12 * np.log2(freq / 440.0)))
+    if midi < 0 or midi >= 128:
+        return "N/A"
+    name = NOTE_NAMES[midi % 12]
+    octave = midi // 12 - 1
+    return f"{name}{octave}"
 
 
 # ----------------- Bootstrap -----------------
