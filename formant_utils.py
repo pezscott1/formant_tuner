@@ -122,7 +122,7 @@ def estimate_pitch(frame, sr):
         return None
     frame = frame - np.mean(frame)
     corr = np.correlate(frame, frame, mode="full")
-    corr = corr[len(corr) // 2 :]
+    corr = corr[len(corr) // 2:]
     d = np.diff(corr)
     pos = np.where(d > 0)[0]
     if pos.size == 0:
@@ -145,10 +145,10 @@ def lpc_envelope_peaks(
     try:
         frame = lfilter([1, -0.97], 1, frame)
         frame = frame * np.hamming(len(frame))
-        R = np.correlate(frame, frame, mode="full")[len(frame) - 1 :]
+        R = np.correlate(frame, frame, mode="full")[len(frame) - 1:]
         order = min(order, max(8, len(R) - 1))
-        Rm = np.array([R[i : i + order] for i in range(order)])
-        rv = -R[order : order + order]
+        Rm = np.array([R[i: i + order] for i in range(order)])
+        rv = -R[order: order + order]
         a, *_ = lstsq(Rm, rv, rcond=None)
         a = np.concatenate(([1.0], a))
         w = np.linspace(0, np.pi, nfft // 2)
@@ -269,7 +269,7 @@ def estimate_formants_lpc(
         segment = y
     else:
         start = max(0, (y.size - win_len) // 2)
-        segment = y[start : start + win_len]
+        segment = y[start: start + win_len]
 
     segment = segment * np.hamming(len(segment))
 
@@ -465,7 +465,7 @@ def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
         win = np.hanning(n_fft)
         frames = []
         for i in range(0, max(1, len(y) - n_fft + 1), hop_length):
-            frame = y[i : i + n_fft] * win
+            frame = y[i: i + n_fft] * win
             spec = np.abs(np.fft.rfft(frame)) ** 2
             frames.append(spec)
         S = (

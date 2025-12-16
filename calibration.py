@@ -163,7 +163,8 @@ class CalibrationWindow(QMainWindow):
         self.status_panel.setReadOnly(True)
         self.status_panel.setFixedHeight(50)
         self.status_panel.setStyleSheet(
-            "color: darkblue; font-size: 11pt; font-family: Consolas; font-weight: bold;"
+            "color: darkblue; font-size: 11pt; font-family: "
+            "Consolas; font-weight: bold;"
         )
         text_row.addWidget(self.status_panel, stretch=1)
 
@@ -171,7 +172,8 @@ class CalibrationWindow(QMainWindow):
         self.capture_panel.setWordWrapMode(QTextOption.NoWrap)
         self.capture_panel.setReadOnly(True)
         self.capture_panel.setStyleSheet(
-            "color: darkgreen; font-size: 11pt; font-family: Consolas; font-weight: bold;"
+            "color: darkgreen; font-size: 11pt; font-family: "
+            "Consolas; font-weight: bold;"
         )
         layout.addLayout(text_row)
         layout.addWidget(self.capture_panel)
@@ -345,7 +347,8 @@ class CalibrationWindow(QMainWindow):
                     retries = int(self.retries_map.get(vowel, 0) or 0)
                     self.retries_map[vowel] = retries + 1
                     self.status_panel.appendPlainText(
-                        f"/{vowel}/ retry {self.retries_map[vowel]} (formants/pitch missing)"
+                        f"/{vowel}/ retry {self.retries_map[vowel]}"
+                        f" (formants/pitch missing)"
                     )
                 else:
                     self.status_panel.appendPlainText(
@@ -514,7 +517,8 @@ class CalibrationWindow(QMainWindow):
             if self.prep_secs > 0:
                 try:
                     self.status_panel.appendPlainText(
-                        f"Prepare: Sing /{self.vowels[self.current_index]}/ in {self.prep_secs}…"
+                        f"Prepare: Sing /{self.vowels[self.current_index]}/ "
+                        f"in {self.prep_secs}…"
                     )
                 except Exception:  # noqa: E722
                     pass
@@ -524,7 +528,8 @@ class CalibrationWindow(QMainWindow):
                 self.sing_secs = 2
                 try:
                     self.status_panel.appendPlainText(
-                        f"Sing /{self.vowels[self.current_index]}/ – remaining {self.sing_secs}s"
+                        f"Sing /{self.vowels[self.current_index]}"
+                        f"/ – remaining {self.sing_secs}s"
                     )
                 except Exception:  # noqa: E722
                     pass
@@ -533,7 +538,8 @@ class CalibrationWindow(QMainWindow):
             if self.sing_secs > 0:
                 try:
                     self.status_panel.appendPlainText(
-                        f"Sing /{self.vowels[self.current_index]}/ – remaining {self.sing_secs}s"
+                        f"Sing /{self.vowels[self.current_index]}"
+                        f"/ – remaining {self.sing_secs}s"
                     )
                 except Exception:  # noqa: E722
                     pass

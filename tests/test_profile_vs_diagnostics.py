@@ -127,7 +127,8 @@ class TestProfileVsDiagnostics(unittest.TestCase):
                     and abs(float(pf1) - float(cf1)) > MISMATCH_TOLERANCE_HZ
                 ):
                     mismatches.append(
-                        f"{v}: profile f1 {float(pf1):.1f} vs csv median {float(cf1):.1f}"
+                        f"{v}: profile f1 {float(pf1):.1f} "
+                        f"vs csv median {float(cf1):.1f}"
                     )
                 if (
                     cf2 is not None
@@ -135,7 +136,8 @@ class TestProfileVsDiagnostics(unittest.TestCase):
                     and abs(float(pf2) - float(cf2)) > MISMATCH_TOLERANCE_HZ
                 ):
                     mismatches.append(
-                        f"{v}: profile f2 {float(pf2):.1f} vs csv median {float(cf2):.1f}"
+                        f"{v}: profile f2 {float(pf2):.1f}"
+                        f" vs csv median {float(cf2):.1f}"
                     )
 
             self.assertFalse(mismatches, f"Mismatches vs CSV: {mismatches}")

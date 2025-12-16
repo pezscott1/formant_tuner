@@ -390,7 +390,8 @@ class Analyzer:
 
         lines = [
             f"Voice type={voice_type}",
-            f"Pitch={f0:.2f} Hz | F1={int(f1) if f1 else '—'} F2={int(f2) if f2 else '—'} F3={int(f3) if f3 else '—'}",
+            f"Pitch={f0:.2f} Hz | F1={int(f1) if f1 else '—'} "
+            f"F2={int(f2) if f2 else '—'} F3={int(f3) if f3 else '—'}",
             f"Guessed=/{vowel}/ (score={conf})",
             f"Resonance={int(resonance)} Overall={overall}",
             f"Frame: SR={sr} len={frame_len_samples} dur={dur:.2f}s",

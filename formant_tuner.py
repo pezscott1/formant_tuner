@@ -34,7 +34,7 @@ from matplotlib.backends.backend_qt5agg import (
 
 from vowel_data import FORMANTS, NOTE_NAMES
 from formant_utils import is_plausible_formants
-from mic_analyzer import MicAnalyzer, results_queue
+from mic_analyzer import MicAnalyzer
 from calibration import CalibrationWindow, ProfileDialog
 from voice_analysis import MedianSmoother, PitchSmoother, Analyzer
 import sounddevice as sd
@@ -137,7 +137,8 @@ class FormantTunerApp(QMainWindow):
             QSizePolicy.Expanding, QSizePolicy.Expanding
         )
         self.profile_list.setStyleSheet(
-            "QListWidget { font-size: 11pt; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }"
+            "QListWidget { font-size: 11pt; padding: 4px; border: 1px"
+            " solid #ccc; border-radius: 4px; }"
         )
         profile_layout.addWidget(self.profile_list)
 
@@ -168,7 +169,8 @@ class FormantTunerApp(QMainWindow):
         ):
             b.setFixedHeight(75)
             b.setStyleSheet(
-                f"QPushButton {{ background-color: {color}; color: white; font-size: 12pt; "
+                f"QPushButton {{ background-color: {color}; "
+                f"color: white; font-size: 12pt; "
                 "font-weight: bold; border-radius: 6px; padding: 6px; }}"
             )
             mic_layout.addWidget(b)
@@ -176,8 +178,10 @@ class FormantTunerApp(QMainWindow):
         left_layout.addWidget(mic_container)
 
         hint_label = QLabel(
-            "Tip: To create a new profile, click Calibrate with New Profile highlighted.\n"
-            "To update an existing profile, highlight it first, then click Calibrate."
+            "Tip: To create a new profile, click "
+            "Calibrate with New Profile highlighted.\n"
+            "To update an existing profile, "
+            "highlight it first, then click Calibrate."
         )
         hint_label.setAlignment(Qt.AlignCenter)
         hint_label.setStyleSheet("font-size: 9pt; color: gray;")
@@ -245,19 +249,20 @@ class FormantTunerApp(QMainWindow):
             frame_ms=40,
             analyzer=self.analyzer,
         )
-
+        self.results_queue = self.mic.results_queue
         if hasattr(self.mic, "sample_rate") and self.mic.sample_rate != 44100:
             logger.warning(
-                "MicAnalyzer sample_rate differs from UI default: %s",
+                "MicAnalyzer sample_rate "
+                "differs from UI default: %s",
                 self.mic.sample_rate,
             )
 
         # Signals
-        self.pitch_slider.valueChanged.connect(
+        self.pitch_slider.valueChanged.connect(  # type:ignore
             self.on_pitch_change
-        )  # type:ignore
+        )
         self.tol_slider.valueChanged.connect(self.on_tol_change)  # type:ignore
-        self.play_btn.clicked.connect(
+        self.play_btn.clicked.connect(  # type:ignore
             partial(self.play_pitch, self.pitch_slider.value())
         )  # type:ignore
         self.spec_btn.toggled.connect(self.toggle_spectrogram)  # type:ignore
@@ -565,8 +570,8 @@ class FormantTunerApp(QMainWindow):
             self.pitch_smoother = PitchSmoother(size=5)
 
         updated = False
-        while not results_queue.empty():
-            raw = results_queue.get_nowait()
+        while not self.results_queue.empty():
+            raw = self.results_queue.get_nowait()
 
             f0 = float(raw.get("f0") or self.pitch_slider.value())
             f0 = self.pitch_smoother.update(f0)
@@ -594,7 +599,8 @@ class FormantTunerApp(QMainWindow):
 
             fb1, fb2 = raw.get("fb_f1"), raw.get("fb_f2")
             self.ax_chart.set_title(
-                f"Guess=/{raw.get('vowel_guess')}/ conf={raw.get('vowel_confidence'):.2f}\n"
+                f"Guess=/{raw.get('vowel_guess')}/"
+                f" conf={raw.get('vowel_confidence'):.2f}\n"
                 f"Feedback: {fb1 or ''} {fb2 or ''}"
             )
 

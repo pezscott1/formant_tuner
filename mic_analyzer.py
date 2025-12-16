@@ -74,7 +74,8 @@ class MicAnalyzer:
         else:
             self.results_queue = queue.Queue(maxsize=200)
 
-        # Per-instance raw audio queue for consumers that need raw segments (e.g., calibration)
+        # Per-instance raw audio queue for consumers
+        # that need raw segments (e.g., calibration)
         self.raw_queue: queue.Queue = queue.Queue(maxsize=200)
 
         # running flag for diagnostics
@@ -133,7 +134,8 @@ class MicAnalyzer:
 
                 self.processing_queue.put_nowait(segment)
 
-                # less noisy: use logger.debug so you can enable/disable via logging level
+                # less noisy: use logger.debug so
+                # you can enable/disable via logging level
                 try:
                     q = getattr(self, "results_queue", None) or globals().get(
                         "results_queue", None
