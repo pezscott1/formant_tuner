@@ -7,9 +7,21 @@ import logging
 import threading
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QListWidget, QSlider, QSplitter, QFrame,
-    QMessageBox, QDialog, QSizePolicy, QListWidgetItem
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QListWidget,
+    QSlider,
+    QSplitter,
+    QFrame,
+    QMessageBox,
+    QDialog,
+    QSizePolicy,
+    QListWidgetItem,
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
@@ -24,10 +36,13 @@ from mic_analyzer import MicAnalyzer, results_queue
 from calibration import CalibrationWindow, ProfileDialog
 from voice_analysis import MedianSmoother, PitchSmoother, Analyzer
 import sounddevice as sd
+
 matplotlib.use("Qt5Agg")
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
+    )
 
 PROFILES_DIR = "profiles"
 os.makedirs(PROFILES_DIR, exist_ok=True)
@@ -39,7 +54,11 @@ def profile_display_name(base: str) -> str:
 
 def profile_files():
     return sorted(
-        [fn[:-len("_profile.json")] for fn in os.listdir(PROFILES_DIR) if fn.endswith("_profile.json")]
+        [
+            fn[: -len("_profile.json")]
+            for fn in os.listdir(PROFILES_DIR)
+            if fn.endswith("_profile.json")
+        ]
     )
 
 
@@ -72,7 +91,9 @@ class FormantTunerApp(QMainWindow):
         # Defaults
         self.voice_type = analyzer.voice_type or "bass"
         self.current_vowel_name = (
-            "a" if "a" in FORMANTS[self.voice_type] else list(FORMANTS[self.voice_type].keys())[0]
+            "a"
+            if "a" in FORMANTS[self.voice_type]
+            else list(FORMANTS[self.voice_type].keys())[0]
         )
         self.current_formants = FORMANTS[self.voice_type][self.current_vowel_name]
         self.last_measured = (np.nan, np.nan, np.nan)
@@ -157,7 +178,9 @@ class FormantTunerApp(QMainWindow):
         self.active_label = QLabel("Active: —")
         self.active_label.setAlignment(Qt.AlignCenter)
         self.active_label.setFixedHeight(150)
-        self.active_label.setStyleSheet("font-weight: bold; font-size: 11pt; color: darkblue;")
+        self.active_label.setStyleSheet(
+            "font-weight: bold; font-size: 11pt; color: darkblue;"
+        )
         left_layout.addWidget(self.active_label)
 
         main_layout.addWidget(left_frame)
@@ -195,7 +218,9 @@ class FormantTunerApp(QMainWindow):
         plot_frame = QFrame()
         plot_layout = QVBoxLayout(plot_frame)
 
-        self.fig, (self.ax_chart, self.ax_spec) = plt.subplots(1, 2, figsize=(8, 4), constrained_layout=True)
+        self.fig, (self.ax_chart, self.ax_spec) = plt.subplots(
+            1, 2, figsize=(8, 4), constrained_layout=True
+        )
         self.canvas = FigureCanvas(self.fig)
         plot_layout.addWidget(self.canvas)
 
@@ -212,12 +237,17 @@ class FormantTunerApp(QMainWindow):
         )
 
         if hasattr(self.mic, "sample_rate") and self.mic.sample_rate != 44100:
-            logger.warning("MicAnalyzer sample_rate differs from UI default: %s", self.mic.sample_rate)
+            logger.warning(
+                "MicAnalyzer sample_rate differs from UI default: %s",
+                self.mic.sample_rate,
+            )
 
         # Signals
         self.pitch_slider.valueChanged.connect(self.on_pitch_change)  # type:ignore
         self.tol_slider.valueChanged.connect(self.on_tol_change)  # type:ignore
-        self.play_btn.clicked.connect(partial(self.play_pitch, self.pitch_slider.value()))  # type:ignore
+        self.play_btn.clicked.connect(
+            partial(self.play_pitch, self.pitch_slider.value())
+        )  # type:ignore
         self.spec_btn.toggled.connect(self.toggle_spectrogram)  # type:ignore
         self.start_btn.clicked.connect(self.mic.start)  # type:ignore
         self.stop_btn.clicked.connect(self.mic.stop)  # type:ignore
@@ -331,7 +361,10 @@ class FormantTunerApp(QMainWindow):
         display = profile_display_name(base)
         path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
         ok = QMessageBox.question(
-            self, "Delete", f"Delete profile {display}?", QMessageBox.Yes | QMessageBox.No
+            self,
+            "Delete",
+            f"Delete profile {display}?",
+            QMessageBox.Yes | QMessageBox.No,
         )
         if ok == QMessageBox.Yes:
             try:
@@ -348,11 +381,15 @@ class FormantTunerApp(QMainWindow):
             QMessageBox.information(self, "Apply", "Please select a profile to apply.")
             return
         if item.text().startswith("➕"):
-            QMessageBox.information(self, "New Profile", "Click Calibrate to create a new profile.")
+            QMessageBox.information(
+                self, "New Profile", "Click Calibrate to create a new profile."
+            )
             return
         base = profile_base_from_display(item.text())
 
-        with open(os.path.join(PROFILES_DIR, "active_profile.json"), "w", encoding="utf-8") as fh:
+        with open(
+            os.path.join(PROFILES_DIR, "active_profile.json"), "w", encoding="utf-8"
+        ) as fh:
             json.dump({"active": base}, fh)
 
         profile_path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
@@ -412,7 +449,9 @@ class FormantTunerApp(QMainWindow):
         self.ax_chart.invert_yaxis()
 
     # ----------------- Spectrum -----------------
-    def update_spectrum(self, vowel, target_formants, measured_formants, pitch, tolerance):
+    def update_spectrum(
+        self, vowel, target_formants, measured_formants, pitch, tolerance
+    ):
         self.ax_spec.clear()
 
         # Harmonic series up to 4000 Hz
@@ -452,7 +491,9 @@ class FormantTunerApp(QMainWindow):
         note = freq_to_note_name(pitch)
         self.ax_spec.set_xlim(0, 4000)
         self.ax_spec.set_ylim(0, max(amps) + 1)
-        self.ax_spec.set_title(f"Spectrum /{vowel}/ ({self.voice_type}, {note} {pitch:.2f} Hz)")
+        self.ax_spec.set_title(
+            f"Spectrum /{vowel}/ ({self.voice_type}, {note} {pitch:.2f} Hz)"
+        )
         self.ax_spec.set_xlabel("Frequency (Hz)")
         self.ax_spec.set_ylabel("Amplitude (a.u.)")
 

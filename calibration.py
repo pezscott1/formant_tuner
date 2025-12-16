@@ -14,8 +14,17 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QApplication,
-    QDialog, QLineEdit, QComboBox, QPushButton, QPlainTextEdit, QMessageBox,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QApplication,
+    QDialog,
+    QLineEdit,
+    QComboBox,
+    QPushButton,
+    QPlainTextEdit,
+    QMessageBox,
 )
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtGui import QTextOption
@@ -113,7 +122,11 @@ class CalibrationWindow(QMainWindow):
         self._vowel_scatters = {}
         self._spec_mesh = None
         self._vowel_colors = {
-            "i": "red", "e": "blue", "a": "green", "o": "purple", "u": "orange",
+            "i": "red",
+            "e": "blue",
+            "a": "green",
+            "o": "purple",
+            "u": "orange",
         }
         self.vowels = ["i", "e", "a", "o", "u"]
         self.retries_map = {v: 0 for v in self.vowels}
@@ -217,7 +230,9 @@ class CalibrationWindow(QMainWindow):
         self.phase = phase
         self.phase_deadline = monotonic() + seconds
         if self.timer is not None:
-            self.timer.setInterval(1000 if phase in ("prep", "sing", "capture") else 250)
+            self.timer.setInterval(
+                1000 if phase in ("prep", "sing", "capture") else 250
+            )
 
     def submit_compute(self, segment):
         sr = getattr(self.mic, "sample_rate", 44100)
@@ -281,10 +296,10 @@ class CalibrationWindow(QMainWindow):
 
         try:
             ok_formants = (
-                    (f1 is not None)
-                    and (f2 is not None)
-                    and (not np.isnan(f1))
-                    and (not np.isnan(f2))
+                (f1 is not None)
+                and (f2 is not None)
+                and (not np.isnan(f1))
+                and (not np.isnan(f2))
             )
             ok_pitch = (f0 is not None) and (not np.isnan(f0))
             max_retries = 3
@@ -299,7 +314,7 @@ class CalibrationWindow(QMainWindow):
                 color = self._vowel_colors.get(vowel, "black")
                 html_line = (
                     f'<span style="color:{color}">/{vowel}/ '
-                    f'F1={f1:.1f} Hz, F2={f2:.1f} Hz, F0={f0 or 0:.1f} Hz</span>'
+                    f"F1={f1:.1f} Hz, F2={f2:.1f} Hz, F0={f0 or 0:.1f} Hz</span>"
                 )
                 self.capture_panel.appendHtml(html_line)
                 self.current_index += 1
@@ -360,7 +375,11 @@ class CalibrationWindow(QMainWindow):
                     times_small, freqs[mask], arr_db, shading="auto"
                 )
             except Exception:  # noqa: E722
-                mean_spec = np.mean(S_small, axis=1) if S_small.size else np.zeros_like(freqs[mask])
+                mean_spec = (
+                    np.mean(S_small, axis=1)
+                    if S_small.size
+                    else np.zeros_like(freqs[mask])
+                )
                 self.ax_spec.plot(freqs[mask], 10 * np.log10(mean_spec + 1e-12))
             self.ax_spec.set_title("Spectrogram")
             self.ax_spec.set_xlabel("Time (s)")
@@ -561,7 +580,7 @@ class CalibrationWindow(QMainWindow):
             if arrays:
                 segment = np.concatenate(arrays)
                 if len(self._pending_frames) > len(chunks):
-                    self._pending_frames = self._pending_frames[:-len(chunks)]
+                    self._pending_frames = self._pending_frames[: -len(chunks)]
                 else:
                     self._pending_frames = []
         except Exception:  # noqa: E722
@@ -569,7 +588,9 @@ class CalibrationWindow(QMainWindow):
             segment = None
 
         if segment is not None and self.phase == "capture":
-            if (not getattr(self, "_compute_in_flight", False)) and (self._submitted_index != self.current_index):
+            if (not getattr(self, "_compute_in_flight", False)) and (
+                self._submitted_index != self.current_index
+            ):
                 try:
                     self._compute_in_flight = True
                     self._submitted_index = self.current_index
@@ -593,7 +614,9 @@ class CalibrationWindow(QMainWindow):
     def process_capture(self):
         if self._pending_frames:
             try:
-                self.status_panel.appendPlainText("[process_capture] audio queued for analysis")
+                self.status_panel.appendPlainText(
+                    "[process_capture] audio queued for analysis"
+                )
             except Exception:  # noqa: E722
                 pass
             return
@@ -629,7 +652,9 @@ class CalibrationWindow(QMainWindow):
             return
 
         try:
-            self.status_panel.appendPlainText(f"/{vowel}/ waiting for audio... ({elapsed:.1f}s)")
+            self.status_panel.appendPlainText(
+                f"/{vowel}/ waiting for audio... ({elapsed:.1f}s)"
+            )
         except Exception:  # noqa: E722
             pass
 
@@ -649,7 +674,9 @@ class CalibrationWindow(QMainWindow):
 
         base = self.profile_name
         profile_path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
-        profile_dict = normalize_profile_for_save(self.results, retries_map=self.retries_map)
+        profile_dict = normalize_profile_for_save(
+            self.results, retries_map=self.retries_map
+        )
 
         try:
             with open(profile_path, "w", encoding="utf-8") as fh:
@@ -705,5 +732,7 @@ class CalibrationWindow(QMainWindow):
 # Standalone run (for testing this file directly)
 if __name__ == "__main__":
     app = QApplication([])
-    win = CalibrationWindow(analyzer=None, profile_name="user1", voice_type="tenor", mic=None)
+    win = CalibrationWindow(
+        analyzer=None, profile_name="user1", voice_type="tenor", mic=None
+    )
     sys.exit(app.exec_())

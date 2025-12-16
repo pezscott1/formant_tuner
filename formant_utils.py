@@ -26,6 +26,7 @@ FORMANT_TOLERANCE = 0.25  # ±25% tolerance around reference values
 # Plausibility helpers
 # -------------------------
 
+
 def get_vowel_ranges(voice_type, vowel):
     """Return plausible F1/F2 ranges for a given voice type and vowel."""
     vt = voice_type.lower()
@@ -91,10 +92,7 @@ def guess_vowel(f1, f2, voice_type="bass", last_guess=None):
 # Pitch estimator
 # -------------------------
 def _extract_peak_data(
-    env: np.ndarray,
-    freqs: np.ndarray,
-    mask: np.ndarray,
-    peak_thresh: float
+    env: np.ndarray, freqs: np.ndarray, mask: np.ndarray, peak_thresh: float
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Shared helper to extract peak frequencies and heights."""
     peaks, _ = find_peaks(env[mask], height=np.max(env[mask]) * peak_thresh)
@@ -118,7 +116,7 @@ def estimate_pitch(frame, sr):
         return None
     frame = frame - np.mean(frame)
     corr = np.correlate(frame, frame, mode="full")
-    corr = corr[len(corr) // 2:]
+    corr = corr[len(corr) // 2 :]
     d = np.diff(corr)
     pos = np.where(d > 0)[0]
     if pos.size == 0:
@@ -134,15 +132,17 @@ def estimate_pitch(frame, sr):
 # LPC envelope + cepstral fallbacks
 # -------------------------
 
-def lpc_envelope_peaks(frame, sr, order=14, nfft=8192,
-                       low=50, high=4000, peak_thresh=0.02):
+
+def lpc_envelope_peaks(
+    frame, sr, order=14, nfft=8192, low=50, high=4000, peak_thresh=0.02
+):
     try:
         frame = lfilter([1, -0.97], 1, frame)
         frame = frame * np.hamming(len(frame))
-        R = np.correlate(frame, frame, mode="full")[len(frame) - 1:]
+        R = np.correlate(frame, frame, mode="full")[len(frame) - 1 :]
         order = min(order, max(8, len(R) - 1))
-        Rm = np.array([R[i:i + order] for i in range(order)])
-        rv = -R[order:order + order]
+        Rm = np.array([R[i : i + order] for i in range(order)])
+        rv = -R[order : order + order]
         a, *_ = lstsq(Rm, rv, rcond=None)
         a = np.concatenate(([1.0], a))
         w = np.linspace(0, np.pi, nfft // 2)
@@ -191,6 +191,7 @@ def smoothed_spectrum_peaks(
         logger.exception("smoothed_spectrum_peaks failed: %s", e)
         return np.array([]), np.array([])
 
+
 # -------------------------
 # Main formant estimator
 # -------------------------
@@ -217,7 +218,9 @@ def pick_formants(candidates):
 
     f2 = None
     if f1 is not None:
-        f2_candidates = [f for f in candidates if f2_range[0] <= f <= f2_range[1] and f > f1]
+        f2_candidates = [
+            f for f in candidates if f2_range[0] <= f <= f2_range[1] and f > f1
+        ]
         if f2_candidates:
             f2 = f2_candidates[0]
             mid = [f for f in f2_candidates if 700.0 <= f <= 1200.0]
@@ -233,8 +236,7 @@ def pick_formants(candidates):
     return float(f1) if f1 is not None else None, float(f2) if f2 is not None else None
 
 
-def estimate_formants_lpc(y, sr, order=None, win_len_ms=30,
-                          pre_emph=0.97, debug=False):
+def estimate_formants_lpc(y, sr, order=None, win_len_ms=30, pre_emph=0.97, debug=False):
     """
     Robust LPC-based formant estimator.
     Returns (f1, f2, f3) or (f1, f2, f3, candidates) if debug=True.
@@ -243,7 +245,7 @@ def estimate_formants_lpc(y, sr, order=None, win_len_ms=30,
     if y.size == 0:
         return (None, None, None) if not debug else (None, None, None, [])
 
-    energy = np.mean(y ** 2)
+    energy = np.mean(y**2)
     if energy < 1e-6:
         if debug:
             print("[estimate_formants_lpc] low energy, skipping")
@@ -257,7 +259,7 @@ def estimate_formants_lpc(y, sr, order=None, win_len_ms=30,
         segment = y
     else:
         start = max(0, (y.size - win_len) // 2)
-        segment = y[start:start + win_len]
+        segment = y[start : start + win_len]
 
     segment = segment * np.hamming(len(segment))
 
@@ -303,6 +305,7 @@ def unpack_formants(res):
             return res[0], res[1], None
     return None, None, None
 
+
 # -------------------------
 # Core helpers
 # -------------------------
@@ -344,8 +347,9 @@ def set_active_profile(profile_name: str):
         logger.exception("Failed to set active profile: %s", e)
 
 
-def dump_live_profile(profile_name: str, profile_dict: dict,
-                      dirpath: str = "profiles") -> dict:
+def dump_live_profile(
+    profile_name: str, profile_dict: dict, dirpath: str = "profiles"
+) -> dict:
     """
     Save a snapshot of the current profile in three places:
       - timestamped file
@@ -416,6 +420,7 @@ def normalize_profile_for_save(user_formants, retries_map=None):
 # Spectrogram and expected formants
 # -------------------------
 
+
 def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
     """Compute a safe spectrogram, returning freqs, times, and power."""
     if y is None or len(y) == 0:
@@ -444,7 +449,7 @@ def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
         win = np.hanning(n_fft)
         frames = []
         for i in range(0, max(1, len(y) - n_fft + 1), hop_length):
-            frame = y[i:i + n_fft] * win
+            frame = y[i : i + n_fft] * win
             spec = np.abs(np.fft.rfft(frame)) ** 2
             frames.append(spec)
         S = np.column_stack(frames) if frames else np.zeros((n_fft // 2 + 1, 1))
@@ -486,8 +491,8 @@ def get_expected_formants(
 # Directional feedback
 # -------------------------
 
-def directional_feedback(measured_formants, user_formants,
-                         vowel, tolerance):
+
+def directional_feedback(measured_formants, user_formants, vowel, tolerance):
     """Provide feedback on whether F1/F2 should be raised or lowered."""
     entry = user_formants.get(vowel, {})
     target_f1, target_f2 = entry.get("f1"), entry.get("f2")
@@ -509,6 +514,7 @@ def directional_feedback(measured_formants, user_formants,
 # -------------------------
 # Candidate selection and scoring
 # -------------------------
+
 
 def plausibility_score(f1, f2):
     """Score plausibility of F1/F2 separation."""
@@ -569,6 +575,7 @@ def resonance_tuning_score(formants, pitch, tolerance=50):
 # Vowel guessing
 # -------------------------
 
+
 def robust_guess(measured_formants, voice_type="bass"):
     """Guess vowel robustly from measured formants."""
     if voice_type in FORMANTS:
@@ -579,8 +586,10 @@ def robust_guess(measured_formants, voice_type="bass"):
     if len(valid) < 2:
         return None, 0.0, None
     f1, f2 = sorted(valid)[:2]
-    scores = {v: ((f1 - tf1) ** 2 + (f2 - tf2) ** 2) ** 0.5
-              for v, (tf1, tf2) in ref_map.items()}
+    scores = {
+        v: ((f1 - tf1) ** 2 + (f2 - tf2) ** 2) ** 0.5
+        for v, (tf1, tf2) in ref_map.items()
+    }
     best, second = sorted(scores.items(), key=lambda kv: kv[1])[:2]
     confidence = second[1] / (best[1] + 1e-6)
     return best[0], float(confidence), second[0]
@@ -589,6 +598,7 @@ def robust_guess(measured_formants, voice_type="bass"):
 # -------------------------
 # Smoothing helpers
 # -------------------------
+
 
 class LabelSmoother:
     """Smooth label predictions over a sliding window."""
@@ -629,6 +639,7 @@ class PitchSmoother:
 # Pitch to MIDI + piano rendering
 # -------------------------
 
+
 def hz_to_midi(f0):
     """Convert frequency in Hz to MIDI note number."""
     if f0 is None or f0 <= 0:
@@ -641,16 +652,18 @@ def render_piano(ax, midi_note, octaves=2, base_octave=3):
     ax.clear()
     white_keys = []
     for i in range(octaves * 7):
-        rect = plt.Rectangle((i, 0), 1, 1,
-                             facecolor="white", edgecolor="black", zorder=0)
+        rect = plt.Rectangle(
+            (i, 0), 1, 1, facecolor="white", edgecolor="black", zorder=0
+        )
         ax.add_patch(rect)
         white_keys.append(rect)
     black_offsets = [0.7, 1.7, 3.7, 4.7, 5.7]
     for octave in range(octaves):
         for offset in black_offsets:
             x = octave * 7 + offset
-            rect = plt.Rectangle((x, 0.5), 0.6, 0.5,
-                                 facecolor="black", edgecolor="black", zorder=1)
+            rect = plt.Rectangle(
+                (x, 0.5), 0.6, 0.5, facecolor="black", edgecolor="black", zorder=1
+            )
             ax.add_patch(rect)
     if midi_note is not None:
         key_index = midi_note % 12
@@ -658,15 +671,21 @@ def render_piano(ax, midi_note, octaves=2, base_octave=3):
         if 0 <= octave < octaves:
             white_map = {0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6}
             if key_index in white_map:
-                idx = white_map[key_index] + octave*7
+                idx = white_map[key_index] + octave * 7
                 white_keys[idx].set_facecolor("yellow")
             else:
                 black_map = {1: 0.7, 3: 1.7, 6: 3.7, 8: 4.7, 10: 5.7}
                 if key_index in black_map:
-                    x = octave*7 + black_map[key_index]
-                    rect = plt.Rectangle((x, 0.5), 0.6, 0.5,
-                                         facecolor="yellow", edgecolor="black", zorder=2)
+                    x = octave * 7 + black_map[key_index]
+                    rect = plt.Rectangle(
+                        (x, 0.5),
+                        0.6,
+                        0.5,
+                        facecolor="yellow",
+                        edgecolor="black",
+                        zorder=2,
+                    )
                     ax.add_patch(rect)
-    ax.set_xlim(0, octaves*7)
+    ax.set_xlim(0, octaves * 7)
     ax.set_ylim(0, 1)
     ax.axis("off")

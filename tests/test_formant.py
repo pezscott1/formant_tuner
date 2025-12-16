@@ -8,10 +8,12 @@ from formant_utils import (
     estimate_formants_lpc,
     live_score_formants,
     resonance_tuning_score,
-    robust_guess, unpack_formants
+    robust_guess,
+    unpack_formants,
 )
 from voice_analysis import Analyzer, MedianSmoother
 from vowel_data import FORMANTS
+
 matplotlib.use("Agg")
 
 
@@ -102,7 +104,9 @@ class TestMic(unittest.TestCase):
             if isinstance(res, (tuple, list)) and len(res) > 3:
                 candidates = res[-1]
                 if isinstance(candidates, (list, tuple)) and len(candidates) >= 2:
-                    ok = is_finite_number(candidates[0]) and is_finite_number(candidates[1])
+                    ok = is_finite_number(candidates[0]) and is_finite_number(
+                        candidates[1]
+                    )
 
         self.assertTrue(ok)
 
@@ -160,11 +164,20 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(status["status"], "ok")
         self.assertIn("formants", status)
         f1, f2, _ = status["formants"]
-        self.assertTrue((f1 is None and f2 is None) or (isinstance(f1, float) and isinstance(f2, float)))
+        self.assertTrue(
+            (f1 is None and f2 is None)
+            or (isinstance(f1, float) and isinstance(f2, float))
+        )
 
     def test_render_status_text_runs(self):
         fig, ax = plt.subplots()
-        status = {"status": "ok", "f0": 220, "formants": (500, 1500, 2500), "guess": "a", "conf": 0.9}
+        status = {
+            "status": "ok",
+            "f0": 220,
+            "formants": (500, 1500, 2500),
+            "guess": "a",
+            "conf": 0.9,
+        }
         self.analyzer.render_status_text(ax, status)
 
     def test_render_vowel_chart_runs(self):
@@ -231,7 +244,11 @@ class TestStableTracker(unittest.TestCase):
         tracker = StableTracker(window=3)
         stream = [
             {"status": "ok", "f0": 135.6, "formants": (215.3, 236.8, None)},
-            {"status": "ok", "f0": 14700.0, "formants": (2067.1, 2088.7, None)},  # rejected
+            {
+                "status": "ok",
+                "f0": 14700.0,
+                "formants": (2067.1, 2088.7, None),
+            },  # rejected
             {"status": "ok", "f0": 134.8, "formants": (236.8, 258.3, None)},
         ]
         stable = None

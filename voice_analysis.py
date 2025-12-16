@@ -71,7 +71,11 @@ class MedianSmoother:
 
     @staticmethod
     def _safe_median(values):
-        arr = [v for v in values if v is not None and not (isinstance(v, float) and np.isnan(v))]
+        arr = [
+            v
+            for v in values
+            if v is not None and not (isinstance(v, float) and np.isnan(v))
+        ]
         if not arr:
             return None
         return float(np.median(arr))
@@ -112,7 +116,7 @@ class Analyzer:
             logger.info("Loaded profile %s", profile_path)
         except Exception:  # noqa: BLE001
             logger.exception("Failed to load profile %s", profile_path)
-                
+
     def process_frame(self, audio_frame, sr, target_pitch_hz=None, debug=False):
         """
         Robust frame processing: pitch smoothing, guarded formant extraction,
@@ -129,7 +133,7 @@ class Analyzer:
             f0 = target_pitch_hz or None
 
         # Formants: only attempt if frame has energy
-        energy = float(np.mean(frame ** 2))
+        energy = float(np.mean(frame**2))
         if energy < 1e-6:
             f1 = f2 = f3 = None
         else:
@@ -190,7 +194,9 @@ class Analyzer:
             "overall": overall,
         }
 
-    def calibrate_live(self, vowels=None, sr=44100, duration=2.0, profile_name="default"):
+    def calibrate_live(
+        self, vowels=None, sr=44100, duration=2.0, profile_name="default"
+    ):
         if vowels is None:
             vowels = ["i", "e", "a", "o", "u"]
         data, labels = [], []
@@ -199,7 +205,9 @@ class Analyzer:
 
         for v in vowels:
             try:
-                recording = sd.rec(int(duration * sr), samplerate=sr, channels=1, dtype='float32')
+                recording = sd.rec(
+                    int(duration * sr), samplerate=sr, channels=1, dtype="float32"
+                )
                 sd.wait()
                 y = recording[:, 0].astype(float)
 
@@ -229,7 +237,9 @@ class Analyzer:
             except Exception:  # noqa: BLE001
                 logger.exception("Classifier training failed")
 
-        profile_dict = normalize_profile_for_save(self.user_formants, retries_map=retries_map)
+        profile_dict = normalize_profile_for_save(
+            self.user_formants, retries_map=retries_map
+        )
         dump_live_profile(profile_name, profile_dict)
         self.user_formants = profile_dict
         return True
@@ -239,16 +249,33 @@ class Analyzer:
     def render_status_text(ax, status):
         ax.clear()
         if status["status"] != "ok":
-            ax.text(0.02, 0.8, "Listening… (formants not stable)", color="orange", transform=ax.transAxes)
+            ax.text(
+                0.02,
+                0.8,
+                "Listening… (formants not stable)",
+                color="orange",
+                transform=ax.transAxes,
+            )
             ax.axis("off")
             return
         f0 = status["f0"]
         f1, f2, _ = status["formants"]
         guess = status.get("vowel")
         pitch_str = f"{f0:.2f} Hz" if f0 else "—"
-        ax.text(0.02, 0.85, f"You’re singing: Pitch={pitch_str}, Vowel=/{guess}/", 
-                color="green", transform=ax.transAxes)
-        ax.text(0.02, 0.70, f"Measured F1/F2: {int(f1)}/{int(f2)} Hz", color="gray", transform=ax.transAxes)
+        ax.text(
+            0.02,
+            0.85,
+            f"You’re singing: Pitch={pitch_str}, Vowel=/{guess}/",
+            color="green",
+            transform=ax.transAxes,
+        )
+        ax.text(
+            0.02,
+            0.70,
+            f"Measured F1/F2: {int(f1)}/{int(f2)} Hz",
+            color="gray",
+            transform=ax.transAxes,
+        )
         ax.axis("off")
 
     def set_smoothing(self, enabled: bool, size: int = 5):
@@ -256,7 +283,9 @@ class Analyzer:
         self.smoother = MedianSmoother(size=size) if enabled else None
 
     @staticmethod
-    def render_vowel_chart(ax, voice_type, measured_f1, measured_f2, ranked, show_breakdown=True):
+    def render_vowel_chart(
+        ax, voice_type, measured_f1, measured_f2, ranked, show_breakdown=True
+    ):
         ax.clear()
         VOWEL_TARGETS = {
             vt: {v: (f1, f2) for v, (f1, f2, *_rest) in vowels.items()}
@@ -265,14 +294,16 @@ class Analyzer:
         vt_map = VOWEL_TARGETS.get(voice_type, {})
         for v, (t1, t2) in vt_map.items():
             ax.scatter(t2, t1, c="blue", s=30)
-            ax.text(t2+15, t1+15, f"/{v}/", fontsize=8, color="blue")
+            ax.text(t2 + 15, t1 + 15, f"/{v}/", fontsize=8, color="blue")
         ax.scatter(measured_f2, measured_f1, c="red", s=40)
 
         if show_breakdown and ranked:
             for v, dist in ranked[:3]:
                 if v in vt_map:
                     t1, t2 = vt_map[v]
-                    ax.plot([measured_f2, t2], [measured_f1, t1], color="red", alpha=0.4)
+                    ax.plot(
+                        [measured_f2, t2], [measured_f1, t1], color="red", alpha=0.4
+                    )
 
         ax.set_xlabel("F2 (Hz)")
         ax.set_ylabel("F1 (Hz)")
@@ -300,7 +331,13 @@ class Analyzer:
     def render_diagnostics(ax, status, sr, frame_len_samples, voice_type="bass"):
         ax.clear()
         if status.get("status") != "ok":
-            ax.text(0.02, 0.9, "Diagnostics: awaiting stable frame", color="orange", transform=ax.transAxes)
+            ax.text(
+                0.02,
+                0.9,
+                "Diagnostics: awaiting stable frame",
+                color="orange",
+                transform=ax.transAxes,
+            )
             ax.axis("off")
             return
 

@@ -54,7 +54,9 @@ def check_profile(profile: dict[str, VowelRecord]) -> list[str]:
             if not (F2_RANGE[0] <= float(f2) <= F2_RANGE[1]):
                 failures.append(f"{v}: f2 out of range ({f2})")
             if (float(f2) - float(f1)) < MIN_SEP:
-                failures.append(f"{v}: f2-f1 too small ({float(f2) - float(f1):.1f} Hz)")
+                failures.append(
+                    f"{v}: f2-f1 too small ({float(f2) - float(f1):.1f} Hz)"
+                )
     return failures
 
 
@@ -67,7 +69,9 @@ def csv_medians_by_vowel(csv_path: str) -> dict[str, dict[str, float | None]]:
     with open(csv_path, newline="", encoding="utf-8") as cf:
         reader = csv.DictReader(cf)
         for row in reader:  # type: Dict[str, str]
-            m = re.search(r"_([aeiou])_", row.get("file", ""))  # now PyCharm knows row is a dict
+            m = re.search(
+                r"_([aeiou])_", row.get("file", "")
+            )  # now PyCharm knows row is a dict
             if not m:
                 continue
             v = m.group(1)
@@ -111,10 +115,22 @@ class TestProfileVsDiagnostics(unittest.TestCase):
                 cf1 = med.get(v, {}).get("f1")
                 cf2 = med.get(v, {}).get("f2")
 
-                if cf1 is not None and pf1 is not None and abs(float(pf1) - float(cf1)) > MISMATCH_TOLERANCE_HZ:
-                    mismatches.append(f"{v}: profile f1 {float(pf1):.1f} vs csv median {float(cf1):.1f}")
-                if cf2 is not None and pf2 is not None and abs(float(pf2) - float(cf2)) > MISMATCH_TOLERANCE_HZ:
-                    mismatches.append(f"{v}: profile f2 {float(pf2):.1f} vs csv median {float(cf2):.1f}")
+                if (
+                    cf1 is not None
+                    and pf1 is not None
+                    and abs(float(pf1) - float(cf1)) > MISMATCH_TOLERANCE_HZ
+                ):
+                    mismatches.append(
+                        f"{v}: profile f1 {float(pf1):.1f} vs csv median {float(cf1):.1f}"
+                    )
+                if (
+                    cf2 is not None
+                    and pf2 is not None
+                    and abs(float(pf2) - float(cf2)) > MISMATCH_TOLERANCE_HZ
+                ):
+                    mismatches.append(
+                        f"{v}: profile f2 {float(pf2):.1f} vs csv median {float(cf2):.1f}"
+                    )
 
             self.assertFalse(mismatches, f"Mismatches vs CSV: {mismatches}")
         else:

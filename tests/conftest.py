@@ -7,6 +7,7 @@ import numpy as np
 from scipy.signal import iirpeak, lfilter
 
 from voice_analysis import Analyzer
+
 # from formant_utils import unpack_formants  # unused, remove or comment out
 
 # Ensure project root is importable for pytest
@@ -57,7 +58,7 @@ def synth_vowel(formants, *args, sr=None, dur=0.4, f0=130.0, **kwargs):
 
     # richer harmonic source with controlled tilt
     for n in range(1, max_harm):
-        src += (1.0 / (n ** harmonic_exp)) * np.sin(2 * np.pi * f0 * n * t)
+        src += (1.0 / (n**harmonic_exp)) * np.sin(2 * np.pi * f0 * n * t)
 
     y = src
 

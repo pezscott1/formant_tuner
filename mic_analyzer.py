@@ -53,7 +53,9 @@ class MicAnalyzer:
 
         # Rolling buffer and processing queue
         self.buffer: deque[float] = deque(maxlen=int(self.sample_rate * 3))
-        self.processing_queue: queue.Queue = queue.Queue(maxsize=int(processing_queue_max))
+        self.processing_queue: queue.Queue = queue.Queue(
+            maxsize=int(processing_queue_max)
+        )
         self._worker_stop = threading.Event()
         self._worker: Optional[threading.Thread] = None
 
@@ -81,7 +83,9 @@ class MicAnalyzer:
     # -------------------------
     # Audio callback (fast)
     # -------------------------
-    def audio_callback(self, indata: np.ndarray, _frames: int, _time_info: Any, _status: Any) -> None:
+    def audio_callback(
+        self, indata: np.ndarray, _frames: int, _time_info: Any, _status: Any
+    ) -> None:
         """Sounddevice callback: collect audio, apply energy gate, enqueue segments."""
         try:
             # Convert to mono numpy array of floats
@@ -92,7 +96,7 @@ class MicAnalyzer:
             # cheap energy gate
             if mono.size == 0:
                 return
-            if np.mean(mono ** 2) < self.rms_gate:
+            if np.mean(mono**2) < self.rms_gate:
                 return
 
             # prepare a short segment (tail of buffer)
@@ -131,7 +135,9 @@ class MicAnalyzer:
 
                 # less noisy: use logger.debug so you can enable/disable via logging level
                 try:
-                    q = getattr(self, "results_queue", None) or globals().get("results_queue", None)
+                    q = getattr(self, "results_queue", None) or globals().get(
+                        "results_queue", None
+                    )
                     logger.debug(
                         "MicAnalyzer pushed segment len=%d proc_q=%s ui_q=%s raw_q=%s",
                         segment.size,
@@ -162,7 +168,11 @@ class MicAnalyzer:
             try:
                 # Defensive call: estimate_formants_lpc may return variable shapes
                 res = estimate_formants_lpc(
-                    segment, self.sample_rate, order=None, win_len_ms=self.lpc_win_ms, debug=self.debug
+                    segment,
+                    self.sample_rate,
+                    order=None,
+                    win_len_ms=self.lpc_win_ms,
+                    debug=self.debug,
                 )
 
                 # Normalize result into f1, f2, f0 (f0 used as f3 in some callers)
@@ -190,7 +200,9 @@ class MicAnalyzer:
                 # Build user_forms mapping
                 user_forms: Dict[str, Dict[str, float]] = {}
                 try:
-                    for v, vals in (getattr(self.analyzer, "user_formants", {}) or {}).items():
+                    for v, vals in (
+                        getattr(self.analyzer, "user_formants", {}) or {}
+                    ).items():
                         if isinstance(vals, (tuple, list)) and len(vals) >= 2:
                             user_forms[v] = {"f1": vals[0], "f2": vals[1]}
                         elif isinstance(vals, dict):
@@ -199,13 +211,19 @@ class MicAnalyzer:
                     logger.exception("Failed to build user_forms mapping")
 
                 # Directional feedback
-                current_vowel = self.vowel_provider() if callable(self.vowel_provider) else None
+                current_vowel = (
+                    self.vowel_provider() if callable(self.vowel_provider) else None
+                )
                 tolerance = self.tol_provider() if callable(self.tol_provider) else 50
-                fb_f1, fb_f2 = directional_feedback((f1_s, f2_s, f0_s), user_forms, current_vowel, tolerance)
+                fb_f1, fb_f2 = directional_feedback(
+                    (f1_s, f2_s, f0_s), user_forms, current_vowel, tolerance
+                )
 
                 # Vowel guess uses only formants
                 try:
-                    guessed, conf, second = robust_guess((f1_s, f2_s), voice_type=voice_type)
+                    guessed, conf, second = robust_guess(
+                        (f1_s, f2_s), voice_type=voice_type
+                    )
                 except Exception:  # noqa: BLE001
                     guessed, conf, second = None, 0.0, None
 
@@ -228,7 +246,9 @@ class MicAnalyzer:
 
                 try:
                     # prefer instance queue, fall back to module queue
-                    q = getattr(self, "results_queue", None) or globals().get("results_queue", None)
+                    q = getattr(self, "results_queue", None) or globals().get(
+                        "results_queue", None
+                    )
                     if q is not None:
                         q.put(status, timeout=0.1)
                 except queue.Full:
@@ -267,7 +287,9 @@ class MicAnalyzer:
                 self.stream.start()
                 self.is_running = True
                 logger.info(
-                    "MicAnalyzer audio stream started at %d Hz blocksize %d", self.sample_rate, blocksize
+                    "MicAnalyzer audio stream started at %d Hz blocksize %d",
+                    self.sample_rate,
+                    blocksize,
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("Failed to start audio stream")

@@ -24,5 +24,5 @@ def test_analyzer(analyzer_fixture, sr=16000):
 
 
 if __name__ == "__main__":
-    analyzer = Analyzer()          # create analyzer directly
+    analyzer = Analyzer()  # create analyzer directly
     test_analyzer(analyzer)

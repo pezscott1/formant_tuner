@@ -11,16 +11,16 @@ def synth_vowel(f0=120, f1=500, f2=1500, sr=16000, dur=1.0):
     Generate a synthetic vowel-like signal using source-filter model.
     f0 = pitch, f1/f2 = formant center frequencies
     """
-    t = np.arange(int(sr*dur)) / sr
+    t = np.arange(int(sr * dur)) / sr
     # Source: impulse train at f0
-    source = np.sin(2*np.pi*f0*t)
+    source = np.sin(2 * np.pi * f0 * t)
     # Formant filters: simple resonators
 
     def resonator(fc, bw=100):
-        R = np.exp(-np.pi*bw/sr)
-        theta = 2*np.pi*fc/sr
-        a = [1, -2*R*np.cos(theta), R**2]
-        b = [1-R]
+        R = np.exp(-np.pi * bw / sr)
+        theta = 2 * np.pi * fc / sr
+        a = [1, -2 * R * np.cos(theta), R**2]
+        b = [1 - R]
         return b, a
 
     b1, a1 = resonator(f1)
