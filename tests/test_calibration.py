@@ -16,7 +16,7 @@ def fake_mic():
     return mic
 
 
-def test_process_capture_accepts_and_saves(_tmp_path, _qtbot, fake_mic):
+def test_process_capture_accepts_and_saves(tmp_path, _qtbot, fake_mic):
     """Test that process_capture runs without crashing and saves results."""
     analyzer = MagicMock()
     win = CalibrationWindow(analyzer, "testuser", "tenor", mic=fake_mic)
