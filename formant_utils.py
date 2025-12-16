@@ -36,8 +36,12 @@ def get_vowel_ranges(voice_type, vowel):
     if not ref:
         return None
     f1, f2 = ref[0], ref[1]
-    f1_low, f1_high = f1 * (1 - FORMANT_TOLERANCE), f1 * (1 + FORMANT_TOLERANCE)
-    f2_low, f2_high = f2 * (1 - FORMANT_TOLERANCE), f2 * (1 + FORMANT_TOLERANCE)
+    f1_low, f1_high = f1 * (1 - FORMANT_TOLERANCE), f1 * (
+        1 + FORMANT_TOLERANCE
+    )
+    f2_low, f2_high = f2 * (1 - FORMANT_TOLERANCE), f2 * (
+        1 + FORMANT_TOLERANCE
+    )
     return f1_low, f1_high, f2_low, f2_high
 
 
@@ -104,7 +108,9 @@ def _extract_peak_data(
         return np.empty(0, dtype=np.float64), np.empty(0, dtype=np.float64)
 
     # Use list indexing (NumPy accepts list of ints)
-    peak_freqs = np.asarray(np.round(freqs[mask][idx_list], 1), dtype=np.float64)
+    peak_freqs = np.asarray(
+        np.round(freqs[mask][idx_list], 1), dtype=np.float64
+    )
     heights = np.asarray(np.round(env[mask][idx_list], 2), dtype=np.float64)
     return peak_freqs, heights
 
@@ -233,10 +239,14 @@ def pick_formants(candidates):
         elif len(plausible) == 1:
             f1, f2 = plausible[0], None
 
-    return float(f1) if f1 is not None else None, float(f2) if f2 is not None else None
+    return float(f1) if f1 is not None else None, (
+        float(f2) if f2 is not None else None
+    )
 
 
-def estimate_formants_lpc(y, sr, order=None, win_len_ms=30, pre_emph=0.97, debug=False):
+def estimate_formants_lpc(
+    y, sr, order=None, win_len_ms=30, pre_emph=0.97, debug=False
+):
     """
     Robust LPC-based formant estimator.
     Returns (f1, f2, f3) or (f1, f2, f3, candidates) if debug=True.
@@ -366,7 +376,11 @@ def dump_live_profile(
     _atomic_write_json(latest_path, profile_dict)
     _atomic_write_json(stable_path, profile_dict)
 
-    return {"timestamped": ts_path, "latest": latest_path, "stable": stable_path}
+    return {
+        "timestamped": ts_path,
+        "latest": latest_path,
+        "stable": stable_path,
+    }
 
 
 def normalize_profile_for_save(user_formants, retries_map=None):
@@ -410,7 +424,9 @@ def normalize_profile_for_save(user_formants, retries_map=None):
             "f0": None if f0 is None else float(f0),
             "retries": retries,
             "reason": reason_text,
-            "saved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "saved_at": datetime.now(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z"),
             "source": "calibration",
         }
     return out
@@ -452,7 +468,11 @@ def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
             frame = y[i : i + n_fft] * win
             spec = np.abs(np.fft.rfft(frame)) ** 2
             frames.append(spec)
-        S = np.column_stack(frames) if frames else np.zeros((n_fft // 2 + 1, 1))
+        S = (
+            np.column_stack(frames)
+            if frames
+            else np.zeros((n_fft // 2 + 1, 1))
+        )
         freqs = np.fft.rfftfreq(n_fft, 1.0 / sr)
         times = np.arange(S.shape[1]) * (hop_length / float(sr))
         return freqs, times, S
@@ -579,7 +599,9 @@ def resonance_tuning_score(formants, pitch, tolerance=50):
 def robust_guess(measured_formants, voice_type="bass"):
     """Guess vowel robustly from measured formants."""
     if voice_type in FORMANTS:
-        ref_map = {v: (f1, f2) for v, (f1, f2, *_) in FORMANTS[voice_type].items()}
+        ref_map = {
+            v: (f1, f2) for v, (f1, f2, *_) in FORMANTS[voice_type].items()
+        }
     else:
         ref_map = VOWEL_MAP
     valid = [f for f in measured_formants if f is not None and not np.isnan(f)]
@@ -662,7 +684,12 @@ def render_piano(ax, midi_note, octaves=2, base_octave=3):
         for offset in black_offsets:
             x = octave * 7 + offset
             rect = plt.Rectangle(
-                (x, 0.5), 0.6, 0.5, facecolor="black", edgecolor="black", zorder=1
+                (x, 0.5),
+                0.6,
+                0.5,
+                facecolor="black",
+                edgecolor="black",
+                zorder=1,
             )
             ax.add_patch(rect)
     if midi_note is not None:

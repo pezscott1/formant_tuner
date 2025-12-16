@@ -45,12 +45,18 @@ class FormantSmoother:
         Append only when at least one of f1/f2 is a valid numeric value.
         Return (f1_med, f2_med) where missing values are returned as None.
         """
-        valid_f1 = (f1 is not None) and not (isinstance(f1, float) and np.isnan(f1))
-        valid_f2 = (f2 is not None) and not (isinstance(f2, float) and np.isnan(f2))
+        valid_f1 = (f1 is not None) and not (
+            isinstance(f1, float) and np.isnan(f1)
+        )
+        valid_f2 = (f2 is not None) and not (
+            isinstance(f2, float) and np.isnan(f2)
+        )
 
         if valid_f1 or valid_f2:
             # store tuple with None for missing values so medians compute correctly
-            self.buffer.append((f1 if valid_f1 else None, f2 if valid_f2 else None))
+            self.buffer.append(
+                (f1 if valid_f1 else None, f2 if valid_f2 else None)
+            )
 
         if not self.buffer:
             return None, None
@@ -112,19 +118,27 @@ class Analyzer:
                     self.clf = KNeighborsClassifier(n_neighbors=1)
                     self.clf = joblib.load(model_path)
                 except Exception:  # noqa: BLE001
-                    logger.exception("Failed to load model from %s", model_path)
+                    logger.exception(
+                        "Failed to load model from %s", model_path
+                    )
             logger.info("Loaded profile %s", profile_path)
         except Exception:  # noqa: BLE001
             logger.exception("Failed to load profile %s", profile_path)
 
-    def process_frame(self, audio_frame, sr, target_pitch_hz=None, debug=False):
+    def process_frame(
+        self, audio_frame, sr, target_pitch_hz=None, debug=False
+    ):
         """
         Robust frame processing: pitch smoothing, guarded formant extraction,
         smoothing/fallback, vowel guess and scoring.
         """
         frame = np.asarray(audio_frame, dtype=float).flatten()
         if frame.size == 0:
-            return {"status": "no_data", "f0": None, "formants": (None, None, None)}
+            return {
+                "status": "no_data",
+                "f0": None,
+                "formants": (None, None, None),
+            }
 
         # Pitch
         f0 = estimate_pitch(frame, sr)
@@ -155,7 +169,10 @@ class Analyzer:
                 f1, f2 = f2, f1
 
         # Smoothing
-        if hasattr(self, "formant_smoother") and self.formant_smoother is not None:
+        if (
+            hasattr(self, "formant_smoother")
+            and self.formant_smoother is not None
+        ):
             f1, f2 = self.formant_smoother.update(f1, f2)
 
         # Last-good fallback
@@ -169,7 +186,9 @@ class Analyzer:
         # Vowel classification
         try:
             if self.clf:
-                vowel = self.clf.predict([[f1 or 0.0, f2 or 0.0, f0 or 0.0]])[0]
+                vowel = self.clf.predict([[f1 or 0.0, f2 or 0.0, f0 or 0.0]])[
+                    0
+                ]
             else:
                 vowel = guess_vowel(f1, f2, self.voice_type)
         except Exception:  # noqa: BLE001
@@ -177,12 +196,18 @@ class Analyzer:
 
         # Scoring
         target_formants = self.user_formants.get(vowel, (None, None, None))
-        vowel_score = live_score_formants(target_formants, (f1, f2, f3), tolerance=50)
-        resonance_score = resonance_tuning_score((f1, f2, f3), f0, tolerance=50)
+        vowel_score = live_score_formants(
+            target_formants, (f1, f2, f3), tolerance=50
+        )
+        resonance_score = resonance_tuning_score(
+            (f1, f2, f3), f0, tolerance=50
+        )
         overall = int(0.5 * vowel_score + 0.5 * resonance_score)
 
         if debug:
-            logger.debug("process_frame: f0=%s f1=%s f2=%s f3=%s", f0, f1, f2, f3)
+            logger.debug(
+                "process_frame: f0=%s f1=%s f2=%s f3=%s", f0, f1, f2, f3
+            )
 
         return {
             "status": "ok",
@@ -206,7 +231,10 @@ class Analyzer:
         for v in vowels:
             try:
                 recording = sd.rec(
-                    int(duration * sr), samplerate=sr, channels=1, dtype="float32"
+                    int(duration * sr),
+                    samplerate=sr,
+                    channels=1,
+                    dtype="float32",
                 )
                 sd.wait()
                 y = recording[:, 0].astype(float)
@@ -226,9 +254,13 @@ class Analyzer:
                     data.append([f1 or 0.0, f2 or 0.0, f0 or 0.0])
                     labels.append(v)
                 else:
-                    logger.info("Calibration: vowel %s rejected (%s)", v, reason)
+                    logger.info(
+                        "Calibration: vowel %s rejected (%s)", v, reason
+                    )
             except Exception:  # noqa: BLE001
-                logger.exception("Failed to record/process vowel %s; skipping it", v)
+                logger.exception(
+                    "Failed to record/process vowel %s; skipping it", v
+                )
 
         if len(data) >= 2:
             try:
@@ -302,7 +334,10 @@ class Analyzer:
                 if v in vt_map:
                     t1, t2 = vt_map[v]
                     ax.plot(
-                        [measured_f2, t2], [measured_f1, t1], color="red", alpha=0.4
+                        [measured_f2, t2],
+                        [measured_f1, t1],
+                        color="red",
+                        alpha=0.4,
                     )
 
         ax.set_xlabel("F2 (Hz)")
@@ -316,7 +351,9 @@ class Analyzer:
         ax.plot(freqs, mags, color="black", lw=1)
         has_label = False
         if envelope is not None:
-            ax.plot(freqs, envelope, color="red", lw=1, label="Filter envelope")
+            ax.plot(
+                freqs, envelope, color="red", lw=1, label="Filter envelope"
+            )
             has_label = True
         for f in formants[:3]:
             if f is None or np.isnan(f):
@@ -328,7 +365,9 @@ class Analyzer:
             ax.legend(loc="upper right")
 
     @staticmethod
-    def render_diagnostics(ax, status, sr, frame_len_samples, voice_type="bass"):
+    def render_diagnostics(
+        ax, status, sr, frame_len_samples, voice_type="bass"
+    ):
         ax.clear()
         if status.get("status") != "ok":
             ax.text(

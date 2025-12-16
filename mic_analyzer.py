@@ -141,7 +141,9 @@ class MicAnalyzer:
                     logger.debug(
                         "MicAnalyzer pushed segment len=%d proc_q=%s ui_q=%s raw_q=%s",
                         segment.size,
-                        getattr(self.processing_queue, "qsize", lambda: "n/a")(),
+                        getattr(
+                            self.processing_queue, "qsize", lambda: "n/a"
+                        )(),
                         getattr(q, "qsize", lambda: "n/a")(),
                         getattr(self.raw_queue, "qsize", lambda: "n/a")(),
                     )
@@ -212,9 +214,13 @@ class MicAnalyzer:
 
                 # Directional feedback
                 current_vowel = (
-                    self.vowel_provider() if callable(self.vowel_provider) else None
+                    self.vowel_provider()
+                    if callable(self.vowel_provider)
+                    else None
                 )
-                tolerance = self.tol_provider() if callable(self.tol_provider) else 50
+                tolerance = (
+                    self.tol_provider() if callable(self.tol_provider) else 50
+                )
                 fb_f1, fb_f2 = directional_feedback(
                     (f1_s, f2_s, f0_s), user_forms, current_vowel, tolerance
                 )
@@ -236,7 +242,9 @@ class MicAnalyzer:
                         float(f0_s) if f0_s is not None else None,
                     ),
                     "vowel_guess": guessed,
-                    "vowel_confidence": float(conf) if conf is not None else 0.0,
+                    "vowel_confidence": (
+                        float(conf) if conf is not None else 0.0
+                    ),
                     "vowel_score": 0,
                     "resonance_score": 0,
                     "overall": 0,
@@ -256,7 +264,9 @@ class MicAnalyzer:
                     pass
 
             except Exception:  # noqa: BLE001
-                logger.exception("Processing worker failed while handling a segment")
+                logger.exception(
+                    "Processing worker failed while handling a segment"
+                )
             finally:
                 try:
                     self.processing_queue.task_done()
@@ -270,13 +280,17 @@ class MicAnalyzer:
         """Start worker thread and audio stream."""
         if self._worker is None or not self._worker.is_alive():
             self._worker_stop.clear()
-            self._worker = threading.Thread(target=self._processing_worker, daemon=True)
+            self._worker = threading.Thread(
+                target=self._processing_worker, daemon=True
+            )
             self._worker.start()
             logger.info("MicAnalyzer worker started")
 
         if self.stream is None:
             try:
-                blocksize = max(64, int(self.sample_rate * self.frame_ms / 1000))
+                blocksize = max(
+                    64, int(self.sample_rate * self.frame_ms / 1000)
+                )
                 self.stream = sd.InputStream(
                     samplerate=self.sample_rate,
                     blocksize=blocksize,

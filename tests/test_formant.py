@@ -103,7 +103,10 @@ class TestMic(unittest.TestCase):
         else:
             if isinstance(res, (tuple, list)) and len(res) > 3:
                 candidates = res[-1]
-                if isinstance(candidates, (list, tuple)) and len(candidates) >= 2:
+                if (
+                    isinstance(candidates, (list, tuple))
+                    and len(candidates) >= 2
+                ):
                     ok = is_finite_number(candidates[0]) and is_finite_number(
                         candidates[1]
                     )
@@ -160,7 +163,9 @@ class TestAnalyzer(unittest.TestCase):
 
     def test_process_frame_returns_dict(self):
         dummy_audio = np.zeros(100)
-        status = self.analyzer.process_frame(dummy_audio, sr=44100, target_pitch_hz=220)
+        status = self.analyzer.process_frame(
+            dummy_audio, sr=44100, target_pitch_hz=220
+        )
         self.assertEqual(status["status"], "ok")
         self.assertIn("formants", status)
         f1, f2, _ = status["formants"]
@@ -204,7 +209,9 @@ class TestAnalyzer(unittest.TestCase):
             "overall": 75,
             "penalty": 0.0,
         }
-        self.analyzer.render_diagnostics(ax, status, sr=44100, frame_len_samples=1024)
+        self.analyzer.render_diagnostics(
+            ax, status, sr=44100, frame_len_samples=1024
+        )
 
     def test_vowel_targets_contains_bass(self):
         self.assertIn("bass", FORMANTS)
@@ -232,7 +239,9 @@ class TestScoring(unittest.TestCase):
         pitch = 200
         tol = 50
         vowel_score = live_score_formants(target, measured, tolerance=tol)
-        resonance_score = resonance_tuning_score(measured, pitch, tolerance=tol)
+        resonance_score = resonance_tuning_score(
+            measured, pitch, tolerance=tol
+        )
         overall = int(0.5 * vowel_score + 0.5 * resonance_score)
         self.assertGreaterEqual(overall, 50)
 

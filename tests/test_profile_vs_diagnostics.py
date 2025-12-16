@@ -24,7 +24,11 @@ class VowelRecord(TypedDict, total=False):
 
 def is_finite(x):
     """Return True if x is a finite number."""
-    return x is not None and isinstance(x, (int, float)) and math.isfinite(float(x))
+    return (
+        x is not None
+        and isinstance(x, (int, float))
+        and math.isfinite(float(x))
+    )
 
 
 def load_profile(path):
@@ -104,7 +108,9 @@ class TestProfileVsDiagnostics(unittest.TestCase):
 
         profile = load_profile(PROFILE_PATH)
         failures = check_profile(profile)
-        self.assertFalse(failures, f"Profile plausibility failures: {failures}")
+        self.assertFalse(
+            failures, f"Profile plausibility failures: {failures}"
+        )
 
         if os.path.exists(CSV_PATH):
             mismatches = []

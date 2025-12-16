@@ -11,7 +11,9 @@ import sys
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg as FigureCanvas,
+)
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from PyQt5.QtWidgets import (
     QMainWindow,
@@ -60,7 +62,14 @@ def _extract_audio_array(item):
         if isinstance(item, (list, tuple)):
             return np.atleast_1d(item).astype(float).flatten()
         if isinstance(item, dict):
-            for key in ("data", "audio", "frame", "samples", "chunk", "segment"):
+            for key in (
+                "data",
+                "audio",
+                "frame",
+                "samples",
+                "chunk",
+                "segment",
+            ):
                 if key in item:
                     return np.atleast_1d(item[key]).astype(float).flatten()
             for v in item.values():
@@ -85,7 +94,9 @@ class ProfileDialog(QDialog):
         layout.addWidget(self.name_edit)
 
         self.voice_combo = QComboBox(self)
-        self.voice_combo.addItems(["bass", "baritone", "tenor", "mezzo", "soprano"])
+        self.voice_combo.addItems(
+            ["bass", "baritone", "tenor", "mezzo", "soprano"]
+        )
         layout.addWidget(self.voice_combo)
 
         btn_row = QHBoxLayout()
@@ -165,7 +176,9 @@ class CalibrationWindow(QMainWindow):
         layout.addLayout(text_row)
         layout.addWidget(self.capture_panel)
 
-        self.fig, (self.ax_spec, self.ax_vowel) = plt.subplots(1, 2, figsize=(12, 6))
+        self.fig, (self.ax_spec, self.ax_vowel) = plt.subplots(
+            1, 2, figsize=(12, 6)
+        )
         for ax in (self.ax_spec, self.ax_vowel):
             ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
             ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
@@ -241,7 +254,11 @@ class CalibrationWindow(QMainWindow):
             try:
                 freqs, times, S = safe_spectrogram(segment_local, sr_local)
             except Exception:  # noqa: E722
-                freqs, times, S = np.array([0.0]), np.array([0.0]), np.zeros((1, 1))
+                freqs, times, S = (
+                    np.array([0.0]),
+                    np.array([0.0]),
+                    np.zeros((1, 1)),
+                )
             try:
                 f1, f2, f0 = estimate_formants_lpc(segment_local, sr_local)
             except Exception:  # noqa: E722
@@ -380,7 +397,9 @@ class CalibrationWindow(QMainWindow):
                     if S_small.size
                     else np.zeros_like(freqs[mask])
                 )
-                self.ax_spec.plot(freqs[mask], 10 * np.log10(mean_spec + 1e-12))
+                self.ax_spec.plot(
+                    freqs[mask], 10 * np.log10(mean_spec + 1e-12)
+                )
             self.ax_spec.set_title("Spectrogram")
             self.ax_spec.set_xlabel("Time (s)")
             self.ax_spec.set_ylabel("Frequency (Hz)")
@@ -430,7 +449,9 @@ class CalibrationWindow(QMainWindow):
             self.ax_vowel.legend(loc="best")
         else:
             try:
-                self._vowel_scatters[vowel].set_offsets(np.column_stack(([f2], [f1])))
+                self._vowel_scatters[vowel].set_offsets(
+                    np.column_stack(([f2], [f1]))
+                )
             except Exception:  # noqa: E722
                 try:
                     self._vowel_scatters[vowel].remove()

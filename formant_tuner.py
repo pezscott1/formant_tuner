@@ -28,7 +28,9 @@ from PyQt5.QtGui import QFont
 from functools import partial
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg as FigureCanvas,
+)
 
 from vowel_data import FORMANTS, NOTE_NAMES
 from formant_utils import is_plausible_formants
@@ -95,7 +97,9 @@ class FormantTunerApp(QMainWindow):
             if "a" in FORMANTS[self.voice_type]
             else list(FORMANTS[self.voice_type].keys())[0]
         )
-        self.current_formants = FORMANTS[self.voice_type][self.current_vowel_name]
+        self.current_formants = FORMANTS[self.voice_type][
+            self.current_vowel_name
+        ]
         self.last_measured = (np.nan, np.nan, np.nan)
 
         central = QWidget()
@@ -113,19 +117,25 @@ class FormantTunerApp(QMainWindow):
         )
 
         label = QLabel("Profiles")
-        label.setStyleSheet("font-size: 10pt; font-weight: bold; margin-bottom: 4px;")
+        label.setStyleSheet(
+            "font-size: 10pt; font-weight: bold; margin-bottom: 4px;"
+        )
         label.setFixedHeight(50)
         left_layout.addWidget(label)
 
         # Profile list
         profile_container = QWidget()
-        profile_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        profile_container.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Minimum
+        )
         profile_layout = QVBoxLayout(profile_container)
         profile_layout.setContentsMargins(0, 0, 0, 0)
         profile_layout.setSpacing(6)
 
         self.profile_list = QListWidget()
-        self.profile_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.profile_list.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         self.profile_list.setStyleSheet(
             "QListWidget { font-size: 11pt; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }"
         )
@@ -243,7 +253,9 @@ class FormantTunerApp(QMainWindow):
             )
 
         # Signals
-        self.pitch_slider.valueChanged.connect(self.on_pitch_change)  # type:ignore
+        self.pitch_slider.valueChanged.connect(
+            self.on_pitch_change
+        )  # type:ignore
         self.tol_slider.valueChanged.connect(self.on_tol_change)  # type:ignore
         self.play_btn.clicked.connect(
             partial(self.play_pitch, self.pitch_slider.value())
@@ -329,7 +341,9 @@ class FormantTunerApp(QMainWindow):
     @staticmethod
     def play_pitch(frequency, duration=2.0, sample_rate=44100):
         def _play():
-            t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+            t = np.linspace(
+                0, duration, int(sample_rate * duration), endpoint=False
+            )
             waveform = 0.2 * np.sin(2 * np.pi * frequency * t)
             sd.play(waveform, sample_rate)
             sd.wait()
@@ -356,7 +370,9 @@ class FormantTunerApp(QMainWindow):
     def delete_profile(self):
         base = self.get_selected_profile_base()
         if not base:
-            QMessageBox.information(self, "Delete", "Select a profile to delete.")
+            QMessageBox.information(
+                self, "Delete", "Select a profile to delete."
+            )
             return
         display = profile_display_name(base)
         path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
@@ -372,13 +388,17 @@ class FormantTunerApp(QMainWindow):
                     os.remove(path)
             except Exception:  # noqa: E722
                 traceback.print_exc()
-                QMessageBox.critical(self, "Error", "Failed to delete profile.")
+                QMessageBox.critical(
+                    self, "Error", "Failed to delete profile."
+                )
         self.refresh_profiles()
 
     def apply_selected_profile(self):
         item = self.profile_list.currentItem()
         if not item:
-            QMessageBox.information(self, "Apply", "Please select a profile to apply.")
+            QMessageBox.information(
+                self, "Apply", "Please select a profile to apply."
+            )
             return
         if item.text().startswith("➕"):
             QMessageBox.information(
@@ -388,7 +408,9 @@ class FormantTunerApp(QMainWindow):
         base = profile_base_from_display(item.text())
 
         with open(
-            os.path.join(PROFILES_DIR, "active_profile.json"), "w", encoding="utf-8"
+            os.path.join(PROFILES_DIR, "active_profile.json"),
+            "w",
+            encoding="utf-8",
         ) as fh:
             json.dump({"active": base}, fh)
 
@@ -401,7 +423,9 @@ class FormantTunerApp(QMainWindow):
 
         self.voice_type = self.analyzer.voice_type or self.voice_type
         vowels_map = FORMANTS.get(self.voice_type, FORMANTS["bass"])
-        self.current_vowel_name = "a" if "a" in vowels_map else next(iter(vowels_map))
+        self.current_vowel_name = (
+            "a" if "a" in vowels_map else next(iter(vowels_map))
+        )
         self.current_formants = vowels_map[self.current_vowel_name]
         self.active_label.setText(f"Active: {profile_display_name(base)}")
 
@@ -423,14 +447,18 @@ class FormantTunerApp(QMainWindow):
                 name, voice_type = dlg.get_values()
                 if not name:
                     name = "user1"
-                self.calib_win = CalibrationWindow(self.analyzer, name, voice_type)
+                self.calib_win = CalibrationWindow(
+                    self.analyzer, name, voice_type
+                )
                 self.calib_win.show()
                 self.calib_win.destroyed.connect(self.refresh_profiles)
         else:
             base = self.get_selected_profile_base()
             if base:
                 voice_type = self.analyzer.voice_type or "bass"
-                self.calib_win = CalibrationWindow(self.analyzer, base, voice_type)
+                self.calib_win = CalibrationWindow(
+                    self.analyzer, base, voice_type
+                )
                 self.calib_win.show()
                 self.calib_win.destroyed.connect(self.refresh_profiles)
 
@@ -440,7 +468,9 @@ class FormantTunerApp(QMainWindow):
         vowels = FORMANTS.get(self.voice_type, FORMANTS["bass"])
         for v, (F1, F2, F3, FS) in vowels.items():
             self.ax_chart.scatter(F2, F1, c="blue", s=70, label=f"/{v}/")
-            self.ax_chart.text(F2 + 35, F1 + 35, f"/{v}/", fontsize=9, color="blue")
+            self.ax_chart.text(
+                F2 + 35, F1 + 35, f"/{v}/", fontsize=9, color="blue"
+            )
 
         self.ax_chart.set_title(f"Vowel Chart ({self.voice_type})")
         self.ax_chart.set_xlabel("F2 (Hz)")
@@ -478,11 +508,15 @@ class FormantTunerApp(QMainWindow):
         for f in target_formants[:3]:
             if f and not np.isnan(f):
                 env += np.exp(-0.5 * ((freq_axis - f) / 100.0) ** 2)
-        self.ax_spec.plot(freq_axis, env, "r-", linewidth=2, label="Filter Envelope")
+        self.ax_spec.plot(
+            freq_axis, env, "r-", linewidth=2, label="Filter Envelope"
+        )
 
         for f in target_formants[:3]:
             if f and not np.isnan(f):
-                self.ax_spec.axvline(f, color="blue", linestyle="--", alpha=0.5)
+                self.ax_spec.axvline(
+                    f, color="blue", linestyle="--", alpha=0.5
+                )
 
         for f in measured_formants[:3]:
             if f and not np.isnan(f):
@@ -503,7 +537,9 @@ class FormantTunerApp(QMainWindow):
             if l not in unique:
                 unique[l] = h
         if unique:
-            self.ax_spec.legend(unique.values(), unique.keys(), loc="upper right")
+            self.ax_spec.legend(
+                unique.values(), unique.keys(), loc="upper right"
+            )
 
         f1, f2 = measured_formants[:2]
         if f1 and f2 and not np.isnan(f1) and not np.isnan(f2):
