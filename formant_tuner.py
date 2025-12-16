@@ -22,7 +22,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from vowel_data import FORMANTS, NOTE_NAMES
 from formant_utils import is_plausible_formants, choose_best_candidate
 from mic_analyzer import MicAnalyzer, results_queue
-from calibration_py_qt import CalibrationWindow, ProfileDialog
+from calibration import CalibrationWindow, ProfileDialog
 from voice_analysis import MedianSmoother, PitchSmoother, Analyzer
 # Sounddevice for live audio
 import sounddevice as sd
@@ -46,6 +46,11 @@ def profile_base_from_display(display: str):
     if display.startswith("➕"):
         return None
     return display.replace(" ", "_")
+
+def set_active_profile(self, profile_name: str):
+    """Mark a profile as active and update the UI label."""
+    self.active_profile = profile_name
+    self.active_label.setText(f"Active: {profile_name}")
 
 def freq_to_note_name(freq: float) -> str:
     if not freq or freq <= 0:
@@ -79,7 +84,8 @@ class FormantTunerApp(QMainWindow):
 
         # Left panel: profiles + mic controls
         left_frame = QFrame()
-        left_frame.setMinimumWidth(300)
+        left_frame.setMinimumWidth(250)  # or 200, depending on comfort
+        left_frame.setMaximumWidth(450)  # optional cap so it never grows too wide
         left_layout = QVBoxLayout(left_frame)
         left_frame.setStyleSheet("""
             QFrame {

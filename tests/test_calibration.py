@@ -1,5 +1,5 @@
 import pytest
-from calibration_py_qt import CalibrationWindow
+from calibration import CalibrationWindow
 from unittest.mock import MagicMock, patch
 import numpy as np
 
