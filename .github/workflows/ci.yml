@@ -38,7 +38,7 @@ jobs:
           # exit-zero treats all errors as warnings (useful for gradual adoption)
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
 
-      # Run tests
-      - name: Run pytest
+      - name: Run tests
         run: |
+          export QT_QPA_PLATFORM=offscreen
           PYTHONPATH=. pytest
