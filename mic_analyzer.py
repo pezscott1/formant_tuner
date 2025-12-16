@@ -1,8 +1,8 @@
 # mic_analyzer.py
 import numpy as np
 import sounddevice as sd
-import librosa
-import queue, logging, traceback
+import queue
+import logging
 import threading
 from collections import deque
 
@@ -26,6 +26,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Replace the existing __init__ body with this (keep the same def header but add results_queue param) ---
+
+
 class MicAnalyzer:
     def __init__(self, vowel_provider, tol_provider, pitch_provider,
                  sample_rate=44100, frame_ms=40, analyzer=None,
@@ -117,25 +119,18 @@ class MicAnalyzer:
 
                 self.processing_queue.put_nowait(segment)
 
-                # debug print (safe): shows producer activity and queue sizes
+                # less noisy: use logger.debug so you can enable/disable via logging level
                 try:
                     q = getattr(self, "results_queue", None) or globals().get("results_queue", None)
-                    # less noisy: use logger.debug so you can enable/disable via logging level
-                    try:
-                        q = getattr(self, "results_queue", None) or globals().get("results_queue", None)
-                        logger.debug("MicAnalyzer pushed segment len=%d proc_q=%s ui_q=%s raw_q=%s",
-                                    segment.size,
-                                    getattr(self.processing_queue, "qsize", lambda: 'n/a')(),
-                                    getattr(q, "qsize", lambda: 'n/a')(),
-                                    getattr(self, "raw_queue", None) and getattr(self.raw_queue, "qsize", lambda: 'n/a')())
-                    except Exception:
-                        pass
+                    logger.debug("MicAnalyzer pushed segment len=%d proc_q=%s ui_q=%s raw_q=%s",
+                                 segment.size, getattr(self.processing_queue, "qsize", lambda: 'n/a')(),
+                                 getattr(q, "qsize", lambda: 'n/a')(), getattr(self, "raw_queue", None)
+                                 and getattr(self.raw_queue, "qsize", lambda: 'n/a')())
                 except Exception:
                     pass
             except queue.Full:
                 # drop frame if worker is busy
                 pass
-
         except Exception:
             logger.exception("MicAnalyzer audio callback failed")
 
@@ -151,7 +146,8 @@ class MicAnalyzer:
 
             try:
                 # Defensive call: estimate_formants_lpc may return variable shapes
-                res = estimate_formants_lpc(segment, self.sample_rate, order=None, win_len_ms=self.lpc_win_ms, debug=self.debug)
+                res = estimate_formants_lpc(segment, self.sample_rate, order=None,
+                                            win_len_ms=self.lpc_win_ms, debug=self.debug)
 
                 # Normalize result into f1, f2, f0 (f0 used as f3 in some callers)
                 if res is None:

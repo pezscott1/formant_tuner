@@ -47,10 +47,12 @@ def profile_base_from_display(display: str):
         return None
     return display.replace(" ", "_")
 
+
 def set_active_profile(self, profile_name: str):
     """Mark a profile as active and update the UI label."""
     self.active_profile = profile_name
     self.active_label.setText(f"Active: {profile_name}")
+
 
 def freq_to_note_name(freq: float) -> str:
     if not freq or freq <= 0:
@@ -96,7 +98,7 @@ class FormantTunerApp(QMainWindow):
             }
         """)
         
-       # Profiles label pinned at top
+        # Profiles label pinned at top
         label = QLabel("Profiles")
         label.setStyleSheet("font-size: 10pt; font-weight: bold; margin-bottom: 4px;")
         label.setFixedHeight(50)
@@ -151,7 +153,7 @@ class FormantTunerApp(QMainWindow):
 
         left_layout.addWidget(mic_container)
         hint_label = QLabel("Tip: To create a new profile, click Calibrate with New Profile highlighted.\n"
-                    "To update an existing profile, highlight it first, then click Calibrate.")
+                            "To update an existing profile, highlight it first, then click Calibrate.")
         hint_label.setAlignment(Qt.AlignCenter)
         hint_label.setStyleSheet("font-size: 9pt; color: gray;")
         mic_layout.addWidget(hint_label)
@@ -302,7 +304,6 @@ class FormantTunerApp(QMainWindow):
             return None
         return profile_base_from_display(item.text())
 
-
     def delete_profile(self):
         base = self.get_selected_profile_base()
         if not base:
@@ -320,7 +321,6 @@ class FormantTunerApp(QMainWindow):
                 QMessageBox.critical(self, "Error", "Failed to delete profile.")
         self.refresh_profiles()
 
-        
     def apply_selected_profile(self, base=None):
         item = self.profile_list.currentItem()
         if not item:
@@ -486,7 +486,6 @@ class FormantTunerApp(QMainWindow):
         updated = False
         while not results_queue.empty():
             raw = results_queue.get_nowait()
-            #print("UI received:", raw)  # debug
 
             # --- Pitch smoothing ---
             f0 = float(raw.get("f0") or self.pitch_slider.value())
@@ -543,11 +542,14 @@ class FormantTunerApp(QMainWindow):
 # -------------------------
 # Bootstrap
 # -------------------------
+
+
 def main():
     app = QApplication(sys.argv)
     analyzer = Analyzer(voice_type="bass", smoothing=True, smooth_size=5)
     win = FormantTunerApp(analyzer)
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()

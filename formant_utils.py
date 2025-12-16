@@ -1,13 +1,11 @@
 import numpy as np
 from scipy.signal import lfilter, find_peaks
-from scipy.signal.windows import hamming
 from numpy.linalg import lstsq
 import logging, os, tempfile, json
 from datetime import datetime, timezone
 from collections import deque
 import matplotlib.pyplot as plt
 import librosa
-import scipy.signal as sps
 from vowel_data import FORMANTS, VOWEL_MAP, PITCH_RANGES
 
 logger = logging.getLogger(__name__)
@@ -21,6 +19,7 @@ os.makedirs(PROFILES_DIR, exist_ok=True)
 
 FORMANT_TOLERANCE = 0.25  # ±25% tolerance around reference values
 
+
 def get_vowel_ranges(voice_type, vowel):
     vt = voice_type.lower()
     if vt not in FORMANTS:
@@ -32,6 +31,7 @@ def get_vowel_ranges(voice_type, vowel):
     f1_low, f1_high = f1 * (1 - FORMANT_TOLERANCE), f1 * (1 + FORMANT_TOLERANCE)
     f2_low, f2_high = f2 * (1 - FORMANT_TOLERANCE), f2 * (1 + FORMANT_TOLERANCE)
     return f1_low, f1_high, f2_low, f2_high
+
 
 def is_plausible_formants(f1, f2, voice_type="tenor", vowel=None):
     if f1 is None or f2 is None:
@@ -48,6 +48,7 @@ def is_plausible_formants(f1, f2, voice_type="tenor", vowel=None):
         return False, f"f2 out of range ({f2:.0f} Hz)"
     return True, "ok"
 
+
 def is_plausible_pitch(f0, voice_type="tenor"):
     if f0 is None or np.isnan(f0):
         return False, "missing pitch"
@@ -56,6 +57,7 @@ def is_plausible_pitch(f0, voice_type="tenor"):
     if not (low <= f0 <= high):
         return False, f"f0 out of range ({f0:.0f} Hz)"
     return True, "ok"
+
 
 def guess_vowel(f1, f2, voice_type="bass", last_guess=None):
     """
@@ -79,6 +81,7 @@ def guess_vowel(f1, f2, voice_type="bass", last_guess=None):
 # Pitch estimator
 # -------------------------
 
+
 def estimate_pitch(frame, sr):
     frame = np.asarray(frame, dtype=float)
     if frame.size == 0:
@@ -99,6 +102,7 @@ def estimate_pitch(frame, sr):
 # -------------------------
 # LPC envelope + cepstral fallbacks
 # -------------------------
+
 
 def lpc_envelope_peaks(frame, sr, order=14, nfft=8192,
                        low=50, high=4000, peak_thresh=0.02):
@@ -129,6 +133,7 @@ def lpc_envelope_peaks(frame, sr, order=14, nfft=8192,
         logger.exception("lpc_envelope_peaks failed")
         return np.array([]), np.array([])
 
+
 def smoothed_spectrum_peaks(frame, sr, lifter_cut=60, nfft=8192,
                             low=50, high=4000, peak_thresh=0.02):
     """
@@ -157,9 +162,10 @@ def smoothed_spectrum_peaks(frame, sr, lifter_cut=60, nfft=8192,
         logger.exception("smoothed_spectrum_peaks failed")
         return np.array([]), np.array([])
     
-  # -------------------------
+# -------------------------
 # Main formant estimator
 # -------------------------
+
 
 def pick_formants(candidates):
     """
@@ -204,7 +210,7 @@ def pick_formants(candidates):
 
     return float(f1) if f1 is not None else None, float(f2) if f2 is not None else None
 
-# --- Replace estimate_formants_lpc with this version ---
+
 def estimate_formants_lpc(y, sr, order=None, win_len_ms=30, pre_emph=0.97, debug=False):
     """
     Robust LPC-based formant estimator.
@@ -303,10 +309,12 @@ def unpack_formants(res):
 # Core helpers
 # -------------------------
 
+
 def profile_path(profile_name: str) -> str:
     """Return the filesystem path for a given profile name."""
     safe_name = profile_name.replace(" ", "_")
     return os.path.join(PROFILES_DIR, f"{safe_name}_profile.json")
+
 
 def _atomic_write_json(path, obj):
     dirpath = os.path.dirname(path) or "."
@@ -322,6 +330,7 @@ def _atomic_write_json(path, obj):
             try: os.remove(tmp)
             except Exception: pass
 
+
 def set_active_profile(profile_name):
     """Persist the currently active profile so the rest of the app can apply it."""
     try:
@@ -331,6 +340,7 @@ def set_active_profile(profile_name):
         print(f"INFO: Set active profile to {profile_name}", flush=True)
     except Exception:
         logger.exception("Failed to set active profile")
+
 
 def dump_live_profile(profile_name, profile_dict, dirpath="profiles"):
     """
@@ -350,6 +360,7 @@ def dump_live_profile(profile_name, profile_dict, dirpath="profiles"):
     _atomic_write_json(stable_path, profile_dict)
 
     return {"timestamped": ts_path, "latest": latest_path, "stable": stable_path}
+
 
 def normalize_profile_for_save(user_formants, retries_map=None):
     """
@@ -391,6 +402,7 @@ def normalize_profile_for_save(user_formants, retries_map=None):
 # Spectrogram and expected formants
 # -------------------------
 
+
 def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
     if y is None or len(y) == 0:
         f = np.linspace(0, sr / 2, 128); t = np.array([0.0]); Sxx = np.zeros((f.size, t.size))
@@ -416,6 +428,7 @@ def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
         f = np.linspace(0, sr / 2, 128); t = np.array([0.0]); Sxx = np.zeros((f.size, t.size))
         return f, t, Sxx
 
+
 def get_expected_formants(voice_type_local, vowel, f0=None, user_offsets_local=None):
     vt = voice_type_local.lower() if voice_type_local else "tenor"
     preset = FORMANTS.get(vt, FORMANTS.get("tenor"))
@@ -427,6 +440,7 @@ def get_expected_formants(voice_type_local, vowel, f0=None, user_offsets_local=N
 # -------------------------
 # Directional feedback
 # -------------------------
+
 
 def directional_feedback(measured_formants, user_formants, vowel, tolerance):
     entry = user_formants.get(vowel, {})
@@ -449,12 +463,14 @@ def directional_feedback(measured_formants, user_formants, vowel, tolerance):
 # Candidate selection and scoring
 # -------------------------
 
+
 def plausibility_score(f1, f2):
     if f1 is None or f2 is None:
         return 0.0
     sep = max(0.0, f2 - f1)
     score = sep - abs(500 - f1) * 0.01 - abs(1500 - f2) * 0.001
     return float(score)
+
 
 def choose_best_candidate(initial, retakes):
     """
@@ -470,6 +486,7 @@ def choose_best_candidate(initial, retakes):
             best, best_score = r, sc
     return best
 
+
 def live_score_formants(target_formants, measured_formants, tolerance=50):
     score = 0
     count = 0
@@ -481,6 +498,7 @@ def live_score_formants(target_formants, measured_formants, tolerance=50):
             score += (1 - dist/tolerance) * 100
         count += 1
     return int(score / count) if count > 0 else 0
+
 
 def resonance_tuning_score(formants, pitch, tolerance=50):
     """
@@ -506,6 +524,7 @@ def resonance_tuning_score(formants, pitch, tolerance=50):
 # Vowel guessing (2D and robust)
 # -------------------------
 
+
 def robust_guess(measured_formants, voice_type="bass"):
     if voice_type in FORMANTS:
         ref_map = {v: (f1, f2) for v,(f1,f2,*_) in FORMANTS[voice_type].items()}
@@ -523,6 +542,7 @@ def robust_guess(measured_formants, voice_type="bass"):
 # -------------------------
 # Smoothing helpers
 # -------------------------
+
 
 class LabelSmoother:
     def __init__(self, window=5, min_dwell=2):
@@ -543,6 +563,7 @@ class LabelSmoother:
             self.dwell = 1
         return self.current
 
+
 class PitchSmoother:
     def __init__(self, window=5):
         self.buf = deque(maxlen=window)
@@ -557,10 +578,12 @@ class PitchSmoother:
 # Pitch to MIDI + piano rendering
 # -------------------------
 
+
 def hz_to_midi(f0):
     if f0 is None or f0 <= 0:
         return None
     return int(round(69 + 12 * np.log2(f0 / 440.0)))
+
 
 def render_piano(ax, midi_note, octaves=2, base_octave=3):
     ax.clear()

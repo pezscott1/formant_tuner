@@ -3,17 +3,18 @@ import os, sys
 import pytest
 import numpy as np
 from scipy.signal import iirpeak, lfilter
-
+from voice_analysis import Analyzer
+from formant_utils import unpack_formants
 # Ensure project root is importable for pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from voice_analysis import Analyzer
 
 @pytest.fixture
 def analyzer():
     return Analyzer(voice_type="tenor", smoothing=True, smooth_size=3)
+
 
 @pytest.fixture
 def sr():
@@ -72,18 +73,3 @@ def synth_vowel(formants, *args, sr=None, dur=0.4, f0=130.0, **kwargs):
     y = y * 0.95
     y = y / (np.max(np.abs(y)) + 1e-9)
     return y.astype(np.float32)
-
-
-def unpack_formants(res):
-    """
-    Normalize the various return shapes from estimate_formants_lpc into a 3-tuple (f1,f2,f3).
-    Accepts None, (f1,f2), (f1,f2,f3), or (f1,f2,f3,candidates).
-    """
-    if res is None:
-        return None, None, None
-    if isinstance(res, (tuple, list)):
-        if len(res) >= 3:
-            return res[0], res[1], res[2]
-        if len(res) == 2:
-            return res[0], res[1], None
-    return None, None, None

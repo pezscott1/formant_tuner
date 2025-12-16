@@ -1,11 +1,12 @@
-import json, logging, os
+import json
+import logging
+import os
 from collections import deque
 import numpy as np
 import sounddevice as sd
 import librosa
 from sklearn.neighbors import KNeighborsClassifier
-from datetime import datetime, timezone
-import joblib  # used when loading saved classifier models
+import joblib
 
 # Import all helpers from formant_utils
 from formant_utils import (
@@ -14,12 +15,9 @@ from formant_utils import (
     guess_vowel,
     live_score_formants,
     resonance_tuning_score,
-    robust_guess,
-    plausibility_score,
     is_plausible_formants,
     normalize_profile_for_save,
     dump_live_profile,
-    pick_formants,  # use canonical implementation from formant_utils
 )
 
 from vowel_data import FORMANTS, VOWEL_MAP
@@ -191,7 +189,7 @@ class Analyzer:
             "overall": overall,
         }
 
-    def calibrate_live(self, vowels=["i","e","a","o","u"], sr=44100, duration=2.0, profile_name="default"):
+    def calibrate_live(self, vowels=["i", "e", "a", "o", "u"], sr=44100, duration=2.0, profile_name="default"):
         data, labels = [], []
         self.user_formants = {}
         retries_map = {v: 0 for v in vowels}
@@ -238,7 +236,8 @@ class Analyzer:
         ax.clear()
         if status["status"] != "ok":
             ax.text(0.02, 0.8, "Listening… (formants not stable)", color="orange", transform=ax.transAxes)
-            ax.axis("off"); return
+            ax.axis("off")
+            return
         f0 = status["f0"]
         f1, f2, _ = status["formants"]
         guess = status.get("vowel")
@@ -247,7 +246,6 @@ class Analyzer:
                 color="green", transform=ax.transAxes)
         ax.text(0.02, 0.70, f"Measured F1/F2: {int(f1)}/{int(f2)} Hz", color="gray", transform=ax.transAxes)
         ax.axis("off")
-
 
     def set_smoothing(self, enabled: bool, size: int = 5):
         self.smoothing = enabled
@@ -276,7 +274,6 @@ class Analyzer:
         ax.set_title(f"Vowel chart ({voice_type})")
         ax.grid(True, alpha=0.2)
 
-
     def render_spectrum(self, ax, freqs, mags, formants, envelope=None):
         ax.clear()
         ax.plot(freqs, mags, color="black", lw=1)
@@ -292,7 +289,6 @@ class Analyzer:
         ax.set_title("Spectrum and formants")
         if has_label:
             ax.legend(loc="upper right")
-
 
     def render_diagnostics(self, ax, status, sr, frame_len_samples, voice_type="bass"):
         ax.clear()

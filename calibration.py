@@ -6,10 +6,8 @@ import numpy as np
 import time
 from time import monotonic
 import matplotlib as mpl
-mpl.rcParams['axes.formatter.useoffset'] = False
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import sounddevice as sd
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QApplication,
     QDialog, QLineEdit, QComboBox, QPushButton, QPlainTextEdit, QLabel, QMessageBox
@@ -27,6 +25,8 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Empty, Queue
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 import logging
+mpl.rcParams['axes.formatter.useoffset'] = False
+
 # Logger setup
 logging.basicConfig(
     level=logging.INFO,
@@ -108,6 +108,7 @@ class ProfileDialog(QDialog):
 class CalibrationWindow(QMainWindow):
     # Signal to deliver worker results safely to the UI thread
     result_ready = pyqtSignal(object)
+
     def __init__(self, analyzer, profile_name, voice_type, mic=None):
         super().__init__()
 
@@ -529,6 +530,7 @@ class CalibrationWindow(QMainWindow):
     # -------------------------
     # Apply compute result on UI thread (lightweight updates only)
     # -------------------------
+
     def _apply_compute_result(self, freqs, times, S, f1, f2, f0):
         # clear in-flight flag immediately so new segments can be submitted
         logger.info("apply_compute_result idx=%d f1=%.1f f2=%.1f f0=%s freqs_len=%s S_shape=%s",
