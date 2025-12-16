@@ -101,7 +101,8 @@ def _extract_peak_data(
     """Shared helper to extract peak frequencies and heights."""
     peaks, _ = find_peaks(env[mask], height=np.max(env[mask]) * peak_thresh)
 
-    # Convert to a plain Python list[int] so the IDE/type checker accepts it as Iterable/Sized
+    # Convert to a plain Python list[int],
+    # so the IDE/type checker accepts it as Iterable/Sized
     idx_list: List[int] = [int(p) for p in np.asarray(peaks).ravel()]
 
     if not idx_list:

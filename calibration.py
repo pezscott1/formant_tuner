@@ -5,7 +5,6 @@ import time
 import traceback
 from time import monotonic
 from concurrent.futures import ThreadPoolExecutor
-from queue import Empty
 import logging
 import sys
 import numpy as np
@@ -153,6 +152,7 @@ class CalibrationWindow(QMainWindow):
         self.sing_secs = 0
         self.capture_secs = 0
         self._closing = False
+        self.result_ready.connect(self._on_result_ready)  # type: ignore
         # UI setup
         central = QWidget()
         self.setCentralWidget(central)
@@ -291,17 +291,14 @@ class CalibrationWindow(QMainWindow):
     # -------------------------
     # Result handling (UI thread)
     # -------------------------
-    def _on_result_ready(self, res):
-        """Slot called on the UI thread when worker finishes."""
-        try:
-            freqs, times, S, f1, f2, f0 = res
-        except Exception:  # noqa: E722
-            print("[_on_result_ready] malformed result:", type(res))
-            return
 
+    def _on_result_ready(self, result):
+        self._compute_in_flight = False
         try:
+            freqs, times, S, f1, f2, f0 = result
             self._apply_compute_result(freqs, times, S, f1, f2, f0)
         except Exception:  # noqa: E722
+            print("[_on_result_ready] malformed result:", type(result))
             traceback.print_exc()
 
     def _apply_compute_result(self, freqs, times, s, f1, f2, f0):
@@ -575,17 +572,13 @@ class CalibrationWindow(QMainWindow):
 
         while drained < MAX_ITEMS_PER_TICK:
             try:
-                item = queue_to_poll.get_nowait()
-            except Empty:
-                break
+                item = queue_to_poll.get(timeout=0)
             except Exception:  # noqa: E722
-                try:
-                    item = queue_to_poll.get(timeout=0)
-                except Exception:  # noqa: E722
-                    break
+                break
 
             try:
                 self._pending_frames.append(item)
+                logger.info("Pending frames=%d", len(self._pending_frames))
                 if len(self._pending_frames) > 200:
                     self._pending_frames = self._pending_frames[-200:]
             except Exception:  # noqa: E722

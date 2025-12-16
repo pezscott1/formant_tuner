@@ -564,9 +564,9 @@ class FormantTunerApp(QMainWindow):
         if not hasattr(self, "canvas") or self.canvas is None:
             return
 
-        if not hasattr(self, "formant_smoother"):
+        if self.formant_smoother is None:
             self.formant_smoother = MedianSmoother(size=5)
-        if not hasattr(self, "pitch_smoother"):
+        if self.pitch_smoother is None:
             self.pitch_smoother = PitchSmoother(size=5)
 
         updated = False
@@ -624,7 +624,7 @@ class FormantTunerApp(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     analyzer = Analyzer(voice_type="bass", smoothing=True, smooth_size=5)
-    _win = FormantTunerApp(analyzer)
+    _ = FormantTunerApp(analyzer)
     sys.exit(app.exec_())
 
 
