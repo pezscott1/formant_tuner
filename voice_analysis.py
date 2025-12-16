@@ -69,7 +69,8 @@ class MedianSmoother:
         self.f2 = deque(maxlen=size)
         self.f3 = deque(maxlen=size)
 
-    def _safe_median(self, values):
+    @staticmethod
+    def _safe_median(values):
         arr = [v for v in values if v is not None and not (isinstance(v, float) and np.isnan(v))]
         if not arr:
             return None
@@ -106,10 +107,10 @@ class Analyzer:
                 try:
                     self.clf = KNeighborsClassifier(n_neighbors=1)
                     self.clf = joblib.load(model_path)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.exception("Failed to load model from %s", model_path)
             logger.info("Loaded profile %s", profile_path)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Failed to load profile %s", profile_path)
                 
     def process_frame(self, audio_frame, sr, target_pitch_hz=None, debug=False):
@@ -167,7 +168,7 @@ class Analyzer:
                 vowel = self.clf.predict([[f1 or 0.0, f2 or 0.0, f0 or 0.0]])[0]
             else:
                 vowel = guess_vowel(f1, f2, self.voice_type)
-        except Exception:
+        except Exception:  # noqa: BLE001
             vowel = guess_vowel(f1, f2, self.voice_type)
 
         # Scoring
@@ -189,7 +190,9 @@ class Analyzer:
             "overall": overall,
         }
 
-    def calibrate_live(self, vowels=["i", "e", "a", "o", "u"], sr=44100, duration=2.0, profile_name="default"):
+    def calibrate_live(self, vowels=None, sr=44100, duration=2.0, profile_name="default"):
+        if vowels is None:
+            vowels = ["i", "e", "a", "o", "u"]
         data, labels = [], []
         self.user_formants = {}
         retries_map = {v: 0 for v in vowels}
@@ -205,7 +208,7 @@ class Analyzer:
                 try:
                     f0_arr = librosa.yin(y, fmin=50, fmax=500, sr=sr)
                     f0 = float(np.nanmedian(f0_arr)) if f0_arr.size else None
-                except Exception:
+                except Exception:  # noqa: BLE001
                     f0 = None
 
                 # Only accept if formants are plausible
@@ -216,14 +219,14 @@ class Analyzer:
                     labels.append(v)
                 else:
                     logger.info("Calibration: vowel %s rejected (%s)", v, reason)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.exception("Failed to record/process vowel %s; skipping it", v)
 
         if len(data) >= 2:
             try:
                 self.clf = KNeighborsClassifier(n_neighbors=1)
                 self.clf.fit(data, labels)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.exception("Classifier training failed")
 
         profile_dict = normalize_profile_for_save(self.user_formants, retries_map=retries_map)
@@ -232,7 +235,8 @@ class Analyzer:
         return True
 
     # --- Rendering helpers (from old analysis.py) ---
-    def render_status_text(self, ax, status):
+    @staticmethod
+    def render_status_text(ax, status):
         ax.clear()
         if status["status"] != "ok":
             ax.text(0.02, 0.8, "Listening… (formants not stable)", color="orange", transform=ax.transAxes)
@@ -251,7 +255,8 @@ class Analyzer:
         self.smoothing = enabled
         self.smoother = MedianSmoother(size=size) if enabled else None
 
-    def render_vowel_chart(self, ax, voice_type, measured_f1, measured_f2, ranked, show_breakdown=True):
+    @staticmethod
+    def render_vowel_chart(ax, voice_type, measured_f1, measured_f2, ranked, show_breakdown=True):
         ax.clear()
         VOWEL_TARGETS = {
             vt: {v: (f1, f2) for v, (f1, f2, *_rest) in vowels.items()}
@@ -274,7 +279,8 @@ class Analyzer:
         ax.set_title(f"Vowel chart ({voice_type})")
         ax.grid(True, alpha=0.2)
 
-    def render_spectrum(self, ax, freqs, mags, formants, envelope=None):
+    @staticmethod
+    def render_spectrum(ax, freqs, mags, formants, envelope=None):
         ax.clear()
         ax.plot(freqs, mags, color="black", lw=1)
         has_label = False
@@ -290,7 +296,8 @@ class Analyzer:
         if has_label:
             ax.legend(loc="upper right")
 
-    def render_diagnostics(self, ax, status, sr, frame_len_samples, voice_type="bass"):
+    @staticmethod
+    def render_diagnostics(ax, status, sr, frame_len_samples, voice_type="bass"):
         ax.clear()
         if status.get("status") != "ok":
             ax.text(0.02, 0.9, "Diagnostics: awaiting stable frame", color="orange", transform=ax.transAxes)

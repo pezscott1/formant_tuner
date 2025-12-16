@@ -1,10 +1,14 @@
 # tests/conftest.py
-import os, sys
+import os
+import sys
+
 import pytest
 import numpy as np
 from scipy.signal import iirpeak, lfilter
+
 from voice_analysis import Analyzer
-from formant_utils import unpack_formants
+# from formant_utils import unpack_formants  # unused, remove or comment out
+
 # Ensure project root is importable for pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -12,28 +16,30 @@ if ROOT not in sys.path:
 
 
 @pytest.fixture
-def analyzer():
+def analyzer_fixture():
     return Analyzer(voice_type="tenor", smoothing=True, smooth_size=3)
 
 
 @pytest.fixture
 def sr():
+    """Fixture: sample rate for tests."""
     return 16000
 
 
 def synth_vowel(formants, *args, sr=None, dur=0.4, f0=130.0, **kwargs):
     """
-    Robust synth helper:
-      - accepts sr as positional or keyword
-      - always initializes src before use
-      - tuning knobs: bw_base, harmonic_exp
+    Robust synth helper.
+
+    - Accepts sr as positional or keyword.
+    - Always initializes src before use.
+    - Tuning knobs: bw_base, harmonic_exp.
     """
     # Resolve sr from args or keyword
     if sr is None:
         if args:
             try:
                 sr = int(args[0])
-            except Exception:
+            except (ValueError, TypeError):
                 sr = 16000
         else:
             sr = 16000

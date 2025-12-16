@@ -1,38 +1,47 @@
 # mic_analyzer.py
-import numpy as np
-import sounddevice as sd
-import queue
 import logging
+import queue
 import threading
 from collections import deque
+from typing import Any, Dict, Optional
+import numpy as np
+import sounddevice as sd
 
 from formant_utils import (
+    directional_feedback,
     estimate_formants_lpc,
     is_plausible_formants,
-    directional_feedback,
-    robust_guess
+    robust_guess,
 )
 from voice_analysis import MedianSmoother
-
-# Shared queue for UI updates
-results_queue = queue.Queue()
 
 # Logger setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s: %(message)s",
-    datefmt="%H:%M:%S"
+    datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
-# --- Replace the existing __init__ body with this (keep the same def header but add results_queue param) ---
-
 
 class MicAnalyzer:
-    def __init__(self, vowel_provider, tol_provider, pitch_provider,
-                 sample_rate=44100, frame_ms=40, analyzer=None,
-                 processing_window_s=0.25, lpc_win_ms=30, processing_queue_max=6,
-                 rms_gate=1e-6, debug=False, results_queue=None):
+    """Real-time microphone analyzer that estimates formants and posts results."""
+
+    def __init__(
+        self,
+        vowel_provider,
+        tol_provider,
+        pitch_provider,
+        sample_rate: int = 44100,
+        frame_ms: int = 40,
+        analyzer: Optional[Any] = None,
+        processing_window_s: float = 0.25,
+        lpc_win_ms: int = 30,
+        processing_queue_max: int = 6,
+        rms_gate: float = 1e-6,
+        debug: bool = False,
+        results_queue: Optional[queue.Queue] = None,
+    ) -> None:
         self.smoother = MedianSmoother(size=5)
         self.vowel_provider = vowel_provider
         self.tol_provider = tol_provider
@@ -40,34 +49,31 @@ class MicAnalyzer:
         self.sample_rate = int(sample_rate)
         self.frame_ms = int(frame_ms)
         self.analyzer = analyzer
-        self.stream = None
+        self.stream: Optional[sd.InputStream] = None
 
         # Rolling buffer and processing queue
-        self.buffer = deque(maxlen=int(self.sample_rate * 3))
-        self.processing_queue = queue.Queue(maxsize=int(processing_queue_max))
+        self.buffer: deque[float] = deque(maxlen=int(self.sample_rate * 3))
+        self.processing_queue: queue.Queue = queue.Queue(maxsize=int(processing_queue_max))
         self._worker_stop = threading.Event()
-        self._worker = None
+        self._worker: Optional[threading.Thread] = None
 
         # Tunables
         self.processing_window_s = float(processing_window_s)
         self.lpc_win_ms = int(lpc_win_ms)
         self.rms_gate = float(rms_gate)
         self.debug = bool(debug)
-        
+
         # Ensure we always have a queue to publish audio/analysis results to
         module_q = globals().get("results_queue", None)
         if results_queue is not None:
             self.results_queue = results_queue
         elif module_q is not None:
-            self.results_queue = module_q
+            self.results_queue = module_q  # type: ignore[assignment]
         else:
             self.results_queue = queue.Queue(maxsize=200)
 
         # Per-instance raw audio queue for consumers that need raw segments (e.g., calibration)
-        self.raw_queue = queue.Queue(maxsize=200)
-
-        # Worker thread will be started in start()
-        self._worker = None
+        self.raw_queue: queue.Queue = queue.Queue(maxsize=200)
 
         # running flag for diagnostics
         self.is_running = False
@@ -75,10 +81,12 @@ class MicAnalyzer:
     # -------------------------
     # Audio callback (fast)
     # -------------------------
-    def audio_callback(self, indata, frames, time_info, status):
+    def audio_callback(self, indata: np.ndarray, _frames: int, _time_info: Any, _status: Any) -> None:
+        """Sounddevice callback: collect audio, apply energy gate, enqueue segments."""
         try:
+            # Convert to mono numpy array of floats
             mono = np.asarray(indata[:, 0], dtype=float).flatten()
-            # append to deque
+            # append to deque (extend with list to avoid per-element overhead)
             self.buffer.extend(mono.tolist())
 
             # cheap energy gate
@@ -91,10 +99,11 @@ class MicAnalyzer:
             win_len = int(self.sample_rate * self.processing_window_s)
             if win_len < 1:
                 return
+
             if len(self.buffer) < win_len:
                 segment = np.array(list(self.buffer), dtype=float)
             else:
-                # efficient tail extraction
+                # efficient tail extraction without copying the whole deque
                 tail = []
                 it = iter(self.buffer)
                 skip = len(self.buffer) - win_len
@@ -106,7 +115,7 @@ class MicAnalyzer:
 
             # enqueue for processing without blocking
             try:
-                # also publish raw audio for any consumer that wants it (calibrator)
+                # publish raw audio for any consumer that wants it (calibrator)
                 try:
                     self.raw_queue.put_nowait(segment)
                 except queue.Full:
@@ -114,7 +123,8 @@ class MicAnalyzer:
                     try:
                         _ = self.raw_queue.get_nowait()
                         self.raw_queue.put_nowait(segment)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
+                        # best effort; don't propagate from callback
                         pass
 
                 self.processing_queue.put_nowait(segment)
@@ -122,22 +132,27 @@ class MicAnalyzer:
                 # less noisy: use logger.debug so you can enable/disable via logging level
                 try:
                     q = getattr(self, "results_queue", None) or globals().get("results_queue", None)
-                    logger.debug("MicAnalyzer pushed segment len=%d proc_q=%s ui_q=%s raw_q=%s",
-                                 segment.size, getattr(self.processing_queue, "qsize", lambda: 'n/a')(),
-                                 getattr(q, "qsize", lambda: 'n/a')(), getattr(self, "raw_queue", None)
-                                 and getattr(self.raw_queue, "qsize", lambda: 'n/a')())
-                except Exception:
+                    logger.debug(
+                        "MicAnalyzer pushed segment len=%d proc_q=%s ui_q=%s raw_q=%s",
+                        segment.size,
+                        getattr(self.processing_queue, "qsize", lambda: "n/a")(),
+                        getattr(q, "qsize", lambda: "n/a")(),
+                        getattr(self.raw_queue, "qsize", lambda: "n/a")(),
+                    )
+                except Exception:  # noqa: BLE001
+                    # swallow logging-related errors
                     pass
             except queue.Full:
                 # drop frame if worker is busy
                 pass
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("MicAnalyzer audio callback failed")
 
     # -------------------------
     # Worker thread
     # -------------------------
-    def _processing_worker(self):
+    def _processing_worker(self) -> None:
+        """Background worker: consume segments, estimate formants, post status dicts."""
         while not self._worker_stop.is_set():
             try:
                 segment = self.processing_queue.get(timeout=0.2)
@@ -146,8 +161,9 @@ class MicAnalyzer:
 
             try:
                 # Defensive call: estimate_formants_lpc may return variable shapes
-                res = estimate_formants_lpc(segment, self.sample_rate, order=None,
-                                            win_len_ms=self.lpc_win_ms, debug=self.debug)
+                res = estimate_formants_lpc(
+                    segment, self.sample_rate, order=None, win_len_ms=self.lpc_win_ms, debug=self.debug
+                )
 
                 # Normalize result into f1, f2, f0 (f0 used as f3 in some callers)
                 if res is None:
@@ -167,19 +183,19 @@ class MicAnalyzer:
 
                 # Plausibility gating
                 voice_type = getattr(self.analyzer, "voice_type", "bass")
-                ok, reason = is_plausible_formants(f1_s, f2_s, voice_type)
+                ok, _reason = is_plausible_formants(f1_s, f2_s, voice_type)
                 if not ok:
                     f1_s, f2_s = None, None
 
                 # Build user_forms mapping
-                user_forms = {}
+                user_forms: Dict[str, Dict[str, float]] = {}
                 try:
                     for v, vals in (getattr(self.analyzer, "user_formants", {}) or {}).items():
                         if isinstance(vals, (tuple, list)) and len(vals) >= 2:
                             user_forms[v] = {"f1": vals[0], "f2": vals[1]}
                         elif isinstance(vals, dict):
-                            user_forms[v] = vals
-                except Exception:
+                            user_forms[v] = vals  # type: ignore[assignment]
+                except Exception:  # noqa: BLE001
                     logger.exception("Failed to build user_forms mapping")
 
                 # Directional feedback
@@ -190,15 +206,17 @@ class MicAnalyzer:
                 # Vowel guess uses only formants
                 try:
                     guessed, conf, second = robust_guess((f1_s, f2_s), voice_type=voice_type)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     guessed, conf, second = None, 0.0, None
 
                 # Compose status dict and post to UI queue
-                status = {
+                status: Dict[str, Any] = {
                     "f0": float(f0_s) if f0_s is not None else None,
-                    "formants": (float(f1_s) if f1_s is not None else None,
-                                 float(f2_s) if f2_s is not None else None,
-                                 float(f0_s) if f0_s is not None else None),
+                    "formants": (
+                        float(f1_s) if f1_s is not None else None,
+                        float(f2_s) if f2_s is not None else None,
+                        float(f0_s) if f0_s is not None else None,
+                    ),
                     "vowel_guess": guessed,
                     "vowel_confidence": float(conf) if conf is not None else 0.0,
                     "vowel_score": 0,
@@ -209,23 +227,27 @@ class MicAnalyzer:
                 }
 
                 try:
-                    results_queue.put(status, timeout=0.1)
+                    # prefer instance queue, fall back to module queue
+                    q = getattr(self, "results_queue", None) or globals().get("results_queue", None)
+                    if q is not None:
+                        q.put(status, timeout=0.1)
                 except queue.Full:
+                    # drop if UI queue is full
                     pass
 
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.exception("Processing worker failed while handling a segment")
-
             finally:
                 try:
                     self.processing_queue.task_done()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
     # -------------------------
     # Public control
     # -------------------------
-    def start(self):
+    def start(self) -> None:
+        """Start worker thread and audio stream."""
         if self._worker is None or not self._worker.is_alive():
             self._worker_stop.clear()
             self._worker = threading.Thread(target=self._processing_worker, daemon=True)
@@ -239,32 +261,35 @@ class MicAnalyzer:
                     samplerate=self.sample_rate,
                     blocksize=blocksize,
                     channels=1,
-                    dtype='float32',
-                    callback=self.audio_callback
+                    dtype="float32",
+                    callback=self.audio_callback,
                 )
                 self.stream.start()
                 self.is_running = True
-                logger.info("MicAnalyzer audio stream started at %d Hz blocksize %d", self.sample_rate, blocksize)
-            except Exception:
+                logger.info(
+                    "MicAnalyzer audio stream started at %d Hz blocksize %d", self.sample_rate, blocksize
+                )
+            except Exception:  # noqa: BLE001
                 logger.exception("Failed to start audio stream")
                 # ensure worker is stopped if stream fails
                 self.stop()
 
-    def stop(self, event=None):
+    def stop(self, _event: Optional[Any] = None) -> None:
+        """Stop audio stream and worker thread."""
         try:
             if self.stream is not None:
                 try:
                     if getattr(self.stream, "active", False):
                         self.stream.stop()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
                 try:
                     self.stream.close()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
                 self.stream = None
                 logger.info("MicAnalyzer audio stream stopped")
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Error stopping audio stream")
 
         try:
@@ -272,12 +297,12 @@ class MicAnalyzer:
                 self._worker_stop.set()
                 try:
                     self.processing_queue.put_nowait(np.zeros(1, dtype=float))
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
                 self._worker.join(timeout=1.0)
                 self._worker = None
                 logger.info("MicAnalyzer worker stopped")
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Error stopping worker")
         finally:
             self.is_running = False
