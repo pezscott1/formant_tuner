@@ -127,9 +127,7 @@ class FormantTunerApp(QMainWindow):
         )
 
         label = QLabel("Profiles")
-        label.setStyleSheet(
-            "font-size: 10pt; font-weight: bold; margin-bottom: 4px;"
-        )
+        label.setStyleSheet("font-size: 10pt; font-weight: bold;")
         label.setFixedHeight(50)
         left_layout.addWidget(label)
 
@@ -147,7 +145,7 @@ class FormantTunerApp(QMainWindow):
             QSizePolicy.Expanding, QSizePolicy.Expanding
         )
         self.profile_list.setStyleSheet(
-            "QListWidget { font-size: 11pt; padding: 4px; border: 1px"
+            "QListWidget { font-size: 11pt; padding: 4px; border: 1px;"
             " solid #ccc; border-radius: 4px; }"
         )
         profile_layout.addWidget(self.profile_list)
@@ -179,9 +177,16 @@ class FormantTunerApp(QMainWindow):
         ):
             b.setFixedHeight(75)
             b.setStyleSheet(
-                f"QPushButton {{ background-color: {color}; "
-                f"color: white; font-size: 12pt; "
-                "font-weight: bold; border-radius: 6px; padding: 6px; }}"
+                f"""
+                QPushButton {{
+                    background-color: {color};
+                    color: white;
+                    font-size: 12pt;
+                    font-weight: bold;
+                    border-radius: 6px;
+                    padding: 6px;
+                }}
+                """
             )
             mic_layout.addWidget(b)
 

@@ -32,7 +32,6 @@ from PyQt5.QtGui import QTextOption
 
 from formant_utils import (
     safe_spectrogram,
-    set_active_profile,
     estimate_formants_lpc,
     normalize_profile_for_save,
     PROFILES_DIR,
@@ -162,18 +161,19 @@ class CalibrationWindow(QMainWindow):
         self.status_panel.setReadOnly(True)
         self.status_panel.setFixedHeight(50)
         self.status_panel.setStyleSheet(
-            "color: darkblue; font-size: 11pt; font-family: "
-            "Consolas; font-weight: bold;"
+            "QFrame { background-color: #e6f0ff; border: 1px solid #99c; border-radius: 6px; }"
         )
+
+        self.status_panel.setStyleSheet("color: darkblue; font-size: 11pt; font-family: Consolas; font-weight: bold;")
         text_row.addWidget(self.status_panel, stretch=1)
 
         self.capture_panel = QPlainTextEdit()
         self.capture_panel.setWordWrapMode(QTextOption.NoWrap)
         self.capture_panel.setReadOnly(True)
         self.capture_panel.setStyleSheet(
-            "color: darkgreen; font-size: 11pt; font-family: "
-            "Consolas; font-weight: bold;"
+            "QFrame { background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 6px; }"
         )
+        self.capture_panel.setStyleSheet("color: darkgreen; font-size: 11pt; font-family: Consolas; font-weight: bold;")
         layout.addLayout(text_row)
         layout.addWidget(self.capture_panel)
 
@@ -261,10 +261,10 @@ class CalibrationWindow(QMainWindow):
                     np.zeros((1, 1)),
                 )
             try:
-                f1, f2, f0 = estimate_formants_lpc(segment_local, sr_local)
+                f1, f2, f3 = estimate_formants_lpc(segment_local, sr_local)
             except Exception:  # noqa: E722
-                f1 = f2 = f0 = None
-            return freqs, times, S, f1, f2, f0
+                f1 = f2 = f3 = None
+            return freqs, times, S, f1, f2, f3
 
         future = _EXECUTOR.submit(_compute, segment, sr)
 
@@ -294,8 +294,8 @@ class CalibrationWindow(QMainWindow):
     def _on_result_ready(self, result):
         self._compute_in_flight = False
         try:
-            freqs, times, S, f1, f2, f0 = result
-            self._apply_compute_result(freqs, times, S, f1, f2, f0)
+            freqs, times, S, f1, f2, f3 = result
+            self._apply_compute_result(freqs, times, S, f1, f2, f3)
         except Exception:  # noqa: E722
             print("[_on_result_ready] malformed result:", type(result))
             traceback.print_exc()
@@ -329,7 +329,7 @@ class CalibrationWindow(QMainWindow):
                 color = self._vowel_colors.get(vowel, "black")
                 html_line = (
                     f'<span style="color:{color}">/{vowel}/ '
-                    f"F1={f1:.1f} Hz, F2={f2:.1f} Hz, F0={f0 or 0:.1f} Hz</span>"
+                    f"F1={f1:.1f} Hz, F2={f2:.1f} Hz, F3={f0 or 0:.1f} Hz</span>"
                 )
                 self.capture_panel.appendHtml(html_line)
                 self.current_index += 1

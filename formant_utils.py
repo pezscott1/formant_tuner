@@ -347,17 +347,6 @@ def _atomic_write_json(path, obj):
                 logger.debug("Failed to remove temp file: %s", e)
 
 
-def set_active_profile(profile_name: str):
-    """Persist the currently active profile so the rest of the app can apply it."""
-    try:
-        active_path = os.path.join(PROFILES_DIR, "active_profile.json")
-        with open(active_path, "w", encoding="utf-8") as fh:
-            json.dump({"active": profile_name}, fh)
-        logger.info("Set active profile to %s", profile_name)
-    except Exception as e:  # noqa: E722
-        logger.exception("Failed to set active profile: %s", e)
-
-
 def dump_live_profile(
     profile_name: str, profile_dict: dict, dirpath: str = "profiles"
 ) -> dict:
@@ -395,7 +384,7 @@ def normalize_profile_for_save(user_formants, retries_map=None):
         return out
 
     for vowel, vals in user_formants.items():
-        f1 = f2 = f0 = None
+        f1 = f2 = f3 = None
         try:
             if isinstance(vals, (list, tuple)):
                 if len(vals) > 0:
@@ -403,14 +392,14 @@ def normalize_profile_for_save(user_formants, retries_map=None):
                 if len(vals) > 1:
                     f2 = None if vals[1] is None else float(vals[1])
                 if len(vals) > 2:
-                    f0 = None if vals[2] is None else float(vals[2])
+                    f3 = None if vals[2] is None else float(vals[2])
             elif isinstance(vals, dict):
                 f1 = None if vals.get("f1") is None else float(vals.get("f1"))
                 f2 = None if vals.get("f2") is None else float(vals.get("f2"))
-                f0 = None if vals.get("f0") is None else float(vals.get("f0"))
+                f3 = None if vals.get("f3") is None else float(vals.get("f3"))
         except Exception as e:  # noqa: E722
             logger.debug("normalize_profile_for_save failed: %s", e)
-            f1, f2, f0 = None, None, None
+            f1, f2, f3 = None, None, None
 
         if f1 is not None and f2 is not None and f1 > f2:
             f1, f2 = f2, f1
@@ -422,7 +411,7 @@ def normalize_profile_for_save(user_formants, retries_map=None):
         out[vowel] = {
             "f1": None if f1 is None else float(f1),
             "f2": None if f2 is None else float(f2),
-            "f0": None if f0 is None else float(f0),
+            "f3": None if f3 is None else float(f3),
             "retries": retries,
             "reason": reason_text,
             "saved_at": datetime.now(timezone.utc)

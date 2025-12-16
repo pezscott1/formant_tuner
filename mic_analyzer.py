@@ -179,21 +179,21 @@ class MicAnalyzer:
                     debug=self.debug,
                 )
 
-                # Normalize result into f1, f2, f0 (f0 used as f3 in some callers)
+                # Normalize result into f1, f2, f3
                 if res is None:
-                    f1 = f2 = f0 = None
+                    f1 = f2 = f3 = None
                 elif isinstance(res, (tuple, list)):
                     if len(res) >= 3:
-                        f1, f2, f0 = res[:3]
+                        f1, f2, f3 = res[:3]
                     elif len(res) == 2:
-                        f1, f2, f0 = res[0], res[1], None
+                        f1, f2, f3 = res[0], res[1], None
                     else:
-                        f1 = f2 = f0 = None
+                        f1 = f2 = f3 = None
                 else:
-                    f1 = f2 = f0 = None
+                    f1 = f2 = f3 = None
 
                 # Smooth values (MedianSmoother returns None for missing)
-                f1_s, f2_s, f0_s = self.smoother.update(f1, f2, f0)
+                f1_s, f2_s, f3_s = self.smoother.update(f1, f2, f3)
 
                 # Plausibility gating
                 voice_type = getattr(self.analyzer, "voice_type", "bass")
@@ -224,7 +224,7 @@ class MicAnalyzer:
                     self.tol_provider() if callable(self.tol_provider) else 50
                 )
                 fb_f1, fb_f2 = directional_feedback(
-                    (f1_s, f2_s, f0_s), user_forms, current_vowel, tolerance
+                    (f1_s, f2_s, f3_s), user_forms, current_vowel, tolerance
                 )
 
                 # Vowel guess uses only formants
@@ -237,11 +237,10 @@ class MicAnalyzer:
 
                 # Compose status dict and post to UI queue
                 status: Dict[str, Any] = {
-                    "f0": float(f0_s) if f0_s is not None else None,
                     "formants": (
                         float(f1_s) if f1_s is not None else None,
                         float(f2_s) if f2_s is not None else None,
-                        float(f0_s) if f0_s is not None else None,
+                        float(f3_s) if f3_s is not None else None,
                     ),
                     "vowel_guess": guessed,
                     "vowel_confidence": (
