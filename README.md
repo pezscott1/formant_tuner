@@ -1,6 +1,6 @@
-# Formant Wizard / Formant Tuner
+# Formant Tuner
 
-Formant Wizard is a scientific and educational tool for **audio analysis and vocal calibration**.  
+Formant Tuner is a scientific and educational tool for **audio analysis and vocal calibration**.  
 It provides a graphical interface for singers, educators, and researchers to measure vowel formants (F1, F2, F0) in real time, visualize spectrograms, and save personalized voice profiles.
 
 ---
