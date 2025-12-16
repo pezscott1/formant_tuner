@@ -114,7 +114,6 @@ class ProfileDialog(QDialog):
 
 class CalibrationWindow(QMainWindow):
     """Calibration workflow window."""
-
     result_ready = pyqtSignal(object)
     profile_calibrated = pyqtSignal(str)
 
@@ -376,7 +375,8 @@ class CalibrationWindow(QMainWindow):
 
         # Spectrogram (<= 4 kHz)
         mask = freqs <= 4000
-        if isinstance(mask, np.ndarray) and mask.sum() == 0:
+        if isinstance(mask, np.ndarray) and mask.sum() < 2:
+            # fallback if too few bins
             mask = np.arange(len(freqs))
 
         max_time_bins = 200
@@ -385,37 +385,39 @@ class CalibrationWindow(QMainWindow):
         times_small = times[::step]
         arr_db = 10 * np.log10(S_small + 1e-12)
 
+        ny, nx = arr_db.shape
+
         if self._spec_mesh is None:
             self.ax_spec.clear()
             try:
+                # Use shading="auto" to avoid off-by-one issues
                 self._spec_mesh = self.ax_spec.pcolormesh(
                     times_small, freqs[mask], arr_db, shading="auto"
                 )
-            except Exception:  # noqa: E722
-                mean_spec = (
-                    np.mean(S_small, axis=1)
-                    if S_small.size
-                    else np.zeros_like(freqs[mask])
-                )
-                self.ax_spec.plot(
-                    freqs[mask], 10 * np.log10(mean_spec + 1e-12)
-                )
-            self.ax_spec.set_title("Spectrogram")
-            self.ax_spec.set_xlabel("Time (s)")
-            self.ax_spec.set_ylabel("Frequency (Hz)")
-            self.ax_spec.set_ylim(0, 4000)
+            except Exception:
+                mean_spec = np.mean(S_small, axis=1) if S_small.size else np.zeros_like(freqs[mask])
+                self.ax_spec.plot(freqs[mask], 10 * np.log10(mean_spec + 1e-12))
         else:
             try:
-                if hasattr(self._spec_mesh, "set_array"):
-                    self._spec_mesh.set_array(arr_db.ravel())
-                else:
+                expected_size = ny * nx
+                current_size = self._spec_mesh.get_array().size
+                if current_size != expected_size:
+                    # Recreate mesh if dimensions changed
                     self.ax_spec.clear()
                     self._spec_mesh = self.ax_spec.pcolormesh(
                         times_small, freqs[mask], arr_db, shading="auto"
                     )
-                self.ax_spec.set_ylim(0, 4000)
-            except Exception:  # noqa: E722
+                else:
+                    # Update with full array, no slicing
+                    self._spec_mesh.set_array(arr_db.ravel())
+            except Exception:
                 traceback.print_exc()
+
+        self.ax_spec.set_title("Spectrogram")
+        self.ax_spec.set_xlabel("Time (s)")
+        self.ax_spec.set_ylabel("Frequency (Hz)")
+        self.ax_spec.set_ylim(0, 4000)
+        self.canvas.draw_idle()
 
         # Vowel scatter
         if f1 is None or f2 is None or vowel is None:
@@ -423,7 +425,7 @@ class CalibrationWindow(QMainWindow):
             if now - self._last_draw >= self._min_draw_interval:
                 try:
                     self.canvas.draw_idle()
-                except Exception:  # noqa: E722
+                except Exception:
                     pass
                 self._last_draw = now
             return
@@ -444,18 +446,16 @@ class CalibrationWindow(QMainWindow):
             try:
                 self.ax_vowel.set_xlim(4000, 0)
                 self.ax_vowel.set_ylim(1200, 0)
-            except Exception:  # noqa: E722
+            except Exception:
                 pass
             self.ax_vowel.legend(loc="best")
         else:
             try:
-                self._vowel_scatters[vowel].set_offsets(
-                    np.column_stack(([f2], [f1]))
-                )
-            except Exception:  # noqa: E722
+                self._vowel_scatters[vowel].set_offsets(np.column_stack(([f2], [f1])))
+            except Exception:
                 try:
                     self._vowel_scatters[vowel].remove()
-                except Exception:  # noqa: E722
+                except Exception:
                     pass
                 scatter = self.ax_vowel.scatter(
                     [f2],
@@ -470,14 +470,14 @@ class CalibrationWindow(QMainWindow):
 
         try:
             self.canvas.draw_idle()
-        except Exception:  # noqa: E722
+        except Exception:
             pass
 
         now = time.time()
         if now - self._last_draw >= self._min_draw_interval:
             try:
                 self.canvas.draw_idle()
-            except Exception:  # noqa: E722
+            except Exception:
                 pass
             self._last_draw = now
 
@@ -578,7 +578,6 @@ class CalibrationWindow(QMainWindow):
 
             try:
                 self._pending_frames.append(item)
-                logger.info("Pending frames=%d", len(self._pending_frames))
                 if len(self._pending_frames) > 200:
                     self._pending_frames = self._pending_frames[-200:]
             except Exception:  # noqa: E722
@@ -692,43 +691,32 @@ class CalibrationWindow(QMainWindow):
         except Exception:  # noqa: E722
             pass
 
-        base = self.profile_name
-        profile_path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
-        profile_dict = normalize_profile_for_save(
-            self.results, retries_map=self.retries_map
-        )
+        base_name = f"{self.profile_name}_{self.voice_type}"
+        profile_path = os.path.join(PROFILES_DIR, f"{base_name}.json")
 
+        profile_dict = normalize_profile_for_save(self.results, retries_map=self.retries_map)
         try:
             with open(profile_path, "w", encoding="utf-8") as fh:
                 json.dump(profile_dict, fh, indent=2)
-        except Exception as e:  # noqa: E722
+        except Exception as e:
             traceback.print_exc()
             QMessageBox.critical(self, "Error", f"Failed to save profile: {e}")
             return
 
-        set_active_profile(base)
-        try:
-            self.profile_calibrated.emit(base)  # type: ignore
-        except Exception:  # noqa: E722
-            pass
-
+        # Tell parent to update active profile
         parent = self.parent()
         if parent:
             try:
                 if hasattr(parent, "reload_profiles"):
                     parent.reload_profiles()
-                if hasattr(parent, "apply_selected_profile"):
-                    parent.apply_selected_profile()
+                if hasattr(parent, "set_active_profile"):
+                    parent.set_active_profile(base_name)
             except Exception:  # noqa: E722
-                pass
-
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Calibration Finished")
-        msg.setText("Calibration complete! Click OK to close.")
-        msg.setIcon(QMessageBox.Information)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
-
+                traceback.print_exc()
+        try:
+            self.profile_calibrated.emit(base_name)   # type:ignore
+        except Exception:  # noqa: E722
+            pass
         self.close()
 
     def closeEvent(self, event):

@@ -315,7 +315,7 @@ class FormantTunerApp(QMainWindow):
     def set_active_profile(self, profile_name: str):
         """Mark a profile as active and update the UI label."""
         self.active_profile = profile_name
-        self.active_label.setText(f"Active: {profile_name}")
+        self.active_label.setText(f"Active: {self.profile_manager.display_name(profile_name)}")
 
     # ----------------- UI Actions -----------------
     def on_pitch_change(self, value: int):
@@ -367,15 +367,25 @@ class FormantTunerApp(QMainWindow):
 
     # ----------------- Profiles -----------------
 
-    def refresh_profiles(self):
+    def refresh_profiles(self, select: str | None = None):
         self.profile_list.clear()
+
         new_item = QListWidgetItem("➕ New Profile")
         new_item.setForeground(Qt.darkGreen)
         new_item.setFont(QFont("Consolas", 11, QFont.Bold))
         self.profile_list.addItem(new_item)
 
         for base in self.profile_manager.list_profiles():
-            self.profile_list.addItem(self.profile_manager.display_name(base))
+            display = self.profile_manager.display_name(base)
+            self.profile_list.addItem(display)
+
+        if select and isinstance(select, str):
+            target_display = self.profile_manager.display_name(select)
+            for i in range(self.profile_list.count()):
+                item = self.profile_list.item(i)
+                if item.text() == target_display:
+                    self.profile_list.setCurrentItem(item)
+                    break
 
     def get_selected_profile_base(self):
         item = self.profile_list.currentItem()
@@ -410,6 +420,7 @@ class FormantTunerApp(QMainWindow):
         base = self.profile_manager.base_from_display(item.text())
         try:
             active = self.profile_manager.apply_profile(base)
+            self.set_active_profile(active)
         except Exception:
             traceback.print_exc()
             return
@@ -443,6 +454,8 @@ class FormantTunerApp(QMainWindow):
                 if not name:
                     name = "user1"
                 self.calib_win = CalibrationWindow(self.analyzer, name, voice_type)
+                # connect signal before showing
+                self.calib_win.profile_calibrated.connect(self.on_profile_calibrated)
                 self.calib_win.show()
                 self.calib_win.destroyed.connect(self.refresh_profiles)
         else:
@@ -450,8 +463,16 @@ class FormantTunerApp(QMainWindow):
             if base:
                 voice_type = self.analyzer.voice_type or "bass"
                 self.calib_win = CalibrationWindow(self.analyzer, base, voice_type)
+                self.calib_win.profile_calibrated.connect(self.on_profile_calibrated)
                 self.calib_win.show()
                 self.calib_win.destroyed.connect(self.refresh_profiles)
+
+    def on_profile_calibrated(self, base_name: str):
+        # base_name is a string like "user1_tenor"
+        self.refresh_profiles(select=base_name)
+        self.set_active_profile(base_name)
+        display = self.profile_manager.display_name(base_name)
+        QMessageBox.information(self, "Profile active", f"Set active profile: {display}")
 
     # ----------------- Vowel Chart -----------------
     def build_vowel_chart(self):
