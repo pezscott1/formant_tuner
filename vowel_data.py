@@ -1,6 +1,3 @@
-# vowel_data.py
-# Central repository for vowel formant targets, maps, and voice types
-
 # Average formant frequencies for different voice types
 FORMANTS = {
     'bass': {
@@ -46,7 +43,6 @@ FORMANTS = {
 }
 
 # Simplified vowel map for guessing mode (F1, F2 only)
-# These are "neutral" averages, not voice-type specific
 VOWEL_MAP = {
     'i': (300, 2200),
     'e': (500, 2000),
@@ -58,9 +54,15 @@ VOWEL_MAP = {
     'u': (350, 950),
 }
 
-# Note names for pitch display
+# Pitch ranges by voice type
+PITCH_RANGES = {
+    "bass": (70, 400),
+    "tenor": (100, 600),
+    "alto": (150, 800),
+    "soprano": (200, 1000),
+}
+
 NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F',
               'F#', 'G', 'G#', 'A', 'A#', 'B']
 
-# Available voice types for UI toggle buttons
 VOICE_TYPES = list(FORMANTS.keys())

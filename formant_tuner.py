@@ -1,488 +1,547 @@
-import matplotlib
-matplotlib.use("TkAgg")
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.widgets import RadioButtons, Slider, Button
-from matplotlib.patches import Ellipse
 import os
-import sounddevice as sd
-from scipy.signal import spectrogram
-import queue
-from collections import deque
+os.environ["QT_LOGGING_RULES"] = "qt.qpa.fonts=false"
+#!/usr/bin/env python3
+import sys, json, threading, traceback
+import numpy as np
+#PyQt imports
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QListWidget, QSlider, QSplitter, QFrame, 
+    QMessageBox, QDialog, QSizePolicy, QListWidgetItem
+)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont 
+
+#matplotlib imports
+import matplotlib
+matplotlib.use("Qt5Agg")
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+# Project modules (existing from your codebase)
 from vowel_data import FORMANTS, NOTE_NAMES
-from voice_analysis import Analyzer
-from formant_utils import robust_guess, is_plausible_formants, plausibility_score, choose_best_candidate
-import subprocess
-import glob
-import tkinter as tk
-from tkinter import ttk
+from formant_utils import is_plausible_formants, choose_best_candidate
 from mic_analyzer import MicAnalyzer, results_queue
+from calibration_py_qt import CalibrationWindow, ProfileDialog
+from voice_analysis import MedianSmoother, PitchSmoother, Analyzer
+# Sounddevice for live audio
+import sounddevice as sd
+import logging
+import threading
 
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
-analyzer = Analyzer(voice_type="bass", smoothing=True, smooth_size=5)
+PROFILES_DIR = "profiles"
+os.makedirs(PROFILES_DIR, exist_ok=True)
 
-PROFILE_PATH = os.path.join("profiles", "user1_profile.json")
-MODEL_PATH = os.path.join("profiles", "user1_model.pkl")
-if os.path.exists(PROFILE_PATH):
-    analyzer.load_profile(PROFILE_PATH, model_path=MODEL_PATH)
+def profile_display_name(base: str) -> str:
+    return base.replace("_", " ")
 
+def profile_files():
+    return sorted([fn[:-len("_profile.json")] for fn in os.listdir(PROFILES_DIR) if fn.endswith("_profile.json")])
 
-recent_results = []
-
-def process_status(status):
-    f1, f2 = status["formants"][:2]
-    ok, reason = is_plausible_formants(f1, f2)
-    if not ok:
-        return None  # skip implausible frame
-
-    recent_results.append(status)
-    if len(recent_results) >= 5:  # smooth over 5 frames
-        best = choose_best_candidate(recent_results[0], recent_results[1:])
-        recent_results.clear()
-        return best
-    return None
-
-
-def harmonic_series(f0, num_harmonics=12):
-    return np.arange(1, num_harmonics + 1) * f0
-
-
-def spectral_envelope(formants, freqs, bandwidth=100):
-    envelope = np.zeros_like(freqs)
-    for f in formants:
-        envelope += np.exp(-0.5 * ((freqs - f) / bandwidth) ** 2)
-    return envelope
-
-
-def score_vowel_pitch(formants, pitch, tolerance=50, max_score=100):
-    harmonics = harmonic_series(pitch, num_harmonics=12)
-    score = 0
-    total_possible = len(formants) * 10
-    for f in formants:
-        closest = min(harmonics, key=lambda h: abs(h - f))
-        distance = abs(closest - f)
-        if distance <= tolerance:
-            points = max(0, 10 - (distance / tolerance) * 10)
-            score += points
-    return int((score / total_possible) * max_score)
-
-
-def score_against_profile(measured_formants, user_profile, vowel, tolerance=50, max_score=100):
-    if not user_profile or vowel not in user_profile:
+def profile_base_from_display(display: str):
+    if display.startswith("➕"):
         return None
-    entry = user_profile[vowel]
-    target_f1 = entry.get("f1")
-    target_f2 = entry.get("f2")
-    measured_f1, measured_f2 = measured_formants[0], measured_formants[1]
-    score = 0
-    total_possible = 20
-    if target_f1 and measured_f1:
-        dist = abs(measured_f1 - target_f1)
-        if dist <= tolerance:
-            score += max(0, 10 - (dist / tolerance) * 10)
-    if target_f2 and measured_f2:
-        dist = abs(measured_f2 - target_f2)
-        if dist <= tolerance:
-            score += max(0, 10 - (dist / tolerance) * 10)
-    return int((score / total_possible) * max_score)
+    return display.replace(" ", "_")
 
-
-def directional_feedback(measured_formants, user_profile, vowel, tolerance=50):
-    if not user_profile or vowel not in user_profile:
-        return None, None
-    target_f1 = user_profile[vowel].get("f1")
-    target_f2 = user_profile[vowel].get("f2")
-    measured_f1, measured_f2 = measured_formants[0], measured_formants[1]
-    fb_f1 = None
-    fb_f2 = None
-    if measured_f1 and target_f1:
-        diff = measured_f1 - target_f1
-        if abs(diff) > tolerance:
-            fb_f1 = "lower F1" if diff > 0 else "raise F1"
-    if measured_f2 and target_f2:
-        diff = measured_f2 - target_f2
-        if abs(diff) > tolerance:
-            fb_f2 = "lower F2" if diff > 0 else "raise F2"
-    return fb_f1, fb_f2
-
-
-def freq_to_note_name(freq):
-    if freq <= 0:
+def freq_to_note_name(freq: float) -> str:
+    if not freq or freq <= 0:
         return "N/A"
     midi = int(round(69 + 12 * np.log2(freq / 440.0)))
+    if midi < 0 or midi >= 128:
+        return "N/A"
     name = NOTE_NAMES[midi % 12]
     octave = midi // 12 - 1
     return f"{name}{octave}"
+  
+
+# -------------------------
+# Main PyQt Application
+# -------------------------
+class FormantTunerApp(QMainWindow):
+    def __init__(self, analyzer: Analyzer):
+        super().__init__()
+        self.setWindowTitle("Formant Tuner")
+        self.analyzer = analyzer
+
+        # Defaults
+        self.voice_type = analyzer.voice_type or "bass"
+        self.current_vowel_name = "a" if "a" in FORMANTS[self.voice_type] else list(FORMANTS[self.voice_type].keys())[0]
+        self.current_formants = FORMANTS[self.voice_type][self.current_vowel_name]
+        self.last_measured = (np.nan, np.nan, np.nan)
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        main_layout = QHBoxLayout(central)
+
+        # Left panel: profiles + mic controls
+        left_frame = QFrame()
+        left_frame.setMinimumWidth(300)
+        left_layout = QVBoxLayout(left_frame)
+        left_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f2f2f2;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
+        
+       # Profiles label pinned at top
+        label = QLabel("Profiles")
+        label.setStyleSheet("font-size: 10pt; font-weight: bold; margin-bottom: 4px;")
+        label.setFixedHeight(50)
+        left_layout.addWidget(label)
+
+        # Profile block: list + buttons grouped tightly
+        profile_container = QWidget()
+        profile_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        profile_layout = QVBoxLayout(profile_container)
+        profile_layout.setContentsMargins(0, 0, 0, 0)
+        profile_layout.setSpacing(6)
+
+        self.profile_list = QListWidget()
+        self.profile_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.profile_list.setStyleSheet("""
+            QListWidget {
+                font-size: 11pt;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+        """)
+        profile_layout.addWidget(self.profile_list)
+
+        # Delete/Refresh row pinned under list
+        btn_row = QHBoxLayout()
+        self.delete_btn = QPushButton("Delete")
+        self.refresh_btn = QPushButton("Refresh")
+        btn_row.addWidget(self.delete_btn)
+        btn_row.addWidget(self.refresh_btn)
+        profile_layout.addLayout(btn_row)
+
+        left_layout.addWidget(profile_container)
+            
+        # Mic buttons block
+        mic_container = QWidget()
+        mic_layout = QVBoxLayout(mic_container)
+        mic_layout.setContentsMargins(0, 0, 0, 0)
+        mic_layout.setSpacing(20)   # padding between buttons
+
+        # Add some top spacing so they sit lower
+        mic_layout.addStretch()
+        # create buttons and keep references
+        self.start_btn = QPushButton("Start Mic")
+        self.stop_btn  = QPushButton("Stop Mic")
+        self.calib_btn  = QPushButton("Calibrate")
+
+        for b, color in ((self.start_btn, "#4CAF50"), (self.stop_btn, "#f44336"), (self.calib_btn, "#2196F3")):
+            b.setFixedHeight(75)
+            b.setStyleSheet(f"QPushButton {{ background-color: {color}; color: white; font-size: 12pt; font-weight: bold; border-radius: 6px; padding: 6px; }}")
+            mic_layout.addWidget(b)
+
+        left_layout.addWidget(mic_container)
+        hint_label = QLabel("Tip: To create a new profile, click Calibrate with New Profile highlighted.\n"
+                    "To update an existing profile, highlight it first, then click Calibrate.")
+        hint_label.setAlignment(Qt.AlignCenter)
+        hint_label.setStyleSheet("font-size: 9pt; color: gray;")
+        mic_layout.addWidget(hint_label)
+        # Stretch to push active label to bottom
+        left_layout.addStretch()
+
+        # Active label pinned at bottom
+        self.active_label = QLabel("Active: —")
+        self.active_label.setAlignment(Qt.AlignCenter)
+        self.active_label.setFixedHeight(150)
+        self.active_label.setStyleSheet("font-weight: bold; font-size: 11pt; color: darkblue;")
+        left_layout.addWidget(self.active_label)
+            
+        main_layout.addWidget(left_frame)
+
+        # Right side: control bar + plots via splitter
+        right_splitter = QSplitter(Qt.Vertical)
+        main_layout.addWidget(right_splitter, stretch=1)
+
+        # Control bar
+        control_frame = QFrame()
+        control_layout = QHBoxLayout(control_frame)
+
+        control_layout.addWidget(QLabel("Pitch (Hz)"))
+        self.pitch_slider = QSlider(Qt.Horizontal)
+        self.pitch_slider.setMinimum(100)
+        self.pitch_slider.setMaximum(600)
+        self.pitch_slider.setValue(261)
+        control_layout.addWidget(self.pitch_slider)
+
+        self.play_btn = QPushButton("Play Pitch")
+        control_layout.addWidget(self.play_btn)
+
+        control_layout.addWidget(QLabel("Tolerance (Hz)"))
+        self.tol_slider = QSlider(Qt.Horizontal)
+        self.tol_slider.setMinimum(10)
+        self.tol_slider.setMaximum(200)
+        self.tol_slider.setValue(50)
+        control_layout.addWidget(self.tol_slider)
+
+        self.spec_btn = QPushButton("Spectrogram")
+        self.spec_btn.setCheckable(True)
+        control_layout.addWidget(self.spec_btn)
+
+        right_splitter.addWidget(control_frame)
+
+        # Matplotlib plots
+        plot_frame = QFrame()
+        plot_layout = QVBoxLayout(plot_frame)
+
+        self.fig, (self.ax_chart, self.ax_spec) = plt.subplots(1, 2, figsize=(8, 4), constrained_layout=True)
+        self.canvas = FigureCanvas(self.fig)
+        plot_layout.addWidget(self.canvas)
+
+        right_splitter.addWidget(plot_frame)
+        right_splitter.setSizes([120, 800])
+
+        self.mic = MicAnalyzer(
+            vowel_provider=lambda: self.current_vowel_name,
+            tol_provider=lambda: self.tol_slider.value(),
+            pitch_provider=lambda: self.pitch_slider.value(),
+            sample_rate=44100,          # <-- make sure this is passed
+            frame_ms=40,
+            analyzer=self.analyzer
+        )
+        if hasattr(self.mic, "sample_rate") and self.mic.sample_rate != 44100:
+            logger.warning("MicAnalyzer sample_rate differs from UI default: %s", self.mic.sample_rate)
+        # Signals/slots
+        self.pitch_slider.valueChanged.connect(self.on_pitch_change)
+        self.tol_slider.valueChanged.connect(self.on_tol_change)
+        self.play_btn.clicked.connect(lambda: self.play_pitch(self.pitch_slider.value()))
+        self.spec_btn.toggled.connect(self.toggle_spectrogram)
+        self.start_btn.clicked.connect(self.mic.start)
+        self.stop_btn.clicked.connect(self.mic.stop)
+        self.refresh_btn.clicked.connect(self.refresh_profiles)
+        self.delete_btn.clicked.connect(self.delete_profile)
+        self.calib_btn.clicked.connect(self.launch_calibration)
+        self.profile_list.itemDoubleClicked.connect(
+            lambda item: self.apply_selected_profile(profile_base_from_display(item.text()))
+        )
+        # Timer to poll results from mic worker
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.poll_queue)
+        self.timer.start(100)
+
+        # Initial chart build
+        self.build_vowel_chart()
+        self.update_spectrum(self.current_vowel_name, self.current_formants, (np.nan, np.nan, np.nan),
+                             pitch=float(self.pitch_slider.value()),
+                             tolerance=int(self.tol_slider.value()))
+        self.canvas.draw()
+
+        # Initial window size ~75% of screen and centered
+        screen = QApplication.primaryScreen().availableGeometry()
+        w = int(screen.width() * 0.75)
+        h = int(screen.height() * 0.75)
+        self.resize(w, h)
+        self.move(screen.center().x() - w // 2, screen.center().y() - h // 2)
+
+        # Populate profiles initially
+        self.refresh_profiles()
+
+        self.show()
+
+    # ------------- UI Actions -------------
+    def on_pitch_change(self, value: int):
+        self.update_spectrum(self.current_vowel_name, self.current_formants, self.last_measured, float(value), int(self.tol_slider.value()))
+        self.canvas.draw()
+
+    def on_tol_change(self, value: int):
+        self.update_spectrum(self.current_vowel_name, self.current_formants, self.last_measured, float(self.pitch_slider.value()), int(value))
+        self.canvas.draw()
+
+    def toggle_spectrogram(self, checked: bool):
+        if checked:
+            self.ax_spec.clear()
+            self.ax_spec.set_title("Spectrogram (toggle on)")
+            self.canvas.draw()
+        else:
+            self.update_spectrum(self.current_vowel_name, self.current_formants, self.last_measured,
+                                 float(self.pitch_slider.value()), int(self.tol_slider.value()))
+            self.canvas.draw()
+
+    def play_pitch(self, frequency, duration=2.0, sample_rate=44100):
+        def _play():
+            t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+            waveform = 0.2 * np.sin(2 * np.pi * frequency * t)
+            sd.play(waveform, sample_rate); sd.wait()
+        threading.Thread(target=_play, daemon=True).start()
+
+    # ------------- Profiles -------------
+    def refresh_profiles(self):
+        self.profile_list.clear()
+
+        # Always add a "New Profile" entry
+        new_item = QListWidgetItem("➕ New Profile")
+        new_item.setForeground(Qt.darkGreen)
+        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
+        self.profile_list.addItem(new_item)
+
+        # Then add existing profiles
+        for base in profile_files():
+            self.profile_list.addItem(profile_display_name(base))
+
+    def get_selected_profile_base(self):
+        item = self.profile_list.currentItem()
+        if not item:
+            return None
+        return profile_base_from_display(item.text())
 
 
-def play_pitch(frequency, duration=2.0, sample_rate=44100):
-    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-    waveform = 0.2 * np.sin(2 * np.pi * frequency * t)
-    sd.play(waveform, sample_rate)
-    sd.wait()
+    def delete_profile(self):
+        base = self.get_selected_profile_base()
+        if not base:
+            QMessageBox.information(self, "Delete", "Select a profile to delete.")
+            return
+        display = profile_display_name(base)
+        path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
+        ok = QMessageBox.question(self, "Delete", f"Delete profile {display}?", QMessageBox.Yes | QMessageBox.No)
+        if ok == QMessageBox.Yes:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                traceback.print_exc()
+                QMessageBox.critical(self, "Error", "Failed to delete profile.")
+        self.refresh_profiles()
 
+        
+    def apply_selected_profile(self, base=None):
+        item = self.profile_list.currentItem()
+        if not item:
+            QMessageBox.information(self, "Apply", "Please select a profile to apply.")
+            return
+        if item.text().startswith("➕"):
+            QMessageBox.information(self, "New Profile", "Click Calibrate to create a new profile.")
+            return
+        base = profile_base_from_display(item.text())
 
-def interactive_vowel_chart(initial_pitch=261.63, voice_type='bass', headless=False):
-    analyzer.voice_type = voice_type
-    vowels = FORMANTS[voice_type]
+        # Mark active
+        with open(os.path.join(PROFILES_DIR, "active_profile.json"), "w", encoding="utf-8") as fh:
+            json.dump({"active": base}, fh)
 
-    # Main figure and two panels
-    fig, (ax_chart, ax_spec) = plt.subplots(1, 2, figsize=(12, 6))
-    fig.subplots_adjust(left=0.36, bottom=0.25)
+        # Load analyzer state
+        profile_path = os.path.join(PROFILES_DIR, f"{base}_profile.json")
+        model_path = profile_path.replace("_profile.json", "_model.pkl")
+        try:
+            self.analyzer.load_profile(profile_path, model_path=model_path)
+        except Exception:
+            traceback.print_exc()
 
-    # Persistent info text
-    info_text = fig.text(0.02, 0.02,
-                         "Measured: F1=?, F2=?, F3=?\nVowel=--, Resonance=--, Overall=--",
-                         ha='left', va='bottom', fontsize=10, color='purple')
-    fig._info_text = info_text
+        # Update UI states
+        self.voice_type = self.analyzer.voice_type or self.voice_type
+        vowels_map = FORMANTS.get(self.voice_type, FORMANTS["bass"])
+        self.current_vowel_name = 'a' if 'a' in vowels_map else next(iter(vowels_map))
+        self.current_formants = vowels_map[self.current_vowel_name]
+        self.active_label.setText(f"Active: {profile_display_name(base)}")
 
-    # Vowel chart points
-    points = {}
-    ax_chart._measured_overlay = []
-    for v, (F1, F2, F3, FS) in vowels.items():
-        pt = ax_chart.scatter(F2, F1, label=f"/{v}/", picker=True, s=100, c='blue')
-        points[pt] = (v, (F1, F2, F3, FS))
-        ax_chart.text(F2 + 50, F1 + 30, f"/{v}/", fontsize=10)
-        ax_chart.add_patch(Ellipse((F2, F1), width=200, height=100, alpha=0.2, color='blue'))
+        self.build_vowel_chart()
+        self.update_spectrum(
+            self.current_vowel_name,
+            self.current_formants,
+            self.last_measured,
+            float(self.pitch_slider.value()),
+            int(self.tol_slider.value())
+        )
+        self.canvas.draw()
 
-    ax_chart.set_title(f"Vowel Chart ({voice_type})")
-    ax_chart.set_xlabel("F2 (Hz)")
-    ax_chart.set_ylabel("F1 (Hz)")
-    ax_chart.invert_xaxis()
-    ax_chart.invert_yaxis()
+    def launch_calibration(self):
+        # Do not stop the mic here — reuse the running MicAnalyzer instance
+        # (stopping can tear down the audio stream/worker and cause calibration to time out)
+        item = self.profile_list.currentItem()
+        if item and item.text().startswith("➕"):
+            # Explicit new profile workflow
+            dlg = ProfileDialog(self)
+            if dlg.exec_() == QDialog.Accepted:
+                name, voice_type = dlg.get_values()
+                if not name:
+                    name = "user1"
+                self.calib_win = CalibrationWindow(self.analyzer, name, voice_type)
+                self.calib_win.show()
+                self.calib_win.destroyed.connect(self.refresh_profiles)
+        else:
+            # Update existing profile
+            base = self.get_selected_profile_base()
+            if base:
+                voice_type = self.analyzer.voice_type or "bass"
+                self.calib_win = CalibrationWindow(self.analyzer, base, voice_type)
+                self.calib_win.show()
+                self.calib_win.destroyed.connect(self.refresh_profiles)
 
-    # Spectrum state
-    freq_axis = np.linspace(0, 4000, 1000)
-    current_vowel_name = 'a' if 'a' in vowels else next(iter(vowels))
-    current_formants = vowels[current_vowel_name]
-    formant_history = deque(maxlen=7)
+    # ------------- Vowel Chart -------------
+    def build_vowel_chart(self):
+        self.ax_chart.clear()
 
-    # Control panel
-    control_left = 0.02
-    control_width = 0.28
-    control_height = 0.05
-    label_offset = 1.12
-
-    ax_pitch_ctrl = plt.axes([control_left, 0.72, control_width, control_height])
-    pitch_slider = Slider(ax_pitch_ctrl, '', 100, 600, valinit=initial_pitch, valstep=0.1)
-    ax_pitch_ctrl.text(0.0, label_offset, "Pitch (Hz)", transform=ax_pitch_ctrl.transAxes,
-                       fontsize=9, ha='left', va='bottom')
-
-    ax_tol_ctrl = plt.axes([control_left, 0.65, control_width, control_height])
-    tol_slider = Slider(ax_tol_ctrl, '', 10, 200, valinit=50, valstep=1)
-    ax_tol_ctrl.text(0.0, label_offset, "Tolerance (Hz)", transform=ax_tol_ctrl.transAxes,
-                     fontsize=9, ha='left', va='bottom')
-
-    PROFILE_DIR = "profiles"
-    try:
-        profile_files = [f for f in os.listdir(PROFILE_DIR) if f.endswith("_profile.json")]
-    except FileNotFoundError:
-        profile_files = []
-
-    if not profile_files:
-        profile_files = ["(none)"]
-
-    # Add special option for calibration
-    profile_files.append("setup profile")
-
-
-    def on_profile_select(label):
-        if label != "(none)":
-            profile_path = os.path.join(PROFILE_DIR, label)
-            model_path = profile_path.replace("_profile.json", "_model.pkl")
-            analyzer.load_profile(profile_path, model_path=model_path)
-            print(f"Loaded profile {label}")
-            # FIX: add measured_formants placeholder
-            update_spectrum(current_vowel_name, current_formants,
-                            (np.nan, np.nan, np.nan),
-                            pitch_slider.val, tol_slider.val)
-
-
-    def add_profile_dropdown(fig, profiles, on_select):
-        canvas = fig.canvas.get_tk_widget()
-        root = canvas.winfo_toplevel()
-
-        label = ttk.Label(root, text="User Profile:", font=("Arial", 14))
-        label.place(x=20, y=60, width=200, height=30)
-
-        combo = ttk.Combobox(root, values=profiles, state="readonly", font=("Arial", 14))
-        combo.place(x=20, y=95, width=280, height=35)  # lower and wider
-        combo.current(0)
-
-        def handler(event):
-            on_select(combo.get())
-
-        combo.bind("<<ComboboxSelected>>", handler)
-        return combo
-
-                
-    # Place dropdown in upper-left corner of the window
-    profile_dropdown = add_profile_dropdown(fig, profile_files, on_profile_select)
-
-    # Buttons
-    ax_btn_start = plt.axes([control_left, 0.55, control_width, control_height])
-    ax_btn_stop = plt.axes([control_left, 0.48, control_width, control_height])
-    ax_btn_play = plt.axes([control_left, 0.41, control_width, control_height])
-    ax_btn_spec = plt.axes([control_left, 0.34, control_width, control_height])
-
-    btn_start = Button(ax_btn_start, 'Start Mic')
-    btn_stop = Button(ax_btn_stop, 'Stop Mic')
-    btn_play = Button(ax_btn_play, 'Play Pitch')
-    btn_spec = Button(ax_btn_spec, 'Show Spectrogram')
-
-    ax_btn_calib = plt.axes([control_left, 0.27, control_width, control_height])
-    btn_calib = Button(ax_btn_calib, 'Calibrate')
-
-
-    def launch_calibration(event):
-        # spawn calibration.py in a new Python process
-        proc = subprocess.Popen(["python", "calibration.py"])
-        proc.wait()  # block until calibration.py exits
-
-        # once calibration.py exits, reload newest profile
-        files = glob.glob(os.path.join(PROFILE_DIR, "*_profile.json"))
-        if files:
-            newest = max(files, key=os.path.getmtime)
-            model_path = newest.replace("_profile.json", "_model.pkl")
-            analyzer.load_profile(newest, model_path=model_path)
-            print(f"Calibration complete. Loaded {os.path.basename(newest)}")
-            profile_dropdown.set(os.path.basename(newest))
-
-
-    btn_calib.on_clicked(launch_calibration)
-
-    mic = MicAnalyzer(
-        vowel_provider=lambda: current_formants,
-        tol_provider=lambda: tol_slider.val,
-        pitch_provider=lambda: pitch_slider.val,
-        sample_rate=44100,  
-        frame_ms=80,        
-        analyzer=analyzer 
-    )
-
-    # Event handlers
-    def on_pick(event):
-        if event.artist in points:
-            vname, formants = points[event.artist]
-            nonlocal current_vowel_name, current_formants
-            current_vowel_name = vname
-            current_formants = formants
-            update_spectrum(vname, formants, pitch_slider.val, tol_slider.val)
-            # No fake measured yet
-            fig._info_text.set_color("purple")
-            fig.canvas.draw_idle()
-
-    def freq_to_midi(f):
-        return 69.0 + 12.0 * np.log2(f / 440.0)
-
-    def midi_to_freq(m):
-        return 440.0 * 2.0 ** ((m - 69.0) / 12.0)
-
-    def on_pitch_change(val):
-        m_cont = freq_to_midi(val)
-        m_round = int(round(m_cont))
-        f_snap = midi_to_freq(m_round)
-        if abs(f_snap - pitch_slider.val) > 1e-6:
-            pitch_slider.eventson = False
-            pitch_slider.set_val(f_snap)
-            pitch_slider.eventson = True
-        update_spectrum(current_vowel_name, current_formants, (np.nan, np.nan, np.nan), f_snap, tol_slider.val)
-
-    def update_voice(label):
-        nonlocal vowels, points, current_formants, voice_type
-        voice_type = label
-        analyzer.voice_type = label
-        vowels = FORMANTS[label]
-
-        ax_chart.clear()
-        points.clear()
+        vowels = FORMANTS.get(self.voice_type, FORMANTS["bass"])
         for v, (F1, F2, F3, FS) in vowels.items():
-            pt = ax_chart.scatter(F2, F1, label=f"/{v}/", picker=True, s=100, c='blue')
-            points[pt] = (v, (F1, F2, F3, FS))
-            ax_chart.text(F2 + 50, F1 + 30, f"/{v}/", fontsize=10)
-            ax_chart.add_patch(Ellipse((F2, F1), width=200, height=100, alpha=0.2, color='blue'))
-        ax_chart.set_title(f"Vowel Chart ({label})")
-        ax_chart.set_xlabel("F2 (Hz)")
-        ax_chart.set_ylabel("F1 (Hz)")
-        ax_chart.invert_xaxis()
-        ax_chart.invert_yaxis()
+            self.ax_chart.scatter(F2, F1, c="blue", s=70, label=f"/{v}/")
+            self.ax_chart.text(F2 + 35, F1 + 35, f"/{v}/", fontsize=9, color="blue")
 
-        if current_vowel_name not in vowels:
-            current_vowel_name = 'a' if 'a' in vowels else next(iter(vowels))
-            current_formants = vowels[current_vowel_name]
-        update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
-        fig.canvas.draw_idle()
+        self.ax_chart.set_title(f"Vowel Chart ({self.voice_type})")
+        self.ax_chart.set_xlabel("F2 (Hz)")
+        self.ax_chart.set_ylabel("F1 (Hz)")
+        self.ax_chart.invert_xaxis()
+        self.ax_chart.invert_yaxis()
 
-    def on_profile_select(label):
-        if label != "(none)":
-            profile_path = os.path.join(PROFILE_DIR, label)
-            model_path = profile_path.replace("_profile.json", "_model.pkl")
-            analyzer.load_profile(profile_path, model_path=model_path)
-            print(f"Loaded profile {label}")
-            update_spectrum(current_vowel_name, current_formants, pitch_slider.val, tol_slider.val)
+    # ------------- Spectrum -------------
+    def update_spectrum(self, vowel, target_formants, measured_formants, pitch, tolerance):
+        self.ax_spec.clear()
 
-    def show_spectrogram(event=None):
-        if mic is None or len(mic.buffer) < 1000:
-            print("Not enough audio captured for spectrogram.")
-            return
-        sig = np.array(mic.buffer)
-        f, t, Sxx = spectrogram(sig, fs=mic.sample_rate, nperseg=1024, noverlap=512)
-        fig2, ax2 = plt.subplots(figsize=(8, 4))
-        pcm = ax2.pcolormesh(t, f, 10 * np.log10(Sxx + 1e-12), shading='gouraud')
-        ax2.set_ylim(0, 4000)
-        ax2.set_title("Spectrogram of captured audio")
-        fig2.colorbar(pcm, ax=ax2, label='Power (dB)')
-        plt.show()
-
-
-    pitch_slider.on_changed(on_pitch_change)
-    tol_slider.on_changed(lambda val: update_spectrum(current_vowel_name, current_formants, pitch_slider.val, val))
-    btn_start.on_clicked(lambda e: mic.start())
-    btn_stop.on_clicked(lambda e: mic.stop())
-    btn_play.on_clicked(lambda e: play_pitch(pitch_slider.val))
-    btn_spec.on_clicked(show_spectrogram)
-    fig.canvas.mpl_connect('pick_event', on_pick)
-
-    # Initial spectrum
-    def update_spectrum(vowel, target_formants, measured_formants, pitch, tolerance):
-        ax_spec.cla()
-        target = (target_formants[0], target_formants[1], target_formants[2])
-        hs = [h for h in harmonic_series(pitch, num_harmonics=12) if 0 <= h <= 4000]
+        # Harmonic series up to 4000 Hz
+        hs = [h for h in np.arange(1, 13) * pitch if h <= 4000]
         if not hs:
-            ax_spec.set_xlim(0, 4000)
-            ax_spec.set_ylim(0, 1)
-            ax_spec.set_title("No harmonics in range")
-            fig.canvas.draw_idle()
+            self.ax_spec.set_xlim(0, 4000)
+            self.ax_spec.set_ylim(0, 1)
+            self.ax_spec.set_title("No harmonics in range")
             return
-        amplitudes = []
+
+        # Boost harmonics near target formants
+        amps = []
         for h in hs:
             boost = 1.0
-            for f in target:
-                if abs(h - f) <= tolerance:
+            for f in target_formants[:3]:
+                if f and not np.isnan(f) and abs(h - f) <= tolerance:
                     boost += 2.0
-            amplitudes.append(boost)
-        amplitudes = np.array(amplitudes)
-        ax_spec.stem(hs, amplitudes, linefmt='gray', markerfmt='o', basefmt=" ")
-        ax_spec.plot(freq_axis := np.linspace(0, 4000, 1000),
-                     spectral_envelope(target, freq_axis), 'r-', linewidth=2, label="Filter Envelope")
-        for f in target:
-            ax_spec.axvline(f, color='blue', linestyle='--', alpha=0.5)
-        score = score_vowel_pitch(target, pitch, tolerance)
-        note_name = freq_to_note_name(pitch)
-        ax_spec.set_xlim(0, 4000)
-        ax_spec.set_ylim(0, max(amplitudes) + 1)
-        ax_spec.set_title(f"Spectrum /{vowel}/ ({voice_type}, {note_name} {pitch:.2f} Hz, Score={score})")
-        ax_spec.set_xlabel("Frequency (Hz)")
-        ax_spec.set_ylabel("Amplitude (a.u.)")
-        ax_spec.legend(loc='upper right')
-        # reset all markers to blue, then highlight current vowel by score/profile
-        for pt, (vname, _) in points.items():
-            try:
-                pt.set_facecolor('blue')
-            except Exception:
-                pt.set_facecolors(['blue'])
-        for pt, (vname, _) in points.items():
-            if vname == vowel:
-                if analyzer.user_formants:
-                    profile_score = score_against_profile(
-                        measured_formants=(measured_formants[0], measured_formants[1]),
-                        user_profile=analyzer.user_formants,
-                        vowel=vowel,
-                        tolerance=tolerance
-                    )
+            amps.append(boost)
+        amps = np.array(amps)
 
-                    if profile_score is not None:
-                        color = 'green' if profile_score >= 80 else 'yellow' if profile_score >= 50 else 'red'
-                    else:
-                        color = 'gray'
-                else:
-                    color = 'green' if score >= 80 else 'yellow' if score >= 50 else 'red'
-                try:
-                    pt.set_facecolor(color)
-                except Exception:
-                    pt.set_facecolors([color])
-        fig.canvas.draw_idle()
+        # Plot harmonics
+        self.ax_spec.stem(hs, amps, linefmt='gray', markerfmt='o', basefmt=" ")
 
+        # Plot spectral envelope
+        freq_axis = np.linspace(0, 4000, 1000)
+        env = np.zeros_like(freq_axis)
+        for f in target_formants[:3]:
+            if f and not np.isnan(f):
+                env += np.exp(-0.5 * ((freq_axis - f) / 100.0) ** 2)
+        self.ax_spec.plot(freq_axis, env, 'r-', linewidth=2, label="Filter Envelope")
 
-    # Poll queue in main thread via Tk timer
-    def poll_queue():
-        updated = False
-        while not results_queue.empty():
-            raw_status = results_queue.get_nowait()
-            stable_status = process_status(raw_status)
-            if not stable_status:
-                continue  # skip implausible/noisy frame
+        # Mark target formants (blue dashed)
+        for f in target_formants[:3]:
+            if f and not np.isnan(f):
+                self.ax_spec.axvline(f, color='blue', linestyle='--', alpha=0.5, label=None)
 
-            # Use stable_status consistently
-            f0 = stable_status.get("f0")
-            f1, f2, f3 = stable_status.get("formants", (np.nan, np.nan, np.nan))
+        # Overlay measured formants (red dotted)
+        for f in measured_formants[:3]:
+            if f and not np.isnan(f):
+                self.ax_spec.axvline(f, color='red', linestyle=':', alpha=0.7, label=None)
 
-            # Sync pitch slider
-            if f0:
-                try:
-                    pitch_slider.set_val(float(f0))
-                except Exception:
-                    pass
+        # Title and labels
+        note = freq_to_note_name(pitch)
+        self.ax_spec.set_xlim(0, 4000)
+        self.ax_spec.set_ylim(0, max(amps) + 1)
+        self.ax_spec.set_title(f"Spectrum /{vowel}/ ({self.voice_type}, {note} {pitch:.2f} Hz)")
+        self.ax_spec.set_xlabel("Frequency (Hz)")
+        self.ax_spec.set_ylabel("Amplitude (a.u.)")
+        handles, labels = self.ax_spec.get_legend_handles_labels()
+        unique = {}
+        for h, l in zip(handles, labels):
+            if l not in unique:
+                unique[l] = h
+        if unique:
+            self.ax_spec.legend(unique.values(), unique.keys(), loc='upper right')
 
-            # Measured formants overlay on chart
-            measured = (f1, f2, f3)
-            update_spectrum(
-                current_vowel_name,
-                current_formants,          # chart tuple
-                measured,                  # mic values from queue
-                pitch_slider.val,
-                tol_slider.val
-            )
-            for a in getattr(ax_chart, "_measured_overlay", []):
+        # Overlay measured dot on chart if available
+        f1, f2 = measured_formants[:2]
+        if f1 and f2 and not np.isnan(f1) and not np.isnan(f2):
+            # Remove previous overlays
+            for a in getattr(self.ax_chart, "_measured_overlay", []):
                 try:
                     a.remove()
                 except Exception:
                     pass
-            ax_chart._measured_overlay = []
-            p = ax_chart.scatter(measured[1], measured[0], c="red", s=60, zorder=10)
-            ax_chart._measured_overlay.append(p)
+            self.ax_chart._measured_overlay = []
+            p = self.ax_chart.scatter(f2, f1, c="red", s=60, zorder=10)
+            self.ax_chart._measured_overlay.append(p)
 
-            # Update info text color based on overall
-            overall = stable_status.get("overall", None)
-            if overall is None:
-                fig._info_text.set_color("purple")
-            else:
-                fig._info_text.set_color(
-                    "green" if overall >= 80 else
-                    "orange" if overall >= 50 else
-                    "red"
-                )
+        # Keep for subsequent updates
+        self.last_measured = measured_formants
 
-            # Minimal info line
-            mf_disp = [f"{int(x)}" if (x is not None and not np.isnan(x)) else "?"
-                    for x in measured]
-            fb_f1 = stable_status.get("fb_f1", "")
-            fb_f2 = stable_status.get("fb_f2", "")
+    # ------------- Queue Polling -------------
+    def poll_queue(self):
+        if not hasattr(self, "canvas") or self.canvas is None:
+            return
 
-            fig._info_text.set_text(
-                f"Voice type={voice_type}, Target=/{current_vowel_name}/\n"
-                f"F1={mf_disp[0]} {fb_f1}, F2={mf_disp[1]} {fb_f2}, F3={mf_disp[2]}\n"
-                f"Score={stable_status.get('vowel_score', 0)}, "
-                f"Resonance={stable_status.get('resonance_score', 0)}, "
-                f"Overall={overall if overall is not None else '--'}"
+        # Initialize stabilizers if not already
+        if not hasattr(self, "formant_smoother"):
+            self.formant_smoother = MedianSmoother(size=5)
+        if not hasattr(self, "pitch_smoother"):
+            self.pitch_smoother = PitchSmoother(size=5)
+
+        updated = False
+        while not results_queue.empty():
+            raw = results_queue.get_nowait()
+            #print("UI received:", raw)  # debug
+
+            # --- Pitch smoothing ---
+            f0 = float(raw.get("f0") or self.pitch_slider.value())
+            f0 = self.pitch_smoother.update(f0)
+
+            # --- Formant smoothing ---
+            f1, f2, f3 = raw.get("formants", (np.nan, np.nan, np.nan))
+            f1, f2, f3 = self.formant_smoother.update(f1, f2, f3)
+
+            # --- Plausibility filter ---
+            ok, reason = is_plausible_formants(f1, f2, self.voice_type)
+            if not ok:
+                # discard implausible frame
+                f1, f2 = np.nan, np.nan
+
+            measured = (
+                f1 if f1 is not None else np.nan,
+                f2 if f2 is not None else np.nan,
+                f3 if f3 is not None else np.nan,
+            )
+
+            # --- Update spectrum with stabilized values ---
+            self.update_spectrum(
+                raw.get("vowel_guess") or self.current_vowel_name,
+                self.current_formants,
+                measured,
+                f0,
+                int(self.tol_slider.value())
+            )
+
+            # --- Overlay feedback text ---
+            fb1, fb2 = raw.get("fb_f1"), raw.get("fb_f2")
+            self.ax_chart.set_title(
+                f"Guess=/{raw.get('vowel_guess')}/ conf={raw.get('vowel_confidence'):.2f}\n"
+                f"Feedback: {fb1 or ''} {fb2 or ''}"
             )
 
             updated = True
 
         if updated:
-            fig.canvas.draw_idle()
+            self.canvas.draw()
 
-        # Re-arm the Tk timer (every 100 ms)
-        fig.canvas.get_tk_widget().after(100, poll_queue)
+    # ------------- Close handling -------------
+    def closeEvent(self, event):
+        try:
+            self.timer.stop()
+            if hasattr(self.mic, "stop"):
+                self.mic.stop()
+            # no join call; MicAnalyzer.stop handles worker shutdown
+        except Exception:
+            logger.exception("Error during shutdown")
+        event.accept()
 
-    # Kick off polling loop once
-    fig.canvas.get_tk_widget().after(100, poll_queue)
-
-    if headless:
-        return fig, mic, fig._info_text, None
-
-    plt.show()
-
+# -------------------------
+# Bootstrap
+# -------------------------
+def main():
+    app = QApplication(sys.argv)
+    analyzer = Analyzer(voice_type="bass", smoothing=True, smooth_size=5)
+    win = FormantTunerApp(analyzer)
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    interactive_vowel_chart()
+    main()

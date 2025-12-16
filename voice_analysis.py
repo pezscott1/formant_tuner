@@ -5,6 +5,7 @@ import sounddevice as sd
 import librosa
 from sklearn.neighbors import KNeighborsClassifier
 from datetime import datetime, timezone
+import joblib  # used when loading saved classifier models
 
 # Import all helpers from formant_utils
 from formant_utils import (
@@ -18,6 +19,7 @@ from formant_utils import (
     is_plausible_formants,
     normalize_profile_for_save,
     dump_live_profile,
+    pick_formants,  # use canonical implementation from formant_utils
 )
 
 from vowel_data import FORMANTS, VOWEL_MAP
@@ -41,12 +43,26 @@ class FormantSmoother:
         self.buffer = deque(maxlen=size)
 
     def update(self, f1, f2):
-        if f1 and f2:
-            self.buffer.append((f1, f2))
-        if self.buffer:
-            f1s, f2s = zip(*self.buffer)
-            return np.median(f1s), np.median(f2s)
-        return f1, f2
+        """
+        Append only when at least one of f1/f2 is a valid numeric value.
+        Return (f1_med, f2_med) where missing values are returned as None.
+        """
+        valid_f1 = (f1 is not None) and not (isinstance(f1, float) and np.isnan(f1))
+        valid_f2 = (f2 is not None) and not (isinstance(f2, float) and np.isnan(f2))
+
+        if valid_f1 or valid_f2:
+            # store tuple with None for missing values so medians compute correctly
+            self.buffer.append((f1 if valid_f1 else None, f2 if valid_f2 else None))
+
+        if not self.buffer:
+            return None, None
+
+        f1s = [x[0] for x in self.buffer if x[0] is not None]
+        f2s = [x[1] for x in self.buffer if x[1] is not None]
+
+        f1_med = float(np.median(f1s)) if f1s else None
+        f2_med = float(np.median(f2s)) if f2s else None
+        return f1_med, f2_med
 
 
 class MedianSmoother:
@@ -55,14 +71,20 @@ class MedianSmoother:
         self.f2 = deque(maxlen=size)
         self.f3 = deque(maxlen=size)
 
+    def _safe_median(self, values):
+        arr = [v for v in values if v is not None and not (isinstance(v, float) and np.isnan(v))]
+        if not arr:
+            return None
+        return float(np.median(arr))
+
     def update(self, f1, f2, f3):
         self.f1.append(f1)
         self.f2.append(f2)
         self.f3.append(f3)
         return (
-            float(np.median(self.f1)),
-            float(np.median(self.f2)),
-            float(np.median(self.f3)),
+            self._safe_median(self.f1),
+            self._safe_median(self.f2),
+            self._safe_median(self.f3),
         )
 
 
@@ -91,33 +113,78 @@ class Analyzer:
             logger.info("Loaded profile %s", profile_path)
         except Exception:
             logger.exception("Failed to load profile %s", profile_path)
+                
+    def process_frame(self, audio_frame, sr, target_pitch_hz=None, debug=False):
+        """
+        Robust frame processing: pitch smoothing, guarded formant extraction,
+        smoothing/fallback, vowel guess and scoring.
+        """
+        frame = np.asarray(audio_frame, dtype=float).flatten()
+        if frame.size == 0:
+            return {"status": "no_data", "f0": None, "formants": (None, None, None)}
 
-    def process_frame(self, audio_frame, sr, target_pitch_hz=None):
-        f0 = estimate_pitch(audio_frame, sr)
+        # Pitch
+        f0 = estimate_pitch(frame, sr)
         f0 = self.pitch_smoother.update(f0)
         if f0 is None or f0 < 50 or f0 > 600:
-            f0 = target_pitch_hz or 220.0
+            f0 = target_pitch_hz or None
 
-        f1, f2 = estimate_formants_lpc(audio_frame, sr)
-        if f1 and f2 and f1 > f2:
-            f1, f2 = f2, f1
-        f1, f2 = self.formant_smoother.update(f1, f2)
+        # Formants: only attempt if frame has energy
+        energy = float(np.mean(frame ** 2))
+        if energy < 1e-6:
+            f1 = f2 = f3 = None
+        else:
+            res = estimate_formants_lpc(frame, sr, debug=debug)
+            # res may be (f1,f2,f3) or (f1,f2,f3,candidates)
+            if isinstance(res, (tuple, list)):
+                if len(res) >= 3:
+                    f1, f2, f3 = res[0], res[1], res[2]
+                else:
+                    f1 = f2 = f3 = None
+            else:
+                f1 = f2 = f3 = None
 
-        if f1 is None: f1 = self.last_formants[0]
-        if f2 is None: f2 = self.last_formants[1]
-        if f1 and f2: self.last_formants = (f1, f2)
+        # Ensure ordering and normalize NaN -> None
+        if f1 is not None and f2 is not None:
+            if np.isnan(f1) or np.isnan(f2):
+                f1, f2 = None, None
+            elif f1 > f2:
+                f1, f2 = f2, f1
 
-        vowel = self.clf.predict([[f1 or 0, f2 or 0, f0]])[0] if self.clf else guess_vowel(f1, f2, self.voice_type)
+        # Smoothing
+        if hasattr(self, "formant_smoother") and self.formant_smoother is not None:
+            f1, f2 = self.formant_smoother.update(f1, f2)
 
+        # Last-good fallback
+        if f1 is None:
+            f1 = self.last_formants[0]
+        if f2 is None:
+            f2 = self.last_formants[1]
+        if f1 is not None and f2 is not None:
+            self.last_formants = (f1, f2)
+
+        # Vowel classification
+        try:
+            if self.clf:
+                vowel = self.clf.predict([[f1 or 0.0, f2 or 0.0, f0 or 0.0]])[0]
+            else:
+                vowel = guess_vowel(f1, f2, self.voice_type)
+        except Exception:
+            vowel = guess_vowel(f1, f2, self.voice_type)
+
+        # Scoring
         target_formants = self.user_formants.get(vowel, (None, None, None))
-        vowel_score = live_score_formants(target_formants, (f1, f2, None), tolerance=50)
-        resonance_score = resonance_tuning_score((f1, f2, None), f0, tolerance=50)
+        vowel_score = live_score_formants(target_formants, (f1, f2, f3), tolerance=50)
+        resonance_score = resonance_tuning_score((f1, f2, f3), f0, tolerance=50)
         overall = int(0.5 * vowel_score + 0.5 * resonance_score)
+
+        if debug:
+            logger.debug("process_frame: f0=%s f1=%s f2=%s f3=%s", f0, f1, f2, f3)
 
         return {
             "status": "ok",
             "f0": f0,
-            "formants": (f1, f2, None),
+            "formants": (f1, f2, f3),
             "vowel": vowel,
             "vowel_score": vowel_score,
             "resonance_score": resonance_score,
@@ -131,19 +198,26 @@ class Analyzer:
 
         for v in vowels:
             try:
-                recording = sd.rec(int(duration * sr), samplerate=sr, channels=1)
+                recording = sd.rec(int(duration * sr), samplerate=sr, channels=1, dtype='float32')
                 sd.wait()
                 y = recording[:, 0].astype(float)
 
-                f1, f2 = estimate_formants_lpc(y, sr)
+                f1, f2, f0 = estimate_formants_lpc(y, sr)
+                # f0 fallback using librosa.yin robustly
                 try:
-                    f0 = float(librosa.yin(y, fmin=50, fmax=500, sr=sr).mean())
+                    f0_arr = librosa.yin(y, fmin=50, fmax=500, sr=sr)
+                    f0 = float(np.nanmedian(f0_arr)) if f0_arr.size else None
                 except Exception:
-                    f0 = float("nan")
+                    f0 = None
 
-                self.user_formants[v] = (f1, f2, f0)
-                data.append([f1 or 0.0, f2 or 0.0, f0 or 0.0])
-                labels.append(v)
+                # Only accept if formants are plausible
+                ok, reason = is_plausible_formants(f1, f2, self.voice_type)
+                if ok:
+                    self.user_formants[v] = (f1, f2, f0)
+                    data.append([f1 or 0.0, f2 or 0.0, f0 or 0.0])
+                    labels.append(v)
+                else:
+                    logger.info("Calibration: vowel %s rejected (%s)", v, reason)
             except Exception:
                 logger.exception("Failed to record/process vowel %s; skipping it", v)
 
@@ -158,7 +232,6 @@ class Analyzer:
         dump_live_profile(profile_name, profile_dict)
         self.user_formants = profile_dict
         return True
-
 
     # --- Rendering helpers (from old analysis.py) ---
     def render_status_text(self, ax, status):
@@ -223,25 +296,24 @@ class Analyzer:
 
     def render_diagnostics(self, ax, status, sr, frame_len_samples, voice_type="bass"):
         ax.clear()
-        if status["status"] != "ok":
+        if status.get("status") != "ok":
             ax.text(0.02, 0.9, "Diagnostics: awaiting stable frame", color="orange", transform=ax.transAxes)
             ax.axis("off")
             return
 
-        f0 = status["f0"]
-        f1, f2, f3 = status["formants"]
-        guess, conf, next_best, resonance = (
-            status["guess"], status["conf"], status["next"], status["resonance"]
-        )
-        overall = status["overall"]
-        penalty = status["penalty"]
-        dur = frame_len_samples / sr
+        f0 = status.get("f0")
+        f1, f2, f3 = status.get("formants", (None, None, None))
+        vowel = status.get("vowel")
+        conf = status.get("vowel_score", 0)
+        resonance = status.get("resonance_score", 0)
+        overall = status.get("overall", 0)
+        dur = frame_len_samples / float(sr)
 
         lines = [
             f"Voice type={voice_type}",
-            f"Pitch={f0:.2f} Hz | F1={int(f1)} F2={int(f2)} F3={int(f3)}",
-            f"Guessed=/{guess}/ (conf={conf:.2f}) Next=/{next_best}/",
-            f"Resonance={int(resonance)} Penalty={penalty:.2f} Overall={overall}",
+            f"Pitch={f0:.2f} Hz | F1={int(f1) if f1 else '—'} F2={int(f2) if f2 else '—'} F3={int(f3) if f3 else '—'}",
+            f"Guessed=/{vowel}/ (score={conf})",
+            f"Resonance={int(resonance)} Overall={overall}",
             f"Frame: SR={sr} len={frame_len_samples} dur={dur:.2f}s",
         ]
         y = 0.95
