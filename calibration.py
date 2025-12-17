@@ -161,19 +161,25 @@ class CalibrationWindow(QMainWindow):
         self.status_panel.setReadOnly(True)
         self.status_panel.setFixedHeight(50)
         self.status_panel.setStyleSheet(
-            "QFrame { background-color: #e6f0ff; border: 1px solid #99c; border-radius: 6px; }"
+            "QFrame { background-color: #e6f0ff; "
+            "border: 1px solid #99c; border-radius: 6px; }"
         )
 
-        self.status_panel.setStyleSheet("color: darkblue; font-size: 11pt; font-family: Consolas; font-weight: bold;")
+        self.status_panel.setStyleSheet(
+            "color: darkblue; font-size: 11pt; "
+            "font-family: Consolas; font-weight: bold;")
         text_row.addWidget(self.status_panel, stretch=1)
 
         self.capture_panel = QPlainTextEdit()
         self.capture_panel.setWordWrapMode(QTextOption.NoWrap)
         self.capture_panel.setReadOnly(True)
         self.capture_panel.setStyleSheet(
-            "QFrame { background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 6px; }"
+            "QFrame { background-color: #f2f2f2; "
+            "border: 1px solid #ccc; border-radius: 6px; }"
         )
-        self.capture_panel.setStyleSheet("color: darkgreen; font-size: 11pt; font-family: Consolas; font-weight: bold;")
+        self.capture_panel.setStyleSheet(
+            "color: darkgreen; font-size: 11pt; "
+            "font-family: Consolas; font-weight: bold;")
         layout.addLayout(text_row)
         layout.addWidget(self.capture_panel)
 
@@ -395,7 +401,8 @@ class CalibrationWindow(QMainWindow):
                     times_small, freqs[mask], arr_db, shading="auto"
                 )
             except Exception:
-                mean_spec = np.mean(S_small, axis=1) if S_small.size else np.zeros_like(freqs[mask])
+                mean_spec = np.mean(S_small, axis=1)\
+                    if S_small.size else np.zeros_like(freqs[mask])
                 self.ax_spec.plot(freqs[mask], 10 * np.log10(mean_spec + 1e-12))
         else:
             try:
@@ -694,7 +701,8 @@ class CalibrationWindow(QMainWindow):
         base_name = f"{self.profile_name}_{self.voice_type}"
         profile_path = os.path.join(PROFILES_DIR, f"{base_name}.json")
 
-        profile_dict = normalize_profile_for_save(self.results, retries_map=self.retries_map)
+        profile_dict = normalize_profile_for_save(
+            self.results, retries_map=self.retries_map)
         try:
             with open(profile_path, "w", encoding="utf-8") as fh:
                 json.dump(profile_dict, fh, indent=2)
