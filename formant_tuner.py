@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import traceback
 import numpy as np
 import logging
@@ -25,7 +24,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from functools import partial
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
@@ -38,7 +36,15 @@ from calibration import CalibrationWindow, ProfileDialog
 from voice_analysis import MedianSmoother, PitchSmoother, Analyzer
 import sounddevice as sd
 
-matplotlib.use("Qt5Agg")
+import matplotlib
+import os
+
+if os.environ.get("DISPLAY", "") == "":
+    # No display → headless
+    matplotlib.use("Agg")
+else:
+    matplotlib.use("Qt5Agg")
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(
