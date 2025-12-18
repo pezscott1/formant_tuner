@@ -1,14 +1,23 @@
 # tests/conftest.py
+import pytest
+from unittest.mock import MagicMock
 import os
 import sys
-
-import pytest
-import numpy as np
-from scipy.signal import iirpeak, lfilter
-
 from voice_analysis import Analyzer
+import numpy as np
+from scipy.signal import lfilter, iirpeak
+from formant_tuner import FormantTunerApp
 
-# from formant_utils import unpack_formants  # unused, remove or comment out
+
+@pytest.fixture
+def main_window(qtbot):
+    fake_analyzer = MagicMock()
+    fake_analyzer.voice_type = "bass"
+    win = FormantTunerApp(fake_analyzer)
+    qtbot.addWidget(win)
+    return win
+
+
 
 # Ensure project root is importable for pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

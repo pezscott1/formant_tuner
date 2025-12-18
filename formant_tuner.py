@@ -283,7 +283,7 @@ class FormantTunerApp(QMainWindow):
         self.spec_btn.toggled.connect(self.toggle_spectrogram)  # type:ignore
         self.start_btn.clicked.connect(self.mic.start)  # type:ignore
         self.stop_btn.clicked.connect(self.mic.stop)  # type:ignore
-        self.refresh_btn.clicked.connect(self.refresh_profiles)  # type:ignore
+        self.refresh_btn.clicked.connect(self.refresh_profiles) # type:ignore
         self.delete_btn.clicked.connect(self.delete_profile)  # type:ignore
         self.calib_btn.clicked.connect(self.launch_calibration)  # type:ignore
         self.profile_list.itemDoubleClicked.connect(  # type:ignore
@@ -379,7 +379,6 @@ class FormantTunerApp(QMainWindow):
         new_item.setForeground(Qt.darkGreen)
         new_item.setFont(QFont("Consolas", 11, QFont.Bold))
         self.profile_list.addItem(new_item)
-
         for base in self.profile_manager.list_profiles():
             display = self.profile_manager.display_name(base)
             self.profile_list.addItem(display)
@@ -399,7 +398,11 @@ class FormantTunerApp(QMainWindow):
         return self.profile_manager.base_from_display(item.text())
 
     def delete_profile(self):
-        base = self.profile_manager.base_from_display(self.get_selected_profile_base())
+        display = self.get_selected_profile_base()
+        if display is None:
+            QMessageBox.warning(self, "No Selection", "Please select a profile to delete.")
+            return
+        base = self.profile_manager.base_from_display(display)
         if not base:
             QMessageBox.information(self, "Delete", "Select a profile to delete.")
             return
@@ -418,7 +421,10 @@ class FormantTunerApp(QMainWindow):
 
     def apply_selected_profile(self):
         item = self.profile_list.currentItem()
-        if not item or item.text().startswith("➕"):
+        if not item:
+            QMessageBox.warning(self, "No Selection", "Please select a profile first.")
+            return
+        elif not item.text().startswith("➕"):
             QMessageBox.information(self, "Apply", "Please select a profile to apply.")
             return
 

@@ -699,7 +699,7 @@ class CalibrationWindow(QMainWindow):
             pass
 
         base_name = f"{self.profile_name}_{self.voice_type}"
-        profile_path = os.path.join(PROFILES_DIR, f"{base_name}.json")
+        profile_path = os.path.join(PROFILES_DIR, f"{base_name}_profile.json")
 
         profile_dict = normalize_profile_for_save(
             self.results, retries_map=self.retries_map)

@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import collections
-
 from formant_utils import (
     estimate_formants_lpc,
     live_score_formants,
@@ -13,7 +12,8 @@ from formant_utils import (
 )
 from voice_analysis import Analyzer, MedianSmoother
 from vowel_data import FORMANTS
-
+from PyQt5.QtWidgets import QMessageBox
+from unittest.mock import patch, MagicMock
 matplotlib.use("Agg")
 
 
@@ -269,6 +269,101 @@ class TestStableTracker(unittest.TestCase):
         f1, f2 = stable["formants"]
         self.assertTrue(150 <= f1 <= 900)
         self.assertTrue(200 <= f2 <= 2500)
+
+
+def test_apply_selected_profile_no_item(main_window):
+    main_window.profile_list.clear()
+    with patch.object(QMessageBox, "warning") as mock_warn:
+        main_window.apply_selected_profile()
+        mock_warn.assert_called_once()
+
+
+def test_delete_profile_no_item(main_window):
+    main_window.profile_list.clear()
+    with patch.object(QMessageBox, "warning") as mock_warn:
+        main_window.delete_profile()
+        mock_warn.assert_called_once()
+
+
+def test_refresh_profiles_with_nonexistent_selection(main_window):
+    with patch.object(QMessageBox, "warning") as mock_warn:
+        main_window.refresh_profiles(select="does_not_exist")
+        # Should not crash, may warn or leave selection None
+
+
+def test_stabletracker_rejects_bad_f1_f2():
+    tracker = StableTracker(window=2)
+    status = {"f0": 120, "formants": (50, 10000, None)}  # out of range
+    result = tracker.update(status)
+    assert result["formants"][0] is None or result["formants"][1] is None
+
+
+def test_delete_profile_no_selection_triggers_warning(qtbot):
+    from formant_tuner import FormantTunerApp
+    from voice_analysis import Analyzer
+    app = FormantTunerApp(Analyzer(voice_type="bass"))
+    qtbot.addWidget(app)
+    with patch("calibration.QMessageBox.warning") as mock_warn:
+        app.delete_profile()
+        mock_warn.assert_called_once()
+
+
+def test_apply_selected_profile_no_selection_triggers_warning(qtbot):
+    from formant_tuner import FormantTunerApp
+    from voice_analysis import Analyzer
+    app = FormantTunerApp(Analyzer(voice_type="bass"))
+    qtbot.addWidget(app)
+    with patch("calibration.QMessageBox.warning") as mock_warn:
+        app.apply_selected_profile()
+        mock_warn.assert_called_once()
+
+
+def test_toggle_spectrogram_on_and_off(qtbot):
+    from formant_tuner import FormantTunerApp
+    from voice_analysis import Analyzer
+    app = FormantTunerApp(Analyzer(voice_type="bass"))
+    qtbot.addWidget(app)
+    app.toggle_spectrogram(True)
+    assert "Spectrogram" in app.ax_spec.get_title()
+    app.toggle_spectrogram(False)
+    assert "Spectrum" in app.ax_spec.get_title()
+
+
+def test_on_profile_calibrated_updates_active(qtbot):
+    from formant_tuner import FormantTunerApp
+    from voice_analysis import Analyzer
+    app = FormantTunerApp(Analyzer(voice_type="bass"))
+    qtbot.addWidget(app)
+    with patch("calibration.QMessageBox.information") as mock_info:
+        app.on_profile_calibrated("user1_tenor")
+        assert "Active:" in app.active_label.text()
+        assert "user1" in app.active_label.text()
+        mock_info.assert_called_once()
+
+
+def test_update_spectrum_with_no_harmonics(qtbot):
+    from formant_tuner import FormantTunerApp
+    from voice_analysis import Analyzer
+    app = FormantTunerApp(Analyzer(voice_type="bass"))
+    qtbot.addWidget(app)
+    app.update_spectrum("a", (500, 1500, 200), (np.nan, np.nan, np.nan), pitch=5000, tolerance=50)
+    assert "No harmonics" in app.ax_spec.get_title()
+
+
+def test_close_event_stops_timer_and_mic(qtbot):
+    from formant_tuner import FormantTunerApp
+    from voice_analysis import Analyzer
+    app = FormantTunerApp(Analyzer(voice_type="bass"))
+    qtbot.addWidget(app)
+    app.mic.stop = MagicMock()
+    ev = MagicMock()
+    app.closeEvent(ev)
+    app.mic.stop.assert_called_once()
+    ev.accept.assert_called_once()
+
+
+def teardown_function(function):
+    plt.close("all")
 
 
 if __name__ == "__main__":

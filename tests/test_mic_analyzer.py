@@ -2,6 +2,9 @@ import time
 import queue
 from mic_analyzer import MicAnalyzer
 from tests.conftest import synth_vowel
+import pytest
+import numpy as np
+from unittest.mock import MagicMock
 
 
 def vowel_provider():
@@ -57,3 +60,78 @@ def test_worker_posts_status(monkeypatch):
         assert "formants" in status and isinstance(status["formants"], tuple)
     finally:
         ma.stop()
+
+
+def test_micanalyzer_start_failure(monkeypatch):
+    """Simulate InputStream.start() raising an exception to hit error handling."""
+    from mic_analyzer import MicAnalyzer
+
+    fake_mic = MagicMock()
+    fake_mic.sample_rate = 16000
+    fake_tol_provider = MagicMock()
+    fake_pitch_provider = MagicMock()
+
+    class FailingStream:
+        def __init__(self, **kwargs): pass
+        def start(self): raise RuntimeError("Stream failed")
+        def stop(self): pass
+        def close(self): pass
+
+    monkeypatch.setattr("mic_analyzer.sd.InputStream", FailingStream)
+
+    analyzer = MicAnalyzer(fake_mic, fake_tol_provider, fake_pitch_provider)
+    analyzer.start()
+    # After failure, is_running should be False and stream reset
+    assert analyzer.is_running is False
+    assert analyzer.stream is None
+
+
+def test_micanalyzer_double_stop(monkeypatch):
+    """Call stop twice to cover cleanup branches."""
+    from mic_analyzer import MicAnalyzer
+
+    fake_mic = MagicMock()
+    fake_mic.sample_rate = 16000
+    fake_tol_provider = MagicMock()
+    fake_pitch_provider = MagicMock()
+
+    class DummyStream:
+        def __init__(self, **kwargs): self.active = True
+        def start(self): pass
+        def stop(self): self.active = False
+        def close(self): pass
+
+    monkeypatch.setattr("mic_analyzer.sd.InputStream", DummyStream)
+
+    analyzer = MicAnalyzer(fake_mic, fake_tol_provider, fake_pitch_provider)
+    analyzer.start()
+    analyzer.stop()
+    # Call stop again to exercise error branches
+    analyzer.stop()
+    assert analyzer.is_running is False
+    assert analyzer.stream is None
+
+
+def test_micanalyzer_worker_cleanup(monkeypatch):
+    """Ensure worker thread is joined and cleaned up."""
+    from mic_analyzer import MicAnalyzer
+
+    fake_mic = MagicMock()
+    fake_mic.sample_rate = 16000
+    fake_tol_provider = MagicMock()
+    fake_pitch_provider = MagicMock()
+
+    class DummyStream:
+        def __init__(self, **kwargs): self.active = True
+        def start(self): pass
+        def stop(self): self.active = False
+        def close(self): pass
+
+    monkeypatch.setattr("mic_analyzer.sd.InputStream", DummyStream)
+
+    analyzer = MicAnalyzer(fake_mic, fake_tol_provider, fake_pitch_provider)
+    analyzer.start()
+    # Stop should join worker and clear it
+    analyzer.stop()
+    assert analyzer._worker is None
+    assert analyzer.is_running is False
