@@ -1,3 +1,5 @@
+# vowel_data.py
+
 # Average formant frequencies for different voice types
 FORMANTS = {
     "bass": {
