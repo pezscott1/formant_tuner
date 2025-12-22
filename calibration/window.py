@@ -190,7 +190,8 @@ class CalibrationWindow(QMainWindow):
             return
 
         # Timeout check during capture
-        if event["event"] == "capture_tick" and self.state.check_timeout(self.capture_timeout):
+        if (event["event"] == "capture_tick" and
+                self.state.check_timeout(self.capture_timeout)):
             vowel = self.state.current_vowel
             self.status_panel.appendPlainText(
                 f"/{vowel}/ capture timed out after {self.capture_timeout:.1f}s"
@@ -231,7 +232,8 @@ class CalibrationWindow(QMainWindow):
                 if 40 <= f0 <= 800:
                     self._capture_buffer.append((float(f1), float(f2), float(f0)))
                     if self.state.phase == "capture":
-                        print(f"APPEND: vowel={self.state.current_vowel} f1={f1} f2={f2} f0={f0}")
+                        print(f"APPEND: vowel="
+                              f"{self.state.current_vowel} f1={f1} f2={f2} f0={f0}")
         # ---------------------------------------------------------
         # 2. Extract segment (but DO NOT return early if missing)
         # ---------------------------------------------------------

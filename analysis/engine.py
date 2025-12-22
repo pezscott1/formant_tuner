@@ -24,16 +24,16 @@ class FormantAnalysisEngine:
     def __init__(self, voice_type: str = "bass") -> None:
         self.voice_type = voice_type
         # Map: vowel -> (f1, f2, f3)
-        self.user_formants: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
+        self.user_formants: (
+            Dict)[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
         self._latest_raw: Optional[Dict[str, Any]] = None
 
     # ---------------------------------------------------------
     # User targets
     # ---------------------------------------------------------
     def set_user_formants(
-        self,
-        formant_map: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]],
-    ) -> None:
+            self, formant_map: Dict[str, Tuple[Optional[float],
+                                    Optional[float], Optional[float]]], ) -> None:
         """Set user-specific target formants for each vowel."""
         self.user_formants = formant_map or {}
 

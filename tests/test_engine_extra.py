@@ -105,7 +105,8 @@ def test_vowel_guess_fallback(_mock_pitch, _mock_lpc, _mock_guess):
 @patch("analysis.engine.robust_guess", return_value=("zzz", 0.5, None))
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_scoring_fallback_unknown_vowel(_mock_pitch, _mock_lpc, _mock_guess, _mock_res, _mock_live):
+def test_scoring_fallback_unknown_vowel(
+        _mock_pitch, _mock_lpc, _mock_guess, _mock_res, _mock_live):
     eng = make_engine()
     frame = np.ones(1024)
 

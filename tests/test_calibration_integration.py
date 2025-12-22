@@ -11,7 +11,8 @@ from tuner.controller import Tuner
 @patch("tuner.controller.LiveAnalyzer")
 @patch("tuner.controller.ProfileManager")
 @patch("tuner.controller.FormantAnalysisEngine")
-def test_calibration_profile_application(mock_engine_cls, mock_profiles_cls, mock_analyzer_cls):
+def test_calibration_profile_application(
+        mock_engine_cls, mock_profiles_cls, mock_analyzer_cls):
     """
     Integration test:
       - load a profile
@@ -70,7 +71,8 @@ def test_calibration_profile_application(mock_engine_cls, mock_profiles_cls, moc
 @patch("tuner.controller.LiveAnalyzer")
 @patch("tuner.controller.ProfileManager")
 @patch("tuner.controller.FormantAnalysisEngine")
-def test_calibration_changes_processing(mock_engine_cls, mock_profiles_cls, mock_analyzer_cls):
+def test_calibration_changes_processing(
+        mock_engine_cls, mock_profiles_cls, mock_analyzer_cls):
     mock_engine = MagicMock()
     mock_engine.user_formants = {}
     mock_engine_cls.return_value = mock_engine

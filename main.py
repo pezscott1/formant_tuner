@@ -41,7 +41,7 @@ def main():
     # ------------------------------------------------------------
     # 4. Create the LiveAnalyzer
     # ------------------------------------------------------------
-    live_analyzer = LiveAnalyzer(
+    _live_analyzer = LiveAnalyzer(
         engine,
         pitch_smoother,
         median_smoother,

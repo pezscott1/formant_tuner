@@ -115,7 +115,7 @@ def estimate_formants_lpc(
     )
     freqs = freqs[mask]
     if freqs.size == 0:
-    # ✅ Fallback: use smoothed spectral peaks
+        # ✅ Fallback: use smoothed spectral peaks
         peaks, _ = smoothed_spectrum_peaks(y, sr)
         if len(peaks) >= 2:
             f1 = peaks[0]

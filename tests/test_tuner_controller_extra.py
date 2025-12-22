@@ -16,7 +16,8 @@ def test_load_profile_sets_active_and_updates_engine_voice_type(tmp_path):
 
 
 def test_load_profile_returns_non_string(tmp_path):
-    # If apply_profile returns something non-string, engine.voice_type should NOT be touched
+    # If apply_profile returns something non-string,
+    # engine.voice_type should NOT be touched
     tuner = Tuner(voice_type="tenor", profiles_dir=str(tmp_path))
     tuner.profile_manager.apply_profile = MagicMock(return_value=None)
 

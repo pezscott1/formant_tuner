@@ -116,7 +116,8 @@ def update_vowel_chart(
             window.vowel_line_artist = None
 
     # ---------------- Update title with scores ----------------
-    title = f"/{vowel}/  Overall={overall} (Vowel={vowel_score}, Resonance={resonance_score})"
+    title = (f"/{vowel}/  Overall={overall} "
+             f"(Vowel={vowel_score}, Resonance={resonance_score})")
     window.ax_vowel.set_title(title)
 
     # ---------------- Redraw ----------------

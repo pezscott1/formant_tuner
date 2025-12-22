@@ -213,20 +213,23 @@ class TunerWindow(QMainWindow):
         right_splitter.setSizes([80, 800])
 
         # ---- Signals ----
-        self.tol_field.editingFinished.connect(self._update_tolerance_from_field)  # type:ignore
+        self.tol_field.editingFinished.connect(  # type:ignore
+            self._update_tolerance_from_field)
         self.start_btn.clicked.connect(self.start_mic)  # type:ignore
         self.stop_btn.clicked.connect(self.stop_mic)  # type:ignore
         self.refresh_btn.clicked.connect(self._populate_profiles)  # type:ignore
         self.delete_btn.clicked.connect(self._delete_selected_profile)  # type:ignore
         self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type:ignore
-        self.profile_list.itemDoubleClicked.connect(self._apply_selected_profile_item)  # type:ignore
+        self.profile_list.itemDoubleClicked.connect(  # type:ignore
+            self._apply_selected_profile_item)
 
     # ---------------------------------------------------------
     # Timers
     # ---------------------------------------------------------
     def _setup_timers(self):
         self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(self._update_display)  # type:ignore
+        self.update_timer.timeout.connect(  # type:ignore
+            self._update_display)
         self.update_timer.start(60)  # ~16 fps
 
     # ---------------------------------------------------------
@@ -278,7 +281,8 @@ class TunerWindow(QMainWindow):
     def _delete_selected_profile(self):
         base = self._get_selected_profile_base()
         if base is None:
-            QMessageBox.warning(self, "No Selection", "Please select a profile to delete.")
+            QMessageBox.warning(self, "No Selection",
+                                "Please select a profile to delete.")
             return
         display = self.profile_manager.display_name(base)
         resp = QMessageBox.question(
@@ -344,7 +348,8 @@ class TunerWindow(QMainWindow):
 
             profile_name, voice_type = dlg.get_values()
             if not profile_name:
-                QMessageBox.warning(self, "Missing name", "Please enter a profile name.")
+                QMessageBox.warning(self,
+                                    "Missing name", "Please enter a profile name.")
                 return
 
             # Launch calibration window
@@ -383,7 +388,8 @@ class TunerWindow(QMainWindow):
         self._apply_profile_base(base_name)
 
         display = self.profile_manager.display_name(base_name)
-        QMessageBox.information(self, "Profile active", f"Set active profile: {display}")
+        QMessageBox.information(self,
+                                "Profile active", f"Set active profile: {display}")
         self.update_timer.start()  # resume tuner UI updates
         self.stop_mic()
 

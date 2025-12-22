@@ -130,7 +130,7 @@ def test_safe_spectrogram_empty():
 
 
 def test_safe_spectrogram_fallback_fft(monkeypatch):
-    def fail_stft(*args, **kwargs):
+    def fail_stft(*_args, **_kwargs):
         raise ValueError("fail")
 
     monkeypatch.setattr("librosa.stft", fail_stft)
