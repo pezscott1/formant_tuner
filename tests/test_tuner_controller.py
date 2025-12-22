@@ -26,6 +26,7 @@ def test_tuner_initialization(mock_engine, mock_analyzer, mock_profiles):
 # Profile operations
 # ---------------------------------------------------------
 
+
 @patch("tuner.controller.ProfileManager")
 def test_load_profile(mock_profiles):
     pm = MagicMock()

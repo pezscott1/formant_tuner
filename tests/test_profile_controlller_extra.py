@@ -52,7 +52,8 @@ def test_extract_formants_handles_invalid_entries(tmp_path):
 
 def test_save_profile_writes_json_and_model(tmp_path):
     pm = ProfileManager(str(tmp_path), analyzer=MagicMock())
-
+    pm.voice_type = "baritone"
+    pm.analyzer.voice_type = "baritone"
     data = {"a": {"f1": 300, "f2": 2500, "f0": 120}}
     model_bytes = b"fake model"
 
@@ -129,10 +130,10 @@ def test_apply_profile_calls_analyzer(tmp_path):
     # active profile should be updated
     assert pm.active_profile_name == "bass"
 
-
 # ---------------------------------------------------------
 # delete_profile removes JSON, model, and clears active profile
 # ---------------------------------------------------------
+
 
 def test_delete_profile_clears_active(tmp_path):
     # Create profile + model + active file

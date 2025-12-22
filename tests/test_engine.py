@@ -14,7 +14,7 @@ def make_engine():
 # ---------------------------------------------------------
 
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_pitch_basic(mock_pitch):
+def test_pitch_basic(_mock_pitch):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -30,7 +30,7 @@ def test_pitch_basic(mock_pitch):
 
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_formant_extraction(mock_pitch, mock_lpc):
+def test_formant_extraction(_mock_pitch, _mock_lpc):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -46,7 +46,7 @@ def test_formant_extraction(mock_pitch, mock_lpc):
 @patch("analysis.engine.robust_guess", return_value=("a", 0.9, None))
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_vowel_guessing(mock_pitch, mock_lpc, mock_guess):
+def test_vowel_guessing(_mock_pitch, _mock_lpc, _mock_guess):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -65,7 +65,7 @@ def test_vowel_guessing(mock_pitch, mock_lpc, mock_guess):
 @patch("analysis.engine.robust_guess", return_value=("a", 0.9, None))
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_scoring(mock_pitch, mock_lpc, mock_guess, mock_res_score, mock_live_score):
+def test_scoring(_mock_pitch, _mock_lpc, _mock_guess, _mock_res_score, _mock_live_score):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -82,7 +82,7 @@ def test_scoring(mock_pitch, mock_lpc, mock_guess, mock_res_score, mock_live_sco
 
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_segment_stored(mock_pitch, mock_lpc):
+def test_segment_stored(_mock_pitch, _mock_lpc):
     eng = make_engine()
     frame = np.ones(1024)
 

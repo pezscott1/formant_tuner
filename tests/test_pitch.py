@@ -18,6 +18,7 @@ def test_very_short_frame_returns_high_pitch():
     assert f0 is not None
     assert f0 > 10000  # extremely short frames → extremely high pitch
 
+
 def test_pure_sine_wave_pitch_estimation():
     sr = 48000
     f0 = 200

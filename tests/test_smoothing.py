@@ -8,7 +8,7 @@ from analysis.smoothing import MedianSmoother, PitchSmoother, LabelSmoother
 # ---------------------------------------------------------
 
 def test_pitch_smoother_basic():
-    s = PitchSmoother(alpha=0.5)
+    s = PitchSmoother(alpha=0.5, jump_limit=None)
 
     # First value initializes the smoother
     assert s.update(100) == 100

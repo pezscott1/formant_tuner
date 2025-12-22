@@ -1,5 +1,4 @@
 # tests/test_calibration_integration.py
-import numpy as np
 from unittest.mock import MagicMock, patch
 
 from tuner.controller import Tuner
@@ -54,7 +53,7 @@ def test_calibration_profile_application(mock_engine_cls, mock_profiles_cls, moc
     # -----------------------------
     # Apply profile
     # -----------------------------
-    profile = t.load_profile("my_profile")
+    t.load_profile("my_profile")
 
     # ProfileManager.apply_profile should have been called with "my_profile"
     mock_profiles.apply_profile.assert_called_once_with("my_profile")
@@ -87,7 +86,7 @@ def test_calibration_changes_processing(mock_engine_cls, mock_profiles_cls, mock
 
     t = Tuner()
 
-    profile = t.load_profile("my_profile")
+    t.load_profile("my_profile")
 
     mock_profiles.apply_profile.assert_called_once_with("my_profile")
     # Optionally:

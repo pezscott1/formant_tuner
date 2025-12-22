@@ -1,5 +1,4 @@
-# tests/test_live_analyzer.py
-import numpy as np
+# tests/test_live_analyzer.pynp
 from unittest.mock import MagicMock
 
 from tuner.live_analyzer import LiveAnalyzer

@@ -13,7 +13,7 @@ def make_engine():
 
 @patch("analysis.engine.estimate_pitch", return_value=None)
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
-def test_missing_pitch(mock_lpc, mock_pitch):
+def test_missing_pitch(_mock_lpc, _mock_pitch):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -30,7 +30,7 @@ def test_missing_pitch(mock_lpc, mock_pitch):
 
 @patch("analysis.engine.estimate_pitch", return_value=120)
 @patch("analysis.engine.estimate_formants_lpc", return_value=(None, None, None))
-def test_missing_formants(mock_lpc, mock_pitch):
+def test_missing_formants(_mock_lpc, _mock_pitch):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -46,7 +46,7 @@ def test_missing_formants(mock_lpc, mock_pitch):
 
 @patch("analysis.engine.estimate_pitch", return_value=120)
 @patch("analysis.engine.estimate_formants_lpc", return_value=(2000, 500, 2500))
-def test_invalid_formants_swapped(mock_lpc, mock_pitch):
+def test_invalid_formants_swapped(_mock_lpc, _mock_pitch):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -65,7 +65,7 @@ def test_invalid_formants_swapped(mock_lpc, mock_pitch):
 
 @patch("analysis.engine.estimate_pitch", return_value=np.nan)
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
-def test_invalid_pitch_nan(mock_lpc, mock_pitch):
+def test_invalid_pitch_nan(_mock_lpc, _mock_pitch):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -86,7 +86,7 @@ def test_invalid_pitch_nan(mock_lpc, mock_pitch):
 @patch("analysis.engine.robust_guess", return_value=(None, 0.0, None))
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_vowel_guess_fallback(mock_pitch, mock_lpc, mock_guess):
+def test_vowel_guess_fallback(_mock_pitch, _mock_lpc, _mock_guess):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -105,7 +105,7 @@ def test_vowel_guess_fallback(mock_pitch, mock_lpc, mock_guess):
 @patch("analysis.engine.robust_guess", return_value=("zzz", 0.5, None))
 @patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
 @patch("analysis.engine.estimate_pitch", return_value=120)
-def test_scoring_fallback_unknown_vowel(mock_pitch, mock_lpc, mock_guess, mock_res, mock_live):
+def test_scoring_fallback_unknown_vowel(_mock_pitch, _mock_lpc, _mock_guess, _mock_res, _mock_live):
     eng = make_engine()
     frame = np.ones(1024)
 
@@ -123,7 +123,7 @@ def test_scoring_fallback_unknown_vowel(mock_pitch, mock_lpc, mock_guess, mock_r
 
 @patch("analysis.engine.estimate_pitch", return_value=None)
 @patch("analysis.engine.estimate_formants_lpc", return_value=(None, None, None))
-def test_no_formants_no_pitch(mock_lpc, mock_pitch):
+def test_no_formants_no_pitch(_mock_lpc, _mock_pitch):
     eng = make_engine()
     frame = np.ones(1024)
 

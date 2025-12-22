@@ -155,12 +155,14 @@ class TunerWindow(QMainWindow):
         left_layout.addWidget(mic_container)
 
         hint_label = QLabel(
-            "Tip: To create a new profile, click Calibrate with\n"
-            "“New Profile” highlighted. To update an existing\n"
+            "Tip: To create a new profile, click Calibrate with"
+            "“New Profile” highlighted. To update an existing"
             "profile, highlight it first, then click Calibrate."
         )
+        hint_label.setWordWrap(True)
         hint_label.setAlignment(Qt.AlignCenter)
         hint_label.setStyleSheet("font-size: 9pt; color: gray;")
+        hint_label.setMinimumHeight(150)
         mic_layout.addWidget(hint_label)
 
         left_layout.addStretch()
@@ -196,7 +198,9 @@ class TunerWindow(QMainWindow):
         plot_layout = QVBoxLayout(plot_frame)
 
         self.fig = plt.figure(figsize=(8, 6))
-        gs = self.fig.add_gridspec(3, 1, height_ratios=[3, 3, 1])
+        self.fig.tight_layout()
+        self.fig.subplots_adjust(hspace=0.3, bottom=0.12)
+        gs = self.fig.add_gridspec(3, 1, height_ratios=[3, 4, 1])
 
         self.ax_chart = self.fig.add_subplot(gs[0])
         self.ax_vowel = self.fig.add_subplot(gs[1])
@@ -332,7 +336,6 @@ class TunerWindow(QMainWindow):
         """
         item = self.profile_list.currentItem()
         base = item.data(Qt.UserRole) if item else None
-
         # --- Case 1: New Profile ---
         if base is None:
             dlg = ProfileDialog(self)
@@ -366,6 +369,8 @@ class TunerWindow(QMainWindow):
             analyzer=self.analyzer,
             parent=self,
         )
+        self.update_timer.stop()
+        self.start_mic()
         self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
         self.calib_win.show()
 
@@ -403,7 +408,7 @@ class TunerWindow(QMainWindow):
             if self.stream is not None:
                 return
 
-            def callback(indata, frames, time, status):
+            def callback(indata, _frames, _time, status):
                 if status:
                     # Optional: log status
                     pass

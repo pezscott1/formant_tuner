@@ -17,12 +17,14 @@ def get_vowel_ranges(voice_type, vowel):
     if not ref:
         return None
     f1, f2 = ref[0], ref[1]
-    f1_low, f1_high = f1 * (1 - FORMANT_TOLERANCE), f1 * (
-        1 + FORMANT_TOLERANCE
-    )
-    f2_low, f2_high = f2 * (1 - FORMANT_TOLERANCE), f2 * (
-        1 + FORMANT_TOLERANCE
-    )
+    if vowel in ("o", "u"):
+        tol = 0.40
+    else:
+        tol = FORMANT_TOLERANCE
+
+    f1_low, f1_high = f1 * (1 - tol), f1 * (1 + tol)
+    f2_low, f2_high = f2 * (1 - tol), f2 * (1 + tol)
+
     return f1_low, f1_high, f2_low, f2_high
 
 
@@ -34,7 +36,7 @@ def is_plausible_formants(f1, f2, voice_type="tenor", vowel=None):
         return False, "f1 > f2 (swapped)"
 
     # Global physiological minimums
-    if f1 < 150 or f2 < 400:
+    if f1 < 120 or f2 < 300:
         return False, "formants too low"
 
     # Vowel-specific ranges

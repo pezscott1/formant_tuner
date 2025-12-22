@@ -1,5 +1,4 @@
 # tests/test_calibration_state_machine.py
-import pytest
 from calibration.state_machine import CalibrationStateMachine
 
 

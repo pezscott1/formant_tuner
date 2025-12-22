@@ -1,5 +1,4 @@
 # tests/test_profile_manager.py
-import os
 import json
 from unittest.mock import MagicMock
 

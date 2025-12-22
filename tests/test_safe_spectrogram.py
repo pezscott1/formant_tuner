@@ -1,6 +1,6 @@
 # tests/test_safe_spectrogram.py
 import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from calibration.plotter import safe_spectrogram
 
@@ -57,7 +57,7 @@ def test_safe_spectrogram_librosa_success(mock_frames, mock_freqs, mock_stft):
 # ---------------------------------------------------------
 
 @patch("calibration.plotter.librosa.stft", side_effect=Exception("librosa fail"))
-def test_safe_spectrogram_fft_fallback(mock_stft):
+def test_safe_spectrogram_fft_fallback(_mock_stft):
     y = np.random.randn(5000)
 
     f, t, S = safe_spectrogram(y, sr=16000)
@@ -74,7 +74,7 @@ def test_safe_spectrogram_fft_fallback(mock_stft):
 
 @patch("calibration.plotter.librosa.stft", side_effect=Exception("librosa fail"))
 @patch("calibration.plotter.np.fft.rfft", side_effect=Exception("fft fail"))
-def test_safe_spectrogram_total_failure(mock_fft, mock_stft):
+def test_safe_spectrogram_total_failure(_mock_fft, _mock_stft):
     y = np.random.randn(5000)
 
     f, t, S = safe_spectrogram(y, sr=16000)

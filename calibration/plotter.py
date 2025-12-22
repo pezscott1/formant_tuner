@@ -1,3 +1,4 @@
+# calibration/plotter.py
 import numpy as np
 import time
 import traceback
@@ -15,7 +16,8 @@ if not logger.handlers:
 def update_artists(self, freqs, times, s, f1, f2, vowel):
     if freqs is None or times is None or s is None:
         return
-
+    if self.state.phase != "capture":
+        vowel = None
     # Spectrogram (<= 4 kHz)
     mask = freqs <= 4000
     if isinstance(mask, np.ndarray) and mask.sum() < 2:
@@ -135,12 +137,6 @@ def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
     """Compute a safe spectrogram, returning freqs, times, and power."""
     if y is None or len(y) == 0:
         f = np.linspace(0, sr / 2, 128)
-        t = np.array([0.0])
-        Sxx = np.zeros((f.size, t.size))
-        return f, t, Sxx
-
-    if len(y) < n_fft:
-        f = np.linspace(0, sr / 2, max(64, int(n_fft // 32)))
         t = np.array([0.0])
         Sxx = np.zeros((f.size, t.size))
         return f, t, Sxx

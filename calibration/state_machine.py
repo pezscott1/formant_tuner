@@ -1,4 +1,3 @@
-# calibration/state_machine.py
 import logging
 from time import monotonic
 
@@ -23,7 +22,7 @@ class CalibrationStateMachine:
         vowels,
         prep_seconds: int = 3,
         sing_seconds: int = 2,
-        capture_seconds: int = 1,
+        capture_seconds: int = 2,
     ):
         self.vowels = list(vowels)
         self.prep_seconds_default = prep_seconds
@@ -53,18 +52,6 @@ class CalibrationStateMachine:
     # Tick
     # ---------------------------------------------------------
     def tick(self):
-        """
-        Advance timers and emit a high-level event describing what happened.
-
-        Returns an event dict, e.g.:
-
-        {"event": "prep_countdown", "secs": 2}
-        {"event": "start_sing", "vowel": "a"}
-        {"event": "sing_countdown", "secs": 1}
-        {"event": "start_capture"}
-        {"event": "capture_ready"}
-        {"event": "finished"}
-        """
         if self.phase == "finished" or self.current_vowel is None:
             return {"event": "finished"}
 
@@ -79,7 +66,6 @@ class CalibrationStateMachine:
                 self.prep_secs -= 1
                 return {"event": "prep_countdown", "secs": secs}
             else:
-                # Transition to sing
                 self.phase = "sing"
                 self.sing_secs = self.sing_seconds_default
                 return {
@@ -93,7 +79,6 @@ class CalibrationStateMachine:
                 self.sing_secs -= 1
                 return {"event": "sing_countdown", "secs": secs}
             else:
-                # Transition to capture
                 self.phase = "capture"
                 self.capture_secs = self.capture_seconds_default
                 self.capture_start_time = monotonic()
@@ -102,10 +87,8 @@ class CalibrationStateMachine:
         elif self.phase == "capture":
             if self.capture_secs > 0:
                 self.capture_secs -= 1
-                # Let UI show "capturing..." without extra event spam
                 return {"event": "capture_tick"}
             else:
-                # Ready to process capture
                 return {"event": "capture_ready"}
 
         return {"event": "noop"}
@@ -114,20 +97,12 @@ class CalibrationStateMachine:
     # Advance to next vowel
     # ---------------------------------------------------------
     def advance(self):
-        """
-        Move to the next vowel or finish.
-
-        Returns an event dict. If finished:
-
-          {"event": "finished"}
-        """
         self.index += 1
 
         if self.index >= len(self.vowels):
             self.phase = "finished"
             return {"event": "finished"}
 
-        # Reset timers for next vowel
         self.phase = "prep"
         self.prep_secs = self.prep_seconds_default
         self.sing_secs = self.sing_seconds_default
@@ -140,9 +115,6 @@ class CalibrationStateMachine:
     # Timeout check
     # ---------------------------------------------------------
     def check_timeout(self, capture_timeout: float) -> bool:
-        """
-        Return True if current capture phase has exceeded given timeout.
-        """
         if self.phase != "capture":
             return False
         if self.capture_start_time is None:
@@ -151,6 +123,13 @@ class CalibrationStateMachine:
         now = monotonic()
         return (now - self.capture_start_time) > capture_timeout
 
-    # Add this at the bottom of the class
+    def retry_current_vowel(self):
+        self.phase = "prep"
+        self.prep_secs = self.prep_seconds_default
+        self.sing_secs = self.sing_seconds_default
+        self.capture_secs = self.capture_seconds_default
+        self.capture_start_time = None
+        return {"event": "retry", "vowel": self.current_vowel}
+
     def is_done(self):
         return self.phase == "finished"

@@ -68,6 +68,12 @@ class ProfileManager:
           - data: dict to write as JSON (rich format)
           - model_bytes: optional binary model data
         """
+
+        # ✅ Ensure voice_type is stored in the JSON
+        #    This makes it recoverable when the profile is reloaded.
+        if "voice_type" not in data:
+            data["voice_type"] = self.analyzer.voice_type
+
         json_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         model_path = json_path.replace("_profile.json", "_model.pkl")
 
@@ -109,6 +115,7 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Internal JSON loader
     # ---------------------------------------------------------
+    # noinspection PyMethodMayBeStatic
     def _load_profile_json(self, path):
         """Load a profile JSON file and return its dict."""
         try:
@@ -120,6 +127,7 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Extract formants from rich profile JSON
     # ---------------------------------------------------------
+    # noinspection PyMethodMayBeStatic
     def _extract_formants(self, raw_dict):
         """
         Convert rich profile entries like:
@@ -148,26 +156,19 @@ class ProfileManager:
     # Loading profiles into the analyzer
     # ---------------------------------------------------------
     def apply_profile(self, base):
-        """
-        Load the given profile into the analyzer and mark it active.
-        Returns the base name for UI display.
-        """
         self.active_profile_name = base
-
         profile_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
 
-        # Load rich JSON profile
         raw = self._load_profile_json(profile_path)
 
-        # Extract only the formants (f1, f2, f3)
-        normalized = self._extract_formants(raw)
+        # ✅ load voice type from JSON
+        voice_type = raw.get("voice_type", "bass")
+        self.analyzer.voice_type = voice_type
 
-        # Apply to the engine
+        normalized = self._extract_formants(raw)
         self.analyzer.set_user_formants(normalized)
 
-        # Persist active profile
         self.set_active_profile(base)
-
         return base
 
     # ---------------------------------------------------------

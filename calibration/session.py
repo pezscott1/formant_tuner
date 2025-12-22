@@ -3,6 +3,7 @@ import os
 import json
 from datetime import timezone, datetime
 from analysis.vowel import is_plausible_formants
+from typing import Any, Dict
 
 
 PROFILES_DIR = "profiles"
@@ -29,7 +30,7 @@ class CalibrationSession:
         self.profile_name = profile_name
         self.voice_type = voice_type
         self.vowels = list(vowels)
-
+        self.voice_type = voice_type
         self.current_index = 0
         # vowel -> (f1, f2, f0)
         self.results = {}
@@ -117,6 +118,8 @@ class CalibrationSession:
             retries_map=self.retries_map,
         )
 
+        profile_dict: Dict[str, Any] = profile_dict
+        profile_dict["voice_type"] = self.voice_type
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(profile_dict, fh, indent=2)
 

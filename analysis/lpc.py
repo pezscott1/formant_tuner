@@ -50,7 +50,7 @@ def estimate_formants_lpc(
     # -----------------------------
     if order is None:
         # Stable for synthetic vowels and real speech
-        order = 12
+        order = 10
 
     # Short-signal guard
     if len(y) < 3 * order:
@@ -114,10 +114,15 @@ def estimate_formants_lpc(
         (bw_vals < 700)                 # reject unstable poles
     )
     freqs = freqs[mask]
-
     if freqs.size == 0:
+    # ✅ Fallback: use smoothed spectral peaks
+        peaks, _ = smoothed_spectrum_peaks(y, sr)
+        if len(peaks) >= 2:
+            f1 = peaks[0]
+            f2 = peaks[1]
+            f3 = peaks[2] if len(peaks) > 2 else None
+            return (f1, f2, f3) if not debug else (f1, f2, f3, peaks.tolist())
         return (None, None, None) if not debug else (None, None, None, [])
-
     freqs = np.sort(freqs)
 
     # -----------------------------

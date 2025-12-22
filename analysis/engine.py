@@ -80,12 +80,13 @@ class FormantAnalysisEngine:
 
         # ---------------- Formants ----------------
         f1, f2, f3 = estimate_formants_lpc(signal, sr)
-
         # Keep copies for feedback (before any plausibility adjustments)
         fb_f1, fb_f2 = f1, f2
 
         # ---------------- Vowel guess + confidence ----------------
+        # noinspection PyUnusedLocal
         vowel = None
+        # noinspection PyUnusedLocal
         vowel_conf = 0.0
 
         try:

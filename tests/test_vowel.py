@@ -7,7 +7,7 @@ from analysis.vowel import (
     robust_guess,
     get_expected_formants,
 )
-from analysis.vowel_data import FORMANTS, VOWEL_MAP, PITCH_RANGES
+from analysis.vowel_data import FORMANTS, PITCH_RANGES
 
 
 # ---------------------------------------------------------

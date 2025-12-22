@@ -9,7 +9,6 @@ def window(qtbot):
     """Create a CalibrationWindow with all heavy components mocked."""
     with patch("calibration.window.CalibrationSession") as MockSession, \
          patch("calibration.window.CalibrationStateMachine") as MockState, \
-         patch("calibration.window.FormantAnalysisEngine") as MockEngine, \
          patch("calibration.window.QTimer") as MockTimer:
 
         # Fake timer
@@ -59,6 +58,7 @@ def window(qtbot):
 def test_poll_audio_processes_frame(mock_update, mock_spec, window):
     win, session, state = window
 
+    win.engine = MagicMock()
     win.engine.get_latest_raw.return_value = {
         "f0": 120,
         "formants": (500, 1500, 2500),
@@ -77,8 +77,7 @@ def test_poll_audio_processes_frame(mock_update, mock_spec, window):
 def test_process_capture_stores_results(window):
     win, session, state = window
 
-    win._last_frame = (500, 1500)
-    win._last_result = {"f0": 120}
+    win._last_frame = (500, 1500, 120)
     win._process_capture()
 
     session.handle_result.assert_called_once_with(500, 1500, 120)
