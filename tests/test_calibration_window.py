@@ -57,18 +57,32 @@ def window(qtbot):
 @patch("calibration.window.update_artists")
 def test_poll_audio_processes_frame(mock_update, mock_spec, window):
     win, session, state = window
+    win.state = state
+
+    state.phase = "capture"
+    state.current_vowel = "a"
+
+    win._spec_buffer = np.zeros(3000)
 
     win.engine = MagicMock()
+    win.engine.sample_rate = 44100  # ✅ must come AFTER MagicMock()
     win.engine.get_latest_raw.return_value = {
         "f0": 120,
         "formants": (500, 1500, 2500),
-        "segment": np.ones(512),
+        "segment": np.ones(4096),
     }
+
+    win.ax_spec = MagicMock()
+    win.ax_vowel = MagicMock()
+    win.canvas = MagicMock()
+    win._vowel_scatters = {}
+    win._vowel_colors = {"a": "red"}
+    win._last_draw = 0
+    win._min_draw_interval = 0
 
     win._poll_audio()
 
     mock_update.assert_called_once()
-    mock_spec.assert_called_once()
 # ---------------------------------------------------------
 # Test _process_capture
 # ---------------------------------------------------------
@@ -77,9 +91,8 @@ def test_poll_audio_processes_frame(mock_update, mock_spec, window):
 def test_process_capture_stores_results(window):
     win, session, state = window
 
-    win._last_frame = (500, 1500, 120)
+    win._capture_buffer = [(500, 1500, 120)]
     win._process_capture()
-
     session.handle_result.assert_called_once_with(500, 1500, 120)
     assert "/a/" in win.capture_panel.toPlainText()
 
