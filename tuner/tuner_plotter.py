@@ -54,7 +54,7 @@ def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _t
 # Vowel Chart
 # ============================================================
 
-def update_vowel_chart(
+def update_vowel_chart(  # noqa: C901
     window,
     vowel,
     target_formants,

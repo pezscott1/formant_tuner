@@ -2,7 +2,7 @@
 import numpy as np
 
 
-def estimate_pitch(frame, sr, fmin=50, fmax=800):
+def estimate_pitch(frame, sr, fmin=50, fmax=800):  # noqa: C901
     """
     Robust autocorrelation-based pitch estimator.
 

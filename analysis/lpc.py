@@ -35,7 +35,7 @@ def _levinson_durbin(r: np.ndarray, order: int) -> Optional[np.ndarray]:
     return a
 
 
-def estimate_formants_lpc(
+def estimate_formants_lpc(  # noqa: C901
     y,
     sr,
     order=None,

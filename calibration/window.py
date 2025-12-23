@@ -221,7 +221,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
-    def _poll_audio(self):
+    def _poll_audio(self):  # noqa: C901
         """
         Poll the shared engine for the latest raw frame.
         Build a rolling audio buffer for spectrogram display.
@@ -330,7 +330,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Capture processing
     # ---------------------------------------------------------
-    def _process_capture(self):
+    def _process_capture(self):  # noqa: C901
         if not self._capture_buffer:
             vowel = self.state.current_vowel
             self.status_panel.appendPlainText(

@@ -14,7 +14,7 @@ def profile_path(base_name: str) -> str:
     return os.path.join(PROFILES_DIR, f"{base_name}_profile.json")
 
 
-def merge_formants(old_vals, new_vals, vowel):
+def merge_formants(old_vals, new_vals, _vowel):
     """
     Merge logic:
       - If new is None or implausible → keep old
@@ -148,7 +148,7 @@ class CalibrationSession:
         return base_name
 
 
-def normalize_profile_for_save(user_formants, retries_map=None):
+def normalize_profile_for_save(user_formants, retries_map=None):  # noqa: C901
     out = {}
     retries_map = retries_map or {}
     if not isinstance(user_formants, dict):

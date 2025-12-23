@@ -13,7 +13,7 @@ if not logger.handlers:
     )
 
 
-def update_artists(self, freqs, times, s, f1, f2, vowel):
+def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
     if freqs is None or times is None or s is None:
         return
 

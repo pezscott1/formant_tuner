@@ -18,7 +18,7 @@ def safe_array(x):
         return np.zeros(0, dtype=float)
 
 
-def _extract_audio_array(item):
+def _extract_audio_array(item):  # noqa: C901
     """
     Robustly extract a 1D float numpy array from:
       - ndarray

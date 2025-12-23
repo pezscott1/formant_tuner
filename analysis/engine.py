@@ -83,9 +83,6 @@ class FormantAnalysisEngine:
         fb_f1, fb_f2 = f1, f2  # feedback copies
 
         # ---------------- Vowel guess + confidence ----------------
-        _vowel = None
-        _vowel_conf = 0.0
-
         if f1 is not None and f2 is not None and not np.isnan(f1) and not np.isnan(f2):
             try:
                 best, conf, _second = robust_guess((f1, f2), voice_type=self.voice_type)
