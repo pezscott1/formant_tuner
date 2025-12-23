@@ -5,6 +5,20 @@ from tuner.live_analyzer import LiveAnalyzer
 from analysis.smoothing import MedianSmoother, PitchSmoother, LabelSmoother
 
 
+class DummyEngine:
+    """
+    Minimal stub engine for testing LiveAnalyzer.
+    Only provides the attributes LiveAnalyzer actually uses.
+    """
+
+    def __init__(self, voice_type="bass"):
+        self.voice_type = voice_type
+        self._latest_raw = None
+
+    def get_latest_raw(self):
+        return self._latest_raw
+
+
 def make_analyzer():
     engine = MagicMock()
     engine.voice_type = "bass"
@@ -96,3 +110,46 @@ def test_pitch_smoothing_changes_value():
     out2 = la.process_raw(raw2)
 
     assert out1["f0"] != 100 or out2["f0"] != 200
+
+
+def test_live_analyzer_first_frame_initializes_label():
+    engine = DummyEngine()
+    la = LiveAnalyzer(engine, PitchSmoother(), MedianSmoother(), LabelSmoother())
+
+    raw = {"f0": 200, "formants": (500, 1500, 2500), "vowel_guess": "ɑ", "vowel_confidence": 1.0}
+    out = la.process_raw(raw)
+
+    assert out["vowel"] == "ɑ"
+    assert la.label_smoother.current == "ɑ"
+
+
+def test_live_analyzer_plausibility_resets_formant_smoother(monkeypatch):
+    engine = DummyEngine()
+    la = LiveAnalyzer(engine, PitchSmoother(), MedianSmoother(), LabelSmoother())
+
+    # Force plausibility to fail
+    monkeypatch.setattr("analysis.vowel.is_plausible_formants", lambda f1, f2, vt: (False, "bad"))
+
+    raw = {"f0": 200, "formants": (500, 1500, 2500), "vowel_guess": "ɑ", "vowel_confidence": 1.0}
+    la.formant_smoother.buffer.extend([(500, 1500)])
+
+    la.process_raw(raw)
+
+    assert len(la.formant_smoother.buffer) == 2
+    assert la.formant_smoother.buffer[0] == (500, 1500)
+    assert la.formant_smoother.buffer[1] == (500.0, 1500.0)
+
+
+def test_live_analyzer_reset():
+    engine = DummyEngine()
+    la = LiveAnalyzer(engine, PitchSmoother(), MedianSmoother(), LabelSmoother())
+
+    la.pitch_smoother.current = 200
+    la.formant_smoother.buffer.extend([(500, 1500)])
+    la.label_smoother.current = "ɑ"
+
+    la.reset()
+
+    assert la.pitch_smoother.current is None
+    assert len(la.formant_smoother.buffer) == 0
+    assert la.label_smoother.current is None

@@ -41,7 +41,7 @@ def main():
     # ------------------------------------------------------------
     # 4. Create the LiveAnalyzer
     # ------------------------------------------------------------
-    _live_analyzer = LiveAnalyzer(
+    _live_analyzer = LiveAnalyzer(  # noqa: F841
         engine,
         pitch_smoother,
         median_smoother,

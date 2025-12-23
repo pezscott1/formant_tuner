@@ -39,18 +39,12 @@ class CalibrationStateMachine:
         self.capture_start_time = None
         self._last_heartbeat = monotonic()
 
-    # ---------------------------------------------------------
-    # Helpers
-    # ---------------------------------------------------------
     @property
     def current_vowel(self):
         if 0 <= self.index < len(self.vowels):
             return self.vowels[self.index]
         return None
 
-    # ---------------------------------------------------------
-    # Tick
-    # ---------------------------------------------------------
     def tick(self):
         if self.phase == "finished" or self.current_vowel is None:
             return {"event": "finished"}
@@ -93,9 +87,6 @@ class CalibrationStateMachine:
 
         return {"event": "noop"}
 
-    # ---------------------------------------------------------
-    # Advance to next vowel
-    # ---------------------------------------------------------
     def advance(self):
         self.index += 1
 
@@ -111,9 +102,6 @@ class CalibrationStateMachine:
 
         return {"event": "next_vowel", "vowel": self.current_vowel}
 
-    # ---------------------------------------------------------
-    # Timeout check
-    # ---------------------------------------------------------
     def check_timeout(self, capture_timeout: float) -> bool:
         if self.phase != "capture":
             return False

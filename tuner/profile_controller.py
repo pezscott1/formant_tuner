@@ -92,12 +92,40 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Active profile tracking
     # ---------------------------------------------------------
-    def set_active_profile(self, base):
-        """Persist the active profile name to active_profile.json."""
-        self.active_profile_name = base
+    # ---------------------------------------------------------
+    # Active profile tracking
+    # ---------------------------------------------------------
+    def set_active_profile(self, name, *, notify=False):
+        """
+        Persist the active profile name to active_profile.json.
+        UI popups are handled by the controller, not here.
+        """
+        self.active_profile_name = name
         path = os.path.join(self.profiles_dir, self.ACTIVE_FILE)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"active": base}, f)
+            json.dump({"active": name}, f)
+
+    def apply_profile(self, base):
+        """
+        Load a profile into the analyzer WITHOUT triggering UI popups.
+        """
+        self.active_profile_name = base
+        profile_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
+
+        raw = self._load_profile_json(profile_path)
+
+        # Load voice type
+        voice_type = raw.get("voice_type", "bass")
+        self.analyzer.voice_type = voice_type
+
+        # Load formants
+        normalized = self._extract_formants(raw)
+        self.analyzer.set_user_formants(normalized)
+
+        # Persist active profile silently
+        self.set_active_profile(base, notify=False)
+
+        return base
 
     def _load_active_profile(self):
         """Load active profile from disk if present."""
@@ -151,25 +179,6 @@ class ProfileManager:
             out[vowel] = (f1, f2, f0)
 
         return out
-
-    # ---------------------------------------------------------
-    # Loading profiles into the analyzer
-    # ---------------------------------------------------------
-    def apply_profile(self, base):
-        self.active_profile_name = base
-        profile_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
-
-        raw = self._load_profile_json(profile_path)
-
-        # ✅ load voice type from JSON
-        voice_type = raw.get("voice_type", "bass")
-        self.analyzer.voice_type = voice_type
-
-        normalized = self._extract_formants(raw)
-        self.analyzer.set_user_formants(normalized)
-
-        self.set_active_profile(base)
-        return base
 
     # ---------------------------------------------------------
     # Deletion

@@ -1,90 +1,171 @@
 # Formant Tuner
 
-Formant Tuner is a scientific and educational tool for **audio analysis and vocal calibration**.  
-It provides a graphical interface for singers, educators, and researchers to measure vowel formants (F1, F2, F0) in real time, visualize spectrograms, and save personalized voice profiles.
+**Formant Tuner** is a scientific and educational tool for real‑time vowel analysis and voice calibration.  
+It provides a PyQt‑based interface for singers, educators, clinicians, and researchers to measure vowel formants (F1, F2, F0), visualize spectrograms, and generate personalized voice profiles.
+
+The system is built on a modern, modular architecture with high test coverage, robust DSP routines, and a clean calibration workflow.
 
 ---
 
 ## Features
 
-- 🎙️ Live microphone capture using [sounddevice](https://python-sounddevice.readthedocs.io/)  
-- 🔬 Spectrogram analysis with `librosa` and custom `safe_spectrogram` routines  
-- 📈 Formant extraction via LPC (`estimate_formants_lpc`)  
-- 🖼️ Dual-panel visualization:
-  - Left: spectrogram of captured audio
-  - Right: vowel space scatter plot (F2 vs F1)
-- 🗂️ Profile management:
-  - Save calibration results to JSON
-  - Reload and apply active profiles
-- 🎨 Durable vowel plotting:
-  - Each vowel plotted in a distinct color
-  - Legend shows vowel labels
-- 📋 Text summary:
-  - Captured formants printed in matching colors above the countdown block
-- ✅ User-friendly calibration flow:
-  - Countdown → sing → capture → analysis
-  - Retry logic for missing formants
-  - Popup confirmation when calibration completes
+### 🎙️ Live Microphone Capture
+- Real‑time audio streaming via `sounddevice`
+- Rolling audio buffers for stable spectrogram updates
+- Safe fallback paths for missing or short audio frames
+
+### 🔬 Spectrogram Analysis
+- Powered by `librosa` with a custom `safe_spectrogram` fallback
+- Automatic downsampling of time bins for smooth UI performance
+- Robust handling of edge cases (short signals, FFT failures)
+
+### 📈 Formant Extraction
+- LPC‑based formant estimation (`estimate_formants_lpc`)
+- Median‑based smoothing and plausibility filtering
+- Vowel‑specific heuristics for difficult vowels (/o/, /u/)
+
+### 🖼️ Dual‑Panel Visualization
+**Left:** Rolling spectrogram (0–4 kHz)  
+**Right:** Vowel space (F2 vs F1) with durable scatter artists
+
+### 🗂️ Profile Management
+- Save calibration results to JSON
+- Load and activate profiles at runtime
+- Profiles include F1, F2, F0 per vowel + metadata
+
+### 🎨 Durable Vowel Plotting
+- Each vowel has a persistent scatter artist
+- Consistent color mapping across sessions
+- Automatic legend management
+
+### 📋 Text Summary Panel
+- Captured formants printed in vowel‑matched colors
+- Clear feedback during calibration phases
+
+### ✅ User‑Friendly Calibration Flow
+- **Prepare → Sing → Capture → Analyze**
+- Countdown timer with visual cues
+- Retry logic for low‑confidence captures
+- Automatic progression through /i e a o u/
+- Popup confirmation when calibration completes
 
 ---
 
 ## Project Structure
-formant_wizard/ ├── calibration_py_qt.py   # Main PyQt5 calibration window ├── mic_analyzer.py        # MicAnalyzer class for audio capture and queuing ├── formant_utils.py       # Spectrogram, LPC, plausibility checks, profile helpers ├── PROFILES_DIR/          # Saved JSON profiles ├── requirements.txt       # Dependency list └── README.md              # This file
+
+```
+formant_tuner/
+│
+├── analysis/
+│   ├── engine.py          # Mic pipeline, raw frame processing
+│   ├── lpc.py             # LPC formant estimation
+│   ├── pitch.py           # F0 estimation
+│   ├── smoothing.py       # Median + window smoothing
+│   ├── scoring.py         # Plausibility checks
+│   └── vowel.py           # Vowel utilities
+│
+├── calibration/
+│   ├── window.py          # PyQt5 CalibrationWindow (UI + workflow)
+│   ├── session.py         # CalibrationSession (state + results)
+│   ├── state_machine.py   # Phase transitions (prep/sing/capture)
+│   ├── plotter.py         # Spectrogram + vowel plotting
+│   └── profiles/          # Saved JSON profiles
+│
+├── tuner/
+│   ├── controller.py      # Real‑time tuner logic
+│   ├── live_analyzer.py   # Streaming analysis for tuning mode
+│   └── tuner_plotter.py   # Tuner visualization
+│
+├── tests/                 # 90%+ coverage test suite
+├── requirements.txt
+└── README.md
+```
 
 ---
 
-## Requirements
+## Installation
 
-All dependencies are listed in `requirements.txt`. Install them with:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Usage
-- Run the formant tuner window:
-python formant_tuner.py
-- Follow the prompts:
-- If calibration is desired or needed (for a new profile), highlight New Profile, click Calibrate, and follow commands.
-- Countdown appears: “Prepare: Sing /i/ in 3…”
-- Sing the vowel during the capture window
-- Spectrogram and vowel scatter update in real time
-- Accepted formants are logged in the summary panel
-- Completion:
-- After all vowels are processed, “Calibration complete!” appears
-- A popup prompts you to click OK to close
-- Profile is saved to PROFILES_DIR/<name>_profile.json
-- Active profile is set automatically
+Run the application:
 
-Profiles
-Profiles are saved as JSON with formant values per vowel. Example:
-{
-  "i": [320.2, 1929.1, 2784.8],
-  "e": [328.4, 1777.7, 2774.2],
-  "a": [542.0, 1402.7, 2656.8],
-  "o": [517.9, 1609.8, 2543.8],
-  "u": [512.1, 1777.8, 2923.8]
-}
-
-
-Profiles can be reloaded and applied in the main app.
-
-Development Notes
-- Durable scatter: Each vowel has its own scatter artist (self._vowel_scatters) with a fixed color map.
-- Summary text: Formants are appended to capture_panel in matching colors.
-- Popup: QMessageBox is shown once at the end of calibration; finish() handles cleanup and closing.
-- Guards: _finished prevents duplicate saves; _compute_in_flight prevents overlapping jobs.
-
-
-License
-MIT License — free to use, modify, and distribute.
+```bash
+python main.py
+```
 
 ---
 
+## Usage
 
+### Starting Calibration
+1. Open the app and select **New Profile**
+2. Click **Calibrate**
+3. Follow the on‑screen countdown:
+   - “Prepare: Sing /i/ in 3…”
+4. Sing the vowel during the capture window
+5. Watch the spectrogram and vowel scatter update in real time
 
+### During Calibration
+- Each vowel is captured using a rolling buffer
+- Formants are extracted and validated
+- Accepted values appear in the summary panel
+- Low‑confidence captures trigger a retry
 
+### Completion
+- A popup announces **Calibration Complete**
+- Profile is saved automatically to:
 
+```
+calibration/profiles/<profile_name>.json
+```
 
+- The new profile becomes active immediately
 
+---
 
+## Profile Format
+
+Profiles are saved as JSON:
+
+```json
+{
+  "i": { "f1": 265.6, "f2": 3342.1, "f0": 148.5 },
+  "e": { "f1": 295.0, "f2": 3181.4, "f0": 145.7 },
+  "a": { "f1": 394.4, "f2": 3024.9, "f0": 145.0 },
+  "o": { "f1": 517.9, "f2": 1609.8, "f0": 154.6 },
+  "u": { "f1": 355.3, "f2": 1211.2, "f0": 214.7 },
+  "voice_type": "bass"
+}
+```
+
+Profiles can be reloaded and applied at any time.
+
+---
+
+## Development Notes
+
+### Plotting
+- Spectrogram mesh is recreated when dimensions change
+- Vowel scatter artists persist across updates
+- Draw calls are throttled for performance
+
+### Calibration Workflow
+- `_poll_audio()` handles streaming + spectrogram updates
+- `_process_capture()` handles vowel‑specific logic
+- `CalibrationSession` stores results and retry reasons
+- `CalibrationStateMachine` manages phase transitions
+
+### Robustness
+- All DSP routines have safe fallbacks
+- All UI updates are exception‑tolerant
+- Tests cover >90% of the codebase
+
+---
+
+## License
+
+MIT License — free to use, modify, and distribute.

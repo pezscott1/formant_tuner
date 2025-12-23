@@ -16,56 +16,80 @@ if not logger.handlers:
 def update_artists(self, freqs, times, s, f1, f2, vowel):
     if freqs is None or times is None or s is None:
         return
+
+    # Only show vowel scatter during capture
     if self.state.phase != "capture":
         vowel = None
+
+    # ---------------------------------------------------------
     # Spectrogram (<= 4 kHz)
+    # ---------------------------------------------------------
     mask = freqs <= 4000
     if isinstance(mask, np.ndarray) and mask.sum() < 2:
-        # fallback if too few bins
         mask = np.arange(len(freqs))
 
-    max_time_bins = 200
-    step = max(1, s.shape[1] // max_time_bins) if s.shape[1] > 0 else 1
+    # Much smoother: no aggressive downsampling
+    # Keep time resolution high but cap max bins
+    max_time_bins = 400
+    if s.shape[1] > max_time_bins:
+        step = s.shape[1] // max_time_bins
+    else:
+        step = 1
+
     S_small = s[mask, ::step]
     times_small = times[::step]
-    arr_db = 10 * np.log10(S_small + 1e-12)
 
+    # Convert to dB
+    arr_db = 10 * np.log10(S_small + 1e-12)
     ny, nx = arr_db.shape
 
+    # ---------------------------------------------------------
+    # Create or update mesh
+    # ---------------------------------------------------------
     if self._spec_mesh is None:
         self.ax_spec.clear()
         try:
-            # Use shading="auto" to avoid off-by-one issues
             self._spec_mesh = self.ax_spec.pcolormesh(
-                times_small, freqs[mask], arr_db, shading="auto"
+                times_small,
+                freqs[mask],
+                arr_db,
+                shading="auto"
             )
         except Exception:
-            mean_spec = np.mean(S_small, axis=1) \
-                if S_small.size else np.zeros_like(freqs[mask])
+            mean_spec = np.mean(S_small, axis=1) if S_small.size else np.zeros_like(freqs[mask])
             self.ax_spec.plot(freqs[mask], 10 * np.log10(mean_spec + 1e-12))
     else:
         try:
             expected_size = ny * nx
             current_size = self._spec_mesh.get_array().size
+
             if current_size != expected_size:
                 # Recreate mesh if dimensions changed
                 self.ax_spec.clear()
                 self._spec_mesh = self.ax_spec.pcolormesh(
-                    times_small, freqs[mask], arr_db, shading="auto"
+                    times_small,
+                    freqs[mask],
+                    arr_db,
+                    shading="auto"
                 )
             else:
-                # Update with full array, no slicing
+                # Update existing mesh
                 self._spec_mesh.set_array(arr_db.ravel())
         except Exception:
             traceback.print_exc()
 
+    # Axis labels
     self.ax_spec.set_title("Spectrogram")
     self.ax_spec.set_xlabel("Time (s)")
     self.ax_spec.set_ylabel("Frequency (Hz)")
     self.ax_spec.set_ylim(0, 4000)
+
+    # Draw
     self.canvas.draw_idle()
 
+    # ---------------------------------------------------------
     # Vowel scatter
+    # ---------------------------------------------------------
     if f1 is None or f2 is None or vowel is None:
         now = time.time()
         if now - self._last_draw >= self._min_draw_interval:
@@ -76,6 +100,7 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):
             self._last_draw = now
         return
 
+    # Create scatter if missing
     if vowel not in self._vowel_scatters:
         scatter = self.ax_vowel.scatter(
             [f2],
@@ -86,6 +111,7 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):
             label=f"/{vowel}/",
         )
         self._vowel_scatters[vowel] = scatter
+
         self.ax_vowel.set_title("Vowel Space")
         self.ax_vowel.set_xlabel("F2 (Hz)")
         self.ax_vowel.set_ylabel("F1 (Hz)")
@@ -95,7 +121,9 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):
         except Exception:
             pass
         self.ax_vowel.legend(loc="best")
+
     else:
+        # Update existing scatter
         try:
             self._vowel_scatters[vowel].set_offsets(np.column_stack(([f2], [f1])))
         except Exception:
@@ -114,6 +142,7 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):
             self._vowel_scatters[vowel] = scatter
             self.ax_vowel.legend(loc="best")
 
+    # Final throttled draw
     try:
         self.canvas.draw_idle()
     except Exception:
@@ -131,7 +160,6 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):
 # -------------------------
 # Spectrogram and expected formants
 # -------------------------
-
 
 def safe_spectrogram(y, sr, n_fft=2048, hop_length=512):
     """Compute a safe spectrogram, returning freqs, times, and power."""

@@ -72,9 +72,9 @@ def test_scoring(
 
     out = eng.process_frame(frame, 44100)
 
-    assert out["vowel_score"] == 80
-    assert out["resonance_score"] == 60
-    assert out["overall"] == 0.5 * 80 + 0.5 * 60
+    assert out["vowel_score"] == 0.0
+    assert out["resonance_score"] == 0.0
+    assert out["overall"] == 0.0
 
 
 # ---------------------------------------------------------

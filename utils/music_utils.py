@@ -1,9 +1,12 @@
-from analysis.vowel_data import NOTE_NAMES
 import numpy as np
 import matplotlib.pyplot as plt
 # -------------------------
 # Pitch to MIDI + piano rendering
 # -------------------------
+NOTE_NAMES = [
+    "C", "C#", "D", "D#", "E", "F",
+    "F#", "G", "G#", "A", "A#", "B"
+]
 
 
 def hz_to_midi(f0):

@@ -1,8 +1,8 @@
+# tuner/window.py
 import threading
 import numpy as np
 import sounddevice as sd
-from calibration.dialog import ProfileDialog
-from calibration.window import CalibrationWindow
+
 from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -26,21 +26,18 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 from tuner.tuner_plotter import update_spectrum, update_vowel_chart
 from utils.music_utils import hz_to_midi, render_piano
+from calibration.dialog import ProfileDialog
+from calibration.window import CalibrationWindow
 
 
 class TunerWindow(QMainWindow):
     """
-    Restored classic UI:
-
-      - Left: profiles, Start/Stop Mic, Calibrate, hint, Active label
-      - Right: vowel chart, spectrum, piano keyboard, numeric tolerance
+    Restored classic UI + modern right panel.
 
     Internals:
-
-      - analyzer: FormantAnalysisEngine (must implement process_frame(signal, sr)
-        and get_latest_raw())
-      - profile_manager: ProfileManager
-      - live_analyzer: LiveAnalyzer (process_raw(raw_dict) -> processed dict)
+      - analyzer: FormantAnalysisEngine (tuner.engine)
+      - profile_manager: ProfileManager (tuner.profile_manager)
+      - live_analyzer: LiveAnalyzer (tuner.live_analyzer)
     """
 
     def __init__(self, tuner, sample_rate=44100, parent=None):
@@ -67,7 +64,7 @@ class TunerWindow(QMainWindow):
         self._populate_profiles()
         self._setup_timers()
 
-        # Initial window size ~75% of screen and centered
+        # Initial window size
         screen = self.screen().availableGeometry()
         w = int(screen.width() * 0.75)
         h = int(screen.height() * 0.75)
@@ -213,23 +210,20 @@ class TunerWindow(QMainWindow):
         right_splitter.setSizes([80, 800])
 
         # ---- Signals ----
-        self.tol_field.editingFinished.connect(  # type:ignore
-            self._update_tolerance_from_field)
-        self.start_btn.clicked.connect(self.start_mic)  # type:ignore
-        self.stop_btn.clicked.connect(self.stop_mic)  # type:ignore
-        self.refresh_btn.clicked.connect(self._populate_profiles)  # type:ignore
-        self.delete_btn.clicked.connect(self._delete_selected_profile)  # type:ignore
-        self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type:ignore
-        self.profile_list.itemDoubleClicked.connect(  # type:ignore
-            self._apply_selected_profile_item)
+        self.tol_field.editingFinished.connect(self._update_tolerance_from_field)
+        self.start_btn.clicked.connect(self.start_mic)
+        self.stop_btn.clicked.connect(self.stop_mic)
+        self.refresh_btn.clicked.connect(self._populate_profiles)
+        self.delete_btn.clicked.connect(self._delete_selected_profile)
+        self.calib_btn.clicked.connect(self._on_calibrate_clicked)
+        self.profile_list.itemDoubleClicked.connect(self._apply_selected_profile_item)
 
     # ---------------------------------------------------------
     # Timers
     # ---------------------------------------------------------
     def _setup_timers(self):
         self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(  # type:ignore
-            self._update_display)
+        self.update_timer.timeout.connect(self._update_display)
         self.update_timer.start(60)  # ~16 fps
 
     # ---------------------------------------------------------
@@ -361,6 +355,7 @@ class TunerWindow(QMainWindow):
             )
             self.update_timer.stop()  # pause tuner UI updates
             self.start_mic()
+            print("[AUDIO] Microphone stream started")
             self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
             self.calib_win.show()
             return
@@ -376,6 +371,7 @@ class TunerWindow(QMainWindow):
         )
         self.update_timer.stop()
         self.start_mic()
+        print("[AUDIO] Microphone stream started")
         self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
         self.calib_win.show()
 
@@ -386,11 +382,9 @@ class TunerWindow(QMainWindow):
         # Refresh list and select the new/updated profile
         self._populate_profiles()
         self._apply_profile_base(base_name)
-
-        display = self.profile_manager.display_name(base_name)
-        QMessageBox.information(self,
-                                "Profile active", f"Set active profile: {display}")
+        self.live_analyzer.reset()
         self.update_timer.start()  # resume tuner UI updates
+        print("[AUDIO] Microphone stream stopped")
         self.stop_mic()
 
     # ---------------------------------------------------------
@@ -407,7 +401,7 @@ class TunerWindow(QMainWindow):
             self.tol_field.setText(str(self.current_tolerance))
 
     # ---------------------------------------------------------
-    # Microphone handling (sounddevice.InputStream)
+    # Mic handling
     # ---------------------------------------------------------
     def start_mic(self):
         with self.stream_lock:
@@ -416,14 +410,21 @@ class TunerWindow(QMainWindow):
 
             def callback(indata, _frames, _time, status):
                 if status:
-                    # Optional: log status
-                    pass
+                    print("[AUDIO STATUS]", status)
+
                 mono = indata[:, 0].copy()
+
+                # Feed pitch smoother's audio buffer (via live_analyzer)
+                try:
+                    self.live_analyzer.pitch_smoother.push_audio(mono)
+                except Exception as error:
+                    print("[AUDIO BUFFER ERROR]", error)
+
+                # Process frame
                 try:
                     self.analyzer.process_frame(mono, self.sample_rate)
-                except Exception:
-                    # Avoid killing the stream from callback errors
-                    pass
+                except Exception as error:
+                    print("[AUDIO CALLBACK ERROR]", error)
 
             try:
                 self.stream = sd.InputStream(
@@ -432,6 +433,7 @@ class TunerWindow(QMainWindow):
                     callback=callback,
                 )
                 self.stream.start()
+                print("[AUDIO] Microphone stream started")
             except Exception as e:
                 self.stream = None
                 QMessageBox.critical(
@@ -447,19 +449,20 @@ class TunerWindow(QMainWindow):
             try:
                 self.stream.stop()
                 self.stream.close()
+                print("[AUDIO] Microphone stream stopped")
             except Exception:
                 pass
             finally:
                 self.stream = None
+                self.live_analyzer.reset()
 
     # ---------------------------------------------------------
-    # Main update loop
+    # Display update
     # ---------------------------------------------------------
     def _update_display(self):
-        """
-        Poll the latest raw frame from the engine, pass through LiveAnalyzer,
-        and update all visual components.
-        """
+        if self.stream is None or not self.stream.active:
+            return
+
         raw = self.analyzer.get_latest_raw()
         if raw is None:
             return
@@ -468,49 +471,57 @@ class TunerWindow(QMainWindow):
         if processed is None:
             return
 
-        f0 = processed.get("f0")
-        f1, f2, f3 = processed.get("formants", (None, None, None))
-        vowel = processed.get("vowel") or ""
+        # Extract smoothed values
+        f0 = processed["f0"]
+        f1, f2, f3 = processed["formants"]
+        vowel = processed["vowel"]
+        vowel_score = processed["vowel_score"]
+        resonance_score = processed["resonance_score"]
+        overall = processed["overall"]
 
-        vowel_score = processed.get("vowel_score", 0)
-        resonance_score = processed.get("resonance_score", 0)
-        overall = processed.get("overall", 0)
+        # Your plotter expects:
+        #   target_formants = (f1_t, f2_t, f3_t)
+        #   measured_formants = (f1_m, f2_m, f3_m)
+        #
+        # For now, we have no target formants in the tuner UI,
+        # so we pass (np.nan, np.nan, np.nan)
+        target_formants = (np.nan, np.nan, np.nan)
+        measured_formants = (f1, f2, f3)
 
-        # Target formants from active profile / engine
-        target_formants = self.analyzer.user_formants.get(
-            vowel, (np.nan, np.nan, np.nan)
-        )
+        # ===== Spectrum panel =====
+        try:
+            update_spectrum(
+                window=self,
+                vowel=vowel,
+                target_formants=target_formants,
+                measured_formants=measured_formants,
+                pitch=f0,
+                _tol=self.current_tolerance,
+            )
+        except Exception as e:
+            print("[TUNER] update_spectrum error:", e)
 
-        measured_formants = (
-            f1 if f1 is not None else np.nan,
-            f2 if f2 is not None else np.nan,
-            f3 if f3 is not None else np.nan,
-        )
+        # ===== Vowel chart =====
+        try:
+            update_vowel_chart(
+                window=self,
+                vowel=vowel,
+                target_formants=target_formants,
+                measured_formants=measured_formants,
+                vowel_score=vowel_score,
+                resonance_score=resonance_score,
+                overall=overall,
+            )
+        except Exception as e:
+            print("[TUNER] update_vowel_chart error:", e)
 
-        # Spectrum
-        update_spectrum(
-            self,
-            vowel,
-            target_formants,
-            measured_formants,
-            f0,
-            self.current_tolerance,
-        )
-
-        # Vowel chart
-        update_vowel_chart(
-            self,
-            vowel,
-            target_formants,
-            measured_formants,
-            vowel_score,
-            resonance_score,
-            overall,
-        )
-
-        # Piano
-        midi = hz_to_midi(f0) if f0 else None
-        render_piano(self.ax_piano, midi)
+        # ===== Piano keyboard =====
+        try:
+            self.ax_piano.cla()
+            midi_note = hz_to_midi(f0) if (f0 is not None and f0 > 0) else None
+            render_piano(self.ax_piano, midi_note)
+        except Exception as e:
+            print("[TUNER] piano render error:", e)
 
         self.canvas.draw_idle()
 
@@ -520,4 +531,5 @@ class TunerWindow(QMainWindow):
     def closeEvent(self, event):
         self.update_timer.stop()
         self.stop_mic()
+        print("[AUDIO] Microphone stream stopped")
         super().closeEvent(event)

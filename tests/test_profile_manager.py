@@ -1,7 +1,6 @@
 # tests/test_profile_manager.py
 import json
 from unittest.mock import MagicMock
-
 from tuner.profile_controller import ProfileManager
 
 

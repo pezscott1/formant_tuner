@@ -110,3 +110,85 @@ def test_label_smoother_window_rollover():
 
     s.update("c")          # new label
     assert s.update("c") == "c"  # stable after dwell
+
+
+def test_pitch_smoother_hps_fallback(monkeypatch):
+    ps = PitchSmoother(jump_limit=50, sr=44100)
+
+    # Seed with stable pitch
+    ps.current = 200.0
+
+    # Fill audio buffer so HPS can run
+    ps.audio_buffer.extend([0.1] * ps.hps_window)
+
+    # Fake HPS result
+    monkeypatch.setattr("analysis.smoothing.hps_pitch", lambda sig, sr: 210.0)
+
+    # Incoming pitch is a huge jump → fallback should override it
+    out = ps.update(500.0)
+    assert abs(out - 202.5) < 1e-6
+
+
+def test_pitch_smoother_no_hps_when_buffer_small(monkeypatch):
+    ps = PitchSmoother(jump_limit=50, sr=44100)
+    ps.current = 200.0
+
+    # Buffer too small → fallback not used
+    ps.audio_buffer.extend([0.1] * 100)
+
+    out = ps.update(500.0)
+    assert out == 200.0  # clamped to previous
+
+
+def test_pitch_smoother_doubling_suppression():
+    ps = PitchSmoother()
+    ps.current = 200.0
+
+    out = ps.update(400.0)  # doubling
+    assert out == 200.0
+
+
+def test_formant_smoother_outlier_rejection():
+    ms = MedianSmoother(window=5, outlier_thresh=100)
+
+    # Add stable values
+    for _ in range(4):
+        ms.update(500, 1500)
+
+    # Add a huge outlier
+    f1_s, f2_s = ms.update(2000, 5000)
+
+    # Should ignore outlier and return median of stable values
+    assert f1_s == 500
+    assert f2_s == 1500
+
+
+def test_formant_smoother_nan_handling():
+    ms = MedianSmoother(window=3)
+
+    ms.update(500, 1500)
+    ms.update(None, None)
+    f1_s, f2_s = ms.update(520, 1480)
+
+    assert abs(f1_s - 510.0) < 1e-6
+    assert abs(f2_s - 1490.0) < 1e-6
+
+
+def test_label_smoother_confidence_threshold():
+    ls = LabelSmoother(min_confidence=0.5)
+    ls.update("ɑ", 1.0)
+
+    out = ls.update("i", 0.2)  # too low confidence
+    assert out == "ɑ"
+
+
+def test_label_smoother_hysteresis():
+    ls = LabelSmoother(hold_frames=3)
+    ls.update("ɑ", 1.0)
+
+    # Not enough persistence
+    ls.update("i", 1.0)
+    ls.update("i", 1.0)
+    out = ls.update("i", 1.0)
+
+    assert out == "i"

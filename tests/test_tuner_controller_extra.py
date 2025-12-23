@@ -54,3 +54,23 @@ def test_poll_latest_processed_calls_live_analyzer(tmp_path):
 
     tuner.live_analyzer.process_raw.assert_called_once_with(fake_raw)
     assert out == {"processed": True}
+
+
+def test_tuner_controller_no_profile():
+    t = Tuner()
+    t.engine._latest_raw = {"f0": 200, "formants": (500, 1500, 2500)}
+
+    out = t.poll_latest_processed()
+    assert out["f0"] == 200
+    assert out["formants"] == (500, 1500, 2500)
+
+
+def test_tuner_controller_with_profile():
+    t = Tuner()
+    t.active_profile = {"ɑ": {"f1": 500, "f2": 1500}}
+
+    t.engine._latest_raw = {"f0": 200, "formants": (500, 1500, 2500)}
+
+    out = t.poll_latest_processed()
+    assert out["profile_vowel"] == "ɑ"
+    assert out["profile_confidence"] > 0

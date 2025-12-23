@@ -1,5 +1,3 @@
-# analysis/engine.py
-
 import numpy as np
 from typing import Dict, Tuple, Any, Optional
 
@@ -24,16 +22,16 @@ class FormantAnalysisEngine:
     def __init__(self, voice_type: str = "bass") -> None:
         self.voice_type = voice_type
         # Map: vowel -> (f1, f2, f3)
-        self.user_formants: (
-            Dict)[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
+        self.user_formants: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
         self._latest_raw: Optional[Dict[str, Any]] = None
 
     # ---------------------------------------------------------
     # User targets
     # ---------------------------------------------------------
     def set_user_formants(
-            self, formant_map: Dict[str, Tuple[Optional[float],
-                                    Optional[float], Optional[float]]], ) -> None:
+        self,
+        formant_map: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]],
+    ) -> None:
         """Set user-specific target formants for each vowel."""
         self.user_formants = formant_map or {}
 
@@ -80,32 +78,37 @@ class FormantAnalysisEngine:
 
         # ---------------- Formants ----------------
         f1, f2, f3 = estimate_formants_lpc(signal, sr)
-        # Keep copies for feedback (before any plausibility adjustments)
-        fb_f1, fb_f2 = f1, f2
+        fb_f1, fb_f2 = f1, f2  # feedback copies
 
         # ---------------- Vowel guess + confidence ----------------
-        # noinspection PyUnusedLocal
         vowel = None
-        # noinspection PyUnusedLocal
         vowel_conf = 0.0
 
-        try:
-            best, conf, _second = robust_guess((f1, f2), voice_type=self.voice_type)
-            vowel = best
-            vowel_conf = float(conf) if conf is not None else 0.0
-        except Exception:
-            # Fallback to simple guess_vowel
+        if f1 is not None and f2 is not None and not np.isnan(f1) and not np.isnan(f2):
             try:
-                vowel = guess_vowel(f1, f2, self.voice_type)
+                best, conf, _second = robust_guess((f1, f2), voice_type=self.voice_type)
+                vowel = best
+                vowel_conf = float(conf) if conf is not None else 0.0
             except Exception:
-                vowel = None
+                try:
+                    vowel = guess_vowel(f1, f2, self.voice_type)
+                except Exception:
+                    vowel = None
+                vowel_conf = 0.0
+        else:
+            vowel = None
             vowel_conf = 0.0
 
         # ---------------- Scoring ----------------
-        target_formants = self.user_formants.get(vowel, (None, None, None))
-        vowel_score = live_score_formants(target_formants, (f1, f2, f3), tolerance=50)
-        resonance_score = resonance_tuning_score(signal, sr)
-        overall = 0.5 * vowel_score + 0.5 * resonance_score
+        if not self.user_formants:
+            vowel_score = 0.0
+            resonance_score = 0.0
+            overall = 0.0
+        else:
+            target_formants = self.user_formants.get(vowel, (None, None, None))
+            vowel_score = live_score_formants(target_formants, (f1, f2, f3), tolerance=50)
+            resonance_score = resonance_tuning_score((f1, f2, f3), f0, tolerance=50)
+            overall = 0.5 * vowel_score + 0.5 * resonance_score
 
         result = {
             "f0": f0,
@@ -121,7 +124,6 @@ class FormantAnalysisEngine:
             "segment": signal.copy(),
         }
 
-        # Store latest raw result for polling from UI
         self._latest_raw = result
         return result
 
