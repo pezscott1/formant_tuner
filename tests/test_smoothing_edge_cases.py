@@ -191,3 +191,17 @@ def test_pitch_smoother_nan_audio():
     sm = PitchSmoother()
     sm.push_audio(np.array([np.nan, np.nan]))
     assert len(sm.audio_buffer) == 2
+
+
+def test_median_smoother_returns_none_when_no_valid_values():
+    sm = MedianSmoother(window=5)
+
+    # Fill buffer with NaNs
+    for _ in range(5):
+        sm.update(None, None)
+
+    # Next update triggers median-of-all-NaN fallback
+    f1, f2 = sm.update(None, None)
+
+    assert f1 is None
+    assert f2 is None

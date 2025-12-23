@@ -70,3 +70,9 @@ def test_render_piano_out_of_range_low():
     ax = MagicMock()
     render_piano(ax, midi_note=-50)
     assert ax.add_patch.called or ax.plot.called
+
+
+def test_render_piano_handles_negative_midi():
+    ax = MagicMock()
+    render_piano(ax, midi_note=-10)
+    assert ax.add_patch.called or ax.plot.called
