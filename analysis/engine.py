@@ -22,7 +22,8 @@ class FormantAnalysisEngine:
     def __init__(self, voice_type: str = "bass") -> None:
         self.voice_type = voice_type
         # Map: vowel -> (f1, f2, f3)
-        self.user_formants: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
+        self.user_formants: \
+            Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
         self._latest_raw: Optional[Dict[str, Any]] = None
 
     # ---------------------------------------------------------
@@ -30,7 +31,8 @@ class FormantAnalysisEngine:
     # ---------------------------------------------------------
     def set_user_formants(
         self,
-        formant_map: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]],
+        formant_map:
+        Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]],
     ) -> None:
         """Set user-specific target formants for each vowel."""
         self.user_formants = formant_map or {}
@@ -81,8 +83,8 @@ class FormantAnalysisEngine:
         fb_f1, fb_f2 = f1, f2  # feedback copies
 
         # ---------------- Vowel guess + confidence ----------------
-        vowel = None
-        vowel_conf = 0.0
+        _vowel = None
+        _vowel_conf = 0.0
 
         if f1 is not None and f2 is not None and not np.isnan(f1) and not np.isnan(f2):
             try:
@@ -106,7 +108,8 @@ class FormantAnalysisEngine:
             overall = 0.0
         else:
             target_formants = self.user_formants.get(vowel, (None, None, None))
-            vowel_score = live_score_formants(target_formants, (f1, f2, f3), tolerance=50)
+            vowel_score = live_score_formants(
+                target_formants, (f1, f2, f3), tolerance=50)
             resonance_score = resonance_tuning_score((f1, f2, f3), f0, tolerance=50)
             overall = 0.5 * vowel_score + 0.5 * resonance_score
 

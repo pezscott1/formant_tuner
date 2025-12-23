@@ -15,7 +15,8 @@ FORMANTS: Dict[str, Dict[str, Tuple[float, float, float]]] = {
         # ɛ: bright, relatively high F1/F2 for a bass (from logs: ~600–800 / 2300–2600)
         "ɛ":  (650.0, 2350.0, 3000.0),
 
-        # ɑ: back-ish but with higher F2 than “classical” tables (logs: ~800–900 / 1600–1800)
+        # ɑ: back-ish but with higher F2 than
+        # “classical” tables (logs: ~800–900 / 1600–1800)
         "ɑ":  (800.0, 1700.0, 2600.0),
 
         # ɔ: mid F1, low-mid F2

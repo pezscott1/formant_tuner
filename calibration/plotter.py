@@ -56,7 +56,8 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):
                 shading="auto"
             )
         except Exception:
-            mean_spec = np.mean(S_small, axis=1) if S_small.size else np.zeros_like(freqs[mask])
+            mean_spec = np.mean(S_small, axis=1) \
+                if S_small.size else np.zeros_like(freqs[mask])
             self.ax_spec.plot(freqs[mask], 10 * np.log10(mean_spec + 1e-12))
     else:
         try:

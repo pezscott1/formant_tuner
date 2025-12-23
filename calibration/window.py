@@ -206,7 +206,8 @@ class CalibrationWindow(QMainWindow):
             return
 
         # Timeout check
-        if event["event"] == "capture_tick" and self.state.check_timeout(self.capture_timeout):
+        if (event["event"] == "capture_tick"
+                and self.state.check_timeout(self.capture_timeout)):
             vowel = self.state.current_vowel
             self.status_panel.appendPlainText(
                 f"/{vowel}/ capture timed out after {self.capture_timeout:.1f}s"
@@ -332,7 +333,8 @@ class CalibrationWindow(QMainWindow):
     def _process_capture(self):
         if not self._capture_buffer:
             vowel = self.state.current_vowel
-            self.status_panel.appendPlainText(f"No audio captured for /{vowel}/ — retrying")
+            self.status_panel.appendPlainText(
+                f"No audio captured for /{vowel}/ — retrying")
             self.state.retry_current_vowel()
             return
 

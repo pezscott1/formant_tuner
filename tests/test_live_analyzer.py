@@ -116,7 +116,8 @@ def test_live_analyzer_first_frame_initializes_label():
     engine = DummyEngine()
     la = LiveAnalyzer(engine, PitchSmoother(), MedianSmoother(), LabelSmoother())
 
-    raw = {"f0": 200, "formants": (500, 1500, 2500), "vowel_guess": "ɑ", "vowel_confidence": 1.0}
+    raw = {"f0": 200, "formants":
+           (500, 1500, 2500), "vowel_guess": "ɑ", "vowel_confidence": 1.0}
     out = la.process_raw(raw)
 
     assert out["vowel"] == "ɑ"
@@ -128,9 +129,11 @@ def test_live_analyzer_plausibility_resets_formant_smoother(monkeypatch):
     la = LiveAnalyzer(engine, PitchSmoother(), MedianSmoother(), LabelSmoother())
 
     # Force plausibility to fail
-    monkeypatch.setattr("analysis.vowel.is_plausible_formants", lambda f1, f2, vt: (False, "bad"))
+    monkeypatch.setattr(
+        "analysis.vowel.is_plausible_formants", lambda f1, f2, vt: (False, "bad"))
 
-    raw = {"f0": 200, "formants": (500, 1500, 2500), "vowel_guess": "ɑ", "vowel_confidence": 1.0}
+    raw = {"f0": 200, "formants":
+           (500, 1500, 2500), "vowel_guess": "ɑ", "vowel_confidence": 1.0}
     la.formant_smoother.buffer.extend([(500, 1500)])
 
     la.process_raw(raw)
