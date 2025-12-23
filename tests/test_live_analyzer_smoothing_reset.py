@@ -17,4 +17,3 @@ def test_plausibility_resets_formant_smoother():
     assert len(la.formant_smoother.buffer) == 2
     assert la.formant_smoother.buffer[0] == (500.0, 1500.0)
     assert la.formant_smoother.buffer[1] == (99999.0, 99999.0)
-

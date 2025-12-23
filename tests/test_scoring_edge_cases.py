@@ -29,7 +29,8 @@ def test_missing_vowel_in_profile():
 
 def test_missing_formants_zero_scores():
     la = make_analyzer(profile={"i": (300, 2500, 100)})
-    out = la.process_raw({"f0": 100, "formants": (None, None, None), "vowel_guess": "i"})
+    out = la.process_raw({"f0": 100, "formants":
+                         (None, None, None), "vowel_guess": "i"})
     assert out["overall"] == 0.0
 
 

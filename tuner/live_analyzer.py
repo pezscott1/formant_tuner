@@ -43,7 +43,8 @@ class LiveAnalyzer:
         vowel_conf = float(raw_dict.get("vowel_confidence", 0.0))
 
         # First-frame initialization
-        if getattr(self.label_smoother, "current", None) is None and vowel_raw is not None:
+        if (getattr(self.label_smoother, "current", None)
+                is None and vowel_raw is not None):
             self.label_smoother.current = vowel_raw
             if hasattr(self.label_smoother, "last"):
                 self.label_smoother.last = vowel_raw

@@ -118,3 +118,76 @@ def test_pitch_smoother_handles_multiple_pushes():
     sm.push_audio(np.array([1, 2, 3]))
     sm.push_audio(np.array([4, 5]))
     assert len(sm.audio_buffer) == 5
+
+
+# -----------------------------
+# MedianSmoother edge cases
+# -----------------------------
+
+
+def test_median_smoother_empty_buffer_fallback():
+    sm = MedianSmoother()
+    f1_s, f2_s = sm.update(None, None)
+    assert f1_s is None
+    assert f2_s is None
+
+
+def test_median_smoother_all_nan_buffer():
+    sm = MedianSmoother(window=3)
+    sm.update(None, None)
+    sm.update(None, None)
+    sm.update(None, None)
+    f1_s, f2_s = sm.update(None, None)
+    assert f1_s is None
+    assert f2_s is None
+
+
+def test_median_smoother_nan_outlier_rejection():
+    sm = MedianSmoother(window=5, outlier_thresh=100)
+    sm.update(500, 1500)
+    sm.update(None, None)  # stored as NaN
+    sm.update(510, 1510)
+
+    # Extreme outlier
+    f1_s, f2_s = sm.update(9999, 9999)
+
+    # Should return median of valid values
+    assert f1_s == 505
+    assert f2_s == 1505
+
+
+# -----------------------------
+# LabelSmoother edge cases
+# -----------------------------
+
+
+def test_label_smoother_threshold_edge():
+    sm = LabelSmoother(min_confidence=0.9)
+    sm.update("i", 0.9)
+    # confidence == threshold → stays on previous label
+    out = sm.update("ɛ", 0.9)
+    assert out == "i"
+
+
+def test_label_smoother_no_previous_label():
+    sm = LabelSmoother()
+    out = sm.update("i", 0.1)
+    assert out is None
+
+# -----------------------------
+# PitchSmoother edge cases
+# -----------------------------
+
+
+def test_pitch_smoother_empty_audio_buffer():
+    sm = PitchSmoother()
+    # No audio pushed yet
+    assert len(sm.audio_buffer) == 0
+    sm.push_audio(np.array([]))
+    assert len(sm.audio_buffer) == 0
+
+
+def test_pitch_smoother_nan_audio():
+    sm = PitchSmoother()
+    sm.push_audio(np.array([np.nan, np.nan]))
+    assert len(sm.audio_buffer) == 2

@@ -238,7 +238,7 @@ class CalibrationWindow(QMainWindow):
         # Debug vowel guess (but do NOT use it for gating)
         # -----------------------------------------------------
         vowel_guess_raw = raw.get("vowel_guess")
-        vowel_guess = self.label_smoother.update(vowel_guess_raw)
+        self.label_smoother.update(vowel_guess_raw)
 
         target = self.state.current_vowel
         # -----------------------------------------------------
@@ -330,7 +330,7 @@ class CalibrationWindow(QMainWindow):
             self.status_panel.appendPlainText(
                 f"No audio captured for /{vowel}/ — retrying"
             )
-            _ev = self.state.retry_current_vowel()
+            self.state.retry_current_vowel()
             self.phase_timer.start(1000)
             return
 
@@ -521,7 +521,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Finish and save profile
     # ---------------------------------------------------------
-    def _finish(self):
+    def _finish(self):  # noqa: C901
         """
         Save profile, stop timers, stop audio, reset smoothers,
         and notify parent.

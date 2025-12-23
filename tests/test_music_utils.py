@@ -1,5 +1,4 @@
 # tests/test_music_utils.py
-import numpy as np
 from utils.music_utils import hz_to_midi, render_piano
 from unittest.mock import MagicMock
 
@@ -45,7 +44,29 @@ def test_render_piano_calls_plotting():
     assert ax.add_patch.called or ax.plot.called
 
 
-def test_render_piano_handles_out_of_range():
+def test_hz_to_midi_fractional_rounding():
+    midi = hz_to_midi(445)
+    assert isinstance(midi, int)
+
+
+def test_hz_to_midi_extreme_values():
+    # Very small frequencies produce very negative MIDI numbers
+    assert isinstance(hz_to_midi(1e-9), int)
+
+
+def test_render_piano_basic():
     ax = MagicMock()
-    render_piano(ax, midi_note=200)  # outside piano range
+    render_piano(ax, midi_note=60)
+    assert ax.add_patch.called or ax.plot.called
+
+
+def test_render_piano_out_of_range_high():
+    ax = MagicMock()
+    render_piano(ax, midi_note=200)
+    assert ax.add_patch.called or ax.plot.called
+
+
+def test_render_piano_out_of_range_low():
+    ax = MagicMock()
+    render_piano(ax, midi_note=-50)
     assert ax.add_patch.called or ax.plot.called

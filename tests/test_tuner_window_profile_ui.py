@@ -1,5 +1,4 @@
 # tests/test_tuner_window_profile_ui.py
-from unittest.mock import MagicMock
 from tuner.window import TunerWindow
 from tuner.controller import Tuner
 from analysis.engine import FormantAnalysisEngine

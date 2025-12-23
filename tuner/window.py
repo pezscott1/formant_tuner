@@ -208,13 +208,15 @@ class TunerWindow(QMainWindow):
         right_splitter.setSizes([80, 800])
 
         # ---- Signals ----
-        self.tol_field.editingFinished.connect(self._update_tolerance_from_field)  # type:ignore
+        self.tol_field.editingFinished.connect(  # type:ignore
+            self._update_tolerance_from_field)
         self.start_btn.clicked.connect(self.start_mic)  # type:ignore
         self.stop_btn.clicked.connect(self.stop_mic)  # type:ignore
         self.refresh_btn.clicked.connect(self._populate_profiles)  # type:ignore
         self.delete_btn.clicked.connect(self._delete_selected_profile)  # type:ignore
         self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type:ignore
-        self.profile_list.itemClicked.connect(self._apply_selected_profile_item)  # type:ignore
+        self.profile_list.itemClicked.connect(  # type:ignore
+            self._apply_selected_profile_item)
 
     # ---------------------------------------------------------
     # Timers
@@ -480,7 +482,7 @@ class TunerWindow(QMainWindow):
     # ---------------------------------------------------------
     # Display update
     # ---------------------------------------------------------
-    def _update_display(self):
+    def _update_display(self):  # noqa: C901
         if self.stream is None or not self.stream.active:
             return
 
