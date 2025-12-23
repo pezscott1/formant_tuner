@@ -8,8 +8,8 @@ from tuner.profile_controller import ProfileManager
 
 
 class Tuner:
-    def __init__(
-            self, engine=None, voice_type="bass", profiles_dir="profiles", sample_rate=44100):
+    def __init__(self, engine=None, voice_type="bass",
+                 profiles_dir="profiles", sample_rate=44100):
         # Shared DSP engine
         self.engine = engine or FormantAnalysisEngine(voice_type=voice_type)
 

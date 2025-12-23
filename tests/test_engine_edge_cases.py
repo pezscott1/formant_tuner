@@ -90,3 +90,20 @@ def test_engine_valid_frame_runs_without_error():
     raw = eng.get_latest_raw()
     assert "f0" in raw
     assert "formants" in raw
+
+
+def test_engine_handles_unprocessable_frame():
+    eng = FormantAnalysisEngine()
+
+    # A frame that is long enough to enter processing,
+    # but contains only NaNs so LPC, pitch, and formants all fail.
+    frame = np.full(2048, np.nan)
+
+    eng.process_frame(frame, 44100)
+    raw = eng.get_latest_raw()
+
+    # All fallback branches should trigger
+    assert raw["f0"] is None
+    assert raw["formants"] == (None, None, None)
+    assert raw["fb_f1"] is None
+    assert raw["fb_f2"] is None
