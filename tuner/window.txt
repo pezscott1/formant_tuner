@@ -2,6 +2,7 @@
 import threading
 import numpy as np
 import sounddevice as sd
+from analysis.engine import FormantAnalysisEngine
 from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -44,7 +45,7 @@ class TunerWindow(QMainWindow):
         self.setWindowTitle("Formant Tuner")
 
         self.tuner = tuner
-        self.analyzer = tuner.engine
+        self.analyzer = engine
         self.profile_manager = tuner.profile_manager
         self.live_analyzer = tuner.live_analyzer
         self.sample_rate = sample_rate
@@ -214,7 +215,7 @@ class TunerWindow(QMainWindow):
         self.refresh_btn.clicked.connect(self._populate_profiles)  # type:ignore
         self.delete_btn.clicked.connect(self._delete_selected_profile)  # type:ignore
         self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type:ignore
-        self.profile_list.itemClicked.connect(self._apply_selected_profile_item)  # type:ignore
+        self.profile_list.itemDoubleClicked.connect(self._apply_selected_profile_item)  # type:ignore
 
     # ---------------------------------------------------------
     # Timers
@@ -256,9 +257,8 @@ class TunerWindow(QMainWindow):
                     break
         elif names:
             # Default to first real profile
-            # base = names[0]
-            # self._apply_profile_base(base)
-            pass
+            base = names[0]
+            self._apply_profile_base(base)
 
     def _set_active_profile(self, base: str):
         """Update the UI label for the active profile."""
@@ -319,6 +319,7 @@ class TunerWindow(QMainWindow):
                 f"Could not apply profile '{base}':\n{e}",
             )
             return
+        print("PROFILE:", self.analyzer.calibrated_profile)
         # Update UI label
         self._set_active_profile(applied)
         # Load the profile JSON
@@ -334,6 +335,7 @@ class TunerWindow(QMainWindow):
 
         # Extract calibrated formants
         formants = self.profile_manager.extract_formants(data)
+        print("ENGINE ID IN WINDOW:", id(self.analyzer))
         # Store in engine so LiveAnalyzer can score vowels
         self.analyzer.calibrated_profile = formants
 
@@ -559,4 +561,6 @@ class TunerWindow(QMainWindow):
     # ---------------------------------------------------------
     def closeEvent(self, event):
         self.update_timer.stop()
+        self.stop_mic()
+        print("[AUDIO] Microphone stream stopped")
         super().closeEvent(event)

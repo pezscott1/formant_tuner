@@ -4,6 +4,7 @@ import os
 import json
 from datetime import timezone, datetime
 from analysis.vowel import is_plausible_formants
+from typing import Any
 
 
 PROFILES_DIR = "profiles"
@@ -136,7 +137,7 @@ class CalibrationSession:
                 merged[vowel] = merge_formants(old_vals, new_vals, vowel)
 
         # Normalize + save
-        profile_dict = normalize_profile_for_save(
+        profile_dict: dict[str, Any] = normalize_profile_for_save(
             merged,
             retries_map=self.retries_map,
         )

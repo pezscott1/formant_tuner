@@ -1,0 +1,226 @@
+
+python main.py
+qt.qpa.fonts: Unable to open default EUDC font: "C:\\Windows\\FONTS\\EUDC.TTE"
+[AUDIO] Microphone stream started
+TUNER RAW: {'f0': 121.86342101049927, 'formants': (np.float64(102.14204061236212), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(102.14204061236212), 'fb_f2': None, 'segment': array([0.00039673, 0.00036621, 0.00042725, ..., 0.00076294, 0.00073242,
+       0.00073242], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 621.5697442000402, 'formants': (None, None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': None, 'fb_f2': None, 'segment': array([ 7.3242188e-04,  7.3242188e-04,  7.3242188e-04, ...,
+       -6.1035156e-05, -3.0517578e-05, -6.1035156e-05],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 134.47478154577144, 'formants': (np.float64(87.64369941246115), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(87.64369941246115), 'fb_f2': None, 'segment': array([-0.00100708, -0.00097656, -0.00097656, ..., -0.00045776,
+       -0.00045776, -0.00045776], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 527.3959070093624, 'formants': (None, None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': None, 'fb_f2': None, 'segment': array([0.00045776, 0.00042725, 0.00042725, ..., 0.00048828, 0.00048828,
+       0.00054932], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 738.0750898806685, 'formants': (np.float64(814.1089182653823), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(814.1089182653823), 'fb_f2': None, 'segment': array([-0.0005188 , -0.00048828, -0.0005188 , ...,  0.00033569,
+        0.00036621,  0.00033569], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 131.34752839476926, 'formants': (np.float64(143.59539225124476), np.float64(3317.1317158872425), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_co
+nfidence': 1.1733913742829956, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(143.59539225124476), 'fb_f2': np.float64(3317.1317158872425), 'segment': array([-0.00949097, -0.00927734, -0.00909424, ...,  0.0050354 ,
+        0.00531006,  0.00558472], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.18672112007673, 'formants': (np.float64(523.4963411118972), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(523.4963411118972), 'fb_f2': None, 'segment': array([0.00793457, 0.00802612, 0.00814819, ..., 0.00775146, 0.00747681,
+       0.00723267], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 147.28400978961, 'formants': (np.float64(631.2287501197594), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_score
+': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(631.2287501197594), 'fb_f2': None, 'segment': array([ 0.0005188 ,  0.00061035,  0.0007019 , ..., -0.00042725,
+       -0.0007019 , -0.00097656], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.06321837850206, 'formants': (np.float64(651.69693938645), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_scor
+e': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(651.69693938645), 'fb_f2': None, 'segment': array([-0.00073242, -0.0005188 , -0.00024414, ..., -0.00064087,
+       -0.00076294, -0.00085449], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 147.6948114139577, 'formants': (np.float64(539.8084424388272), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(539.8084424388272), 'fb_f2': None, 'segment': array([-0.00561523, -0.00634766, -0.00708008, ...,  0.00469971,
+        0.00491333,  0.00518799], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.81426887160663, 'formants': (np.float64(528.1582047207667), np.float64(2891.7565556961076), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_con
+fidence': 1.0243145779868772, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(528.1582047207667), 'fb_f2': np.float64(2891.7565556961076), 'segment': array([ 0.00134277,  0.00097656,  0.00067139, ..., -0.00189209,
+       -0.00177002, -0.00164795], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.58648637342895, 'formants': (np.float64(453.85951029996784), np.float64(2981.44147578922), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_conf
+idence': 1.0993409187855194, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(453.85951029996784), 'fb_f2': np.float64(2981.44147578922), 'segment': array([0.00152588, 0.0015564 , 0.00152588, ..., 0.00375366, 0.00372314,
+       0.00372314], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 72.01277441674013, 'formants': (np.float64(399.5217281843735), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(399.5217281843735), 'fb_f2': None, 'segment': array([ 0.00238037,  0.00213623,  0.00186157, ..., -0.00756836,
+       -0.00769043, -0.00775146], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 72.18314014684633, 'formants': (np.float64(883.5791636845174), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(883.5791636845174), 'fb_f2': None, 'segment': array([ 0.00299072,  0.00305176,  0.00299072, ..., -0.00286865,
+       -0.00296021, -0.00305176], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.03030476165785, 'formants': (np.float64(602.0842692251068), np.float64(2988.573950535543), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_conf
+idence': 1.0331064980546218, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(602.0842692251068), 'fb_f2': np.float64(2988.573950535543), 'segment': array([-0.0088501 , -0.00799561, -0.00698853, ...,  0.00531006,
+        0.00564575,  0.00598145], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.939918610477, 'formants': (np.float64(439.3791654935487), np.float64(2863.4350765951926), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_confi
+dence': 1.1467447795551193, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(439.3791654935487), 'fb_f2': np.float64(2863.4350765951926), 'segment': array([ 0.00311279,  0.00335693,  0.00357056, ..., -0.00238037,
+       -0.00228882, -0.00222778], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.89496734771606, 'formants': (np.float64(481.61098634538587), np.float64(2976.5911222915447), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_co
+nfidence': 1.0732929464323226, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(481.61098634538587), 'fb_f2': np.float64(2976.5911222915447), 'segment': array([ 0.0045166 ,  0.00421143,  0.00390625, ..., -0.00253296,
+       -0.00265503, -0.00283813], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.05158052846565, 'formants': (np.float64(337.6556538383406), np.float64(3091.108803429853), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_conf
+idence': 1.1619710485963914, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(337.6556538383406), 'fb_f2': np.float64(3091.108803429853), 'segment': array([-0.00021362, -0.00027466, -0.00039673, ...,  0.00244141,
+        0.00247192,  0.00247192], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.35063514417433, 'formants': (np.float64(656.9343842504336), np.float64(2906.2751984308884), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_con
+fidence': 1.1134787392924057, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(656.9343842504336), 'fb_f2': np.float64(2906.2751984308884), 'segment': array([-0.00265503, -0.00231934, -0.00204468, ..., -0.00421143,
+       -0.00448608, -0.00476074], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.94833969025004, 'formants': (np.float64(616.6451750484831), np.float64(2903.509306444939), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_conf
+idence': 1.0726502922905332, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(616.6451750484831), 'fb_f2': np.float64(2903.509306444939), 'segment': array([-0.00030518, -0.00039673, -0.00042725, ..., -0.00326538,
+       -0.00366211, -0.00402832], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 141.1612847724665, 'formants': (np.float64(530.832524245599), np.float64(2884.877683228879), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_confid
+ence': 1.0204317233389413, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(530.832524245599), 'fb_f2': np.float64(2884.877683228879), 'segment': array([-0.00549316, -0.00567627, -0.00582886, ...,  0.00167847,
+        0.00170898,  0.00177002], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 72.58594009984269, 'formants': (np.float64(524.5475252546103), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(524.5475252546103), 'fb_f2': None, 'segment': array([0.00094604, 0.00115967, 0.00134277, ..., 0.00109863, 0.00115967,
+       0.00115967], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.7879992536442, 'formants': (np.float64(708.4644276138998), np.float64(2982.5556899032968), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_conf
+idence': 1.120008555994233, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(708.4644276138998), 'fb_f2': np.float64(2982.5556899032968), 'segment': array([-0.0005188 , -0.00036621, -0.00030518, ...,  0.00183105,
+        0.00180054,  0.00180054], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.3955270415016, 'formants': (np.float64(737.460782965238), np.float64(3543.3371628596487), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_confi
+dence': 1.023093234747983, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(737.460782965238), 'fb_f2': np.float64(3543.3371628596487), 'segment': array([0.00137329, 0.00158691, 0.00177002, ..., 0.00079346, 0.00088501,
+       0.00097656], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 142.30041583336742, 'formants': (np.float64(739.2757894451366), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(739.2757894451366), 'fb_f2': None, 'segment': array([ 0.00180054,  0.0017395 ,  0.00167847, ..., -0.00018311,
+       -0.00018311, -0.00018311], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 148.0732994746487, 'formants': (np.float64(734.8546683084232), np.float64(2928.61855009929), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_confid
+ence': 1.170465628015969, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(734.8546683084232), 'fb_f2': np.float64(2928.61855009929), 'segment': array([ 0.00057983,  0.00054932,  0.0005188 , ..., -0.00073242,
+       -0.00073242, -0.0007019 ], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 71.35049867161334, 'formants': (np.float64(796.139073676356), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_scor
+e': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(796.139073676356), 'fb_f2': None, 'segment': array([0.00082397, 0.00091553, 0.00100708, ..., 0.00036621, 0.00039673,
+       0.00042725], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 142.79426913985884, 'formants': (np.float64(401.16712135728403), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(401.16712135728403), 'fb_f2': None, 'segment': array([ 0.0000000e+00, -6.1035156e-05, -1.2207031e-04, ...,
+       -6.1035156e-05, -1.2207031e-04, -1.8310547e-04],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 142.43760951060364, 'formants': (np.float64(378.5717462966036), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(378.5717462966036), 'fb_f2': None, 'segment': array([0.00076294, 0.00082397, 0.00088501, ..., 0.00030518, 0.00033569,
+       0.00033569], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 136.7221279116476, 'formants': (np.float64(349.9520343828577), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(349.9520343828577), 'fb_f2': None, 'segment': array([-9.1552734e-05, -9.1552734e-05, -1.5258789e-04, ...,
+       -1.1901855e-03, -1.1901855e-03, -1.1291504e-03],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 141.02757899924146, 'formants': (np.float64(342.1608927925274), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(342.1608927925274), 'fb_f2': None, 'segment': array([-0.00076294, -0.00064087, -0.00054932, ...,  0.00033569,
+        0.00042725,  0.00045776], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.12121143578665, 'formants': (np.float64(196.6898705372884), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(196.6898705372884), 'fb_f2': None, 'segment': array([-3.6621094e-04, -3.9672852e-04, -4.2724609e-04, ...,
+        0.0000000e+00, -9.1552734e-05, -6.1035156e-05],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.8825448613377, 'formants': (np.float64(303.3427425190417), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(303.3427425190417), 'fb_f2': None, 'segment': array([-0.0010376 , -0.00097656, -0.00085449, ...,  0.0007019 ,
+        0.00064087,  0.00064087], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 70.53690076567489, 'formants': (np.float64(1868.0), np.float64(3935.2), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_confidence': 1.097704572096
+2537, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(1868.0), 'fb_f2': np.float64(3935.2), 'segment': array([ 1.5258789e-04,  1.5258789e-04,  3.0517578e-05, ...,
+       -1.8310547e-04, -1.2207031e-04, -3.0517578e-05],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.40965188689216, 'formants': (np.float64(347.12032346042304), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(347.12032346042304), 'fb_f2': None, 'segment': array([0.00027466, 0.00024414, 0.00021362, ..., 0.00045776, 0.00048828,
+       0.00048828], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 71.17296400072982, 'formants': (np.float64(125.64875630715507), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(125.64875630715507), 'fb_f2': None, 'segment': array([ 0.0005188 ,  0.00042725,  0.00048828, ..., -0.00061035,
+       -0.00054932, -0.00054932], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 72.93446526440944, 'formants': (np.float64(353.5727628304249), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(353.5727628304249), 'fb_f2': None, 'segment': array([ 6.1035156e-05,  6.1035156e-05,  6.1035156e-05, ...,
+       -2.0446777e-03, -2.1667480e-03, -2.1362305e-03],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.74618988568724, 'formants': (np.float64(113.6492846277929), np.float64(3041.8646772590964), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_con
+fidence': 1.309776149127589, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(113.6492846277929), 'fb_f2': np.float64(3041.8646772590964), 'segment': array([0.00042725, 0.0005188 , 0.0005188 , ..., 0.00131226, 0.00128174,
+       0.00115967], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 51.75861500608288, 'formants': (np.float64(572.3182155149266), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(572.3182155149266), 'fb_f2': None, 'segment': array([-0.00280762, -0.0027771 , -0.00289917, ...,  0.00024414,
+        0.00021362,  0.00015259], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.75149474887527, 'formants': (np.float64(447.8382017459392), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(447.8382017459392), 'fb_f2': None, 'segment': array([-0.00140381, -0.00143433, -0.00143433, ...,  0.00082397,
+        0.00091553,  0.00094604], shape=(1136,), dtype=float32)}
+[AUDIO] Microphone stream stopped
+[AUDIO] Microphone stream started
+TUNER RAW: {'f0': 145.3977215796096, 'formants': (np.float64(400.5030876001859), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(400.5030876001859), 'fb_f2': None, 'segment': array([0.00045776, 0.0005188 , 0.00054932, ..., 0.00012207, 0.00015259,
+       0.00012207], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 530.3640536582566, 'formants': (np.float64(103.90723290104779), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(103.90723290104779), 'fb_f2': None, 'segment': array([-0.00094604, -0.00091553, -0.00091553, ..., -0.00039673,
+       -0.00039673, -0.00039673], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 130.83056611837367, 'formants': (np.float64(493.15648113259067), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(493.15648113259067), 'fb_f2': None, 'segment': array([ 0.00363159,  0.00384521,  0.00405884, ..., -0.00372314,
+       -0.00390625, -0.00405884], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.05842323797933, 'formants': (np.float64(366.0900102021747), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(366.0900102021747), 'fb_f2': None, 'segment': array([-9.1552734e-05,  0.0000000e+00,  1.8310547e-04, ...,
+        8.5449219e-04,  6.4086914e-04,  3.9672852e-04],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 149.264466839007, 'formants': (np.float64(632.9609135778834), np.float64(2921.0556696253784), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_confi
+dence': 1.0823448699626326, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(632.9609135778834), 'fb_f2': np.float64(2921.0556696253784), 'segment': array([-0.00067139, -0.00076294, -0.00082397, ...,  0.00109863,
+        0.00137329,  0.00161743], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 147.07710257677033, 'formants': (np.float64(711.571224426356), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(711.571224426356), 'fb_f2': None, 'segment': array([ 9.1552734e-05, -3.9672852e-04, -7.6293945e-04, ...,
+       -4.7607422e-03, -5.0964355e-03, -5.4016113e-03],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 147.10195451304838, 'formants': (np.float64(793.4805001315249), np.float64(2574.4574970448116), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_con
+fidence': 1.9647694125662158, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(793.4805001315249), 'fb_f2': np.float64(2574.4574970448116), 'segment': array([-0.00167847, -0.00204468, -0.00231934, ..., -0.00274658,
+       -0.00299072, -0.00326538], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.3579066262336, 'formants': (np.float64(611.5467588030255), np.float64(2809.773130465924), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_confi
+dence': 1.1156952019472703, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(611.5467588030255), 'fb_f2': np.float64(2809.773130465924), 'segment': array([-0.00054932, -0.00042725, -0.00033569, ..., -0.00360107,
+       -0.00360107, -0.00354004], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.56387679574507, 'formants': (np.float64(721.6119024960027), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(721.6119024960027), 'fb_f2': None, 'segment': array([0.00112915, 0.0012207 , 0.00128174, ..., 0.00250244, 0.00253296,
+       0.00250244], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 142.9206505566029, 'formants': (np.float64(314.59185667875107), np.float64(2579.1458986055427), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_con
+fidence': 2.2599961842956118, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(314.59185667875107), 'fb_f2': np.float64(2579.1458986055427), 'segment': array([-0.0005188 , -0.00042725, -0.00033569, ...,  0.00106812,
+        0.0010376 ,  0.00100708], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 142.58898209181248, 'formants': (np.float64(143.99397880531285), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(143.99397880531285), 'fb_f2': None, 'segment': array([ 0.00024414,  0.00021362,  0.00021362, ..., -0.00134277,
+       -0.00131226, -0.00137329], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.58975606400395, 'formants': (np.float64(257.9230156924988), np.float64(2743.5312395798114), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_con
+fidence': 1.6050627823723669, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(257.9230156924988), 'fb_f2': np.float64(2743.5312395798114), 'segment': array([-0.00302124, -0.00286865, -0.00268555, ...,  0.00045776,
+        0.00045776,  0.00036621], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.2534969148417, 'formants': (np.float64(488.5775540593077), np.float64(2735.9038667477653), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_conf
+idence': 1.0858914186166821, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(488.5775540593077), 'fb_f2': np.float64(2735.9038667477653), 'segment': array([0.00033569, 0.00027466, 0.00024414, ..., 0.00088501, 0.00091553,
+       0.00106812], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.70590344635372, 'formants': (np.float64(2871.3565274481875), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(2871.3565274481875), 'fb_f2': None, 'segment': array([ 0.00030518,  0.00033569,  0.00033569, ..., -0.00030518,
+       -0.00036621, -0.00045776], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 140.73863272965605, 'formants': (np.float64(2635.3410183862125), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(2635.3410183862125), 'fb_f2': None, 'segment': array([0.0007019 , 0.00067139, 0.00064087, ..., 0.00073242, 0.00076294,
+       0.00085449], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 73.07027723210598, 'formants': (np.float64(573.4439344106321), np.float64(3240.2122071958106), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_conf
+idence': 1.0112153392361303, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(573.4439344106321), 'fb_f2': np.float64(3240.2122071958106), 'segment': array([0.0010376 , 0.0012207 , 0.00140381, ..., 0.00106812, 0.0010376 ,
+       0.00100708], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.8750397139646, 'formants': (np.float64(3247.4199077184385), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(3247.4199077184385), 'fb_f2': None, 'segment': array([-0.00018311, -0.00018311, -0.00018311, ..., -0.00030518,
+       -0.00027466, -0.00027466], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.53163589366545, 'formants': (np.float64(144.2970617376519), np.float64(2806.6753532365606), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_con
+fidence': 1.5647398298753317, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(144.2970617376519), 'fb_f2': np.float64(2806.6753532365606), 'segment': array([ 0.00033569,  0.00045776,  0.00057983, ..., -0.00109863,
+       -0.00106812, -0.00109863], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 784.643876842349, 'formants': (np.float64(351.52336136235783), np.float64(3538.2612494486543), None), 'vowel': 'i', 'vowel_guess': 'i', 'vowel_conf
+idence': 1.0752553568521461, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(351.52336136235783), 'fb_f2': np.float64(3538.2612494486543), 'segment': array([-3.0517578e-05,  0.0000000e+00, -3.0517578e-05, ...,
+       -9.1552734e-05, -9.1552734e-05, -1.2207031e-04],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 134.51957295373666, 'formants': (np.float64(1044.4), np.float64(2051.0), np.float64(2863.9)), 'vowel': 'ɑ', 'vowel_guess': 'ɑ', 'vowel_confidence':
+ 1.1571656795261052, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(1044.4), 'fb_f2': np.float64(2051.0), 'segment': array([0.00064087, 0.00061035, 0.00061035, ..., 0.00027466, 0.00027466,
+       0.00027466], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 143.9330377275152, 'formants': (np.float64(243.5410831311228), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sco
+re': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(243.5410831311228), 'fb_f2': None, 'segment': array([ 0.00021362,  0.00015259,  0.00012207, ..., -0.00119019,
+       -0.00128174, -0.00131226], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 145.09116437217273, 'formants': (np.float64(552.0394238114096), np.float64(2746.053965444452), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_conf
+idence': 1.0493147919300583, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(552.0394238114096), 'fb_f2': np.float64(2746.053965444452), 'segment': array([-0.00152588, -0.00152588, -0.00149536, ..., -0.00112915,
+       -0.00119019, -0.00134277], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.88074794380245, 'formants': (np.float64(752.6980029274642), np.float64(3153.4569857432657), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_con
+fidence': 1.0851877670416148, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(752.6980029274642), 'fb_f2': np.float64(3153.4569857432657), 'segment': array([0.00018311, 0.00018311, 0.00018311, ..., 0.00186157, 0.0017395 ,
+       0.00161743], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 658.8849093396545, 'formants': (np.float64(908.6562770244328), np.float64(3470.5950051342693), None), 'vowel': 'ɛ', 'vowel_guess': 'ɛ', 'vowel_conf
+idence': 1.0708299020856382, 'vowel_score': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(908.6562770244328), 'fb_f2': np.float64(3470.5950051342693), 'segment': array([-6.1035156e-05, -1.2207031e-04, -1.2207031e-04, ...,
+        0.0000000e+00, -6.1035156e-05, -6.1035156e-05],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.49371291511838, 'formants': (np.float64(427.53269851053153), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(427.53269851053153), 'fb_f2': None, 'segment': array([-0.00064087, -0.00064087, -0.00061035, ..., -0.0007019 ,
+       -0.00061035, -0.0005188 ], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 146.20084086132593, 'formants': (np.float64(404.00720016446616), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_s
+core': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(404.00720016446616), 'fb_f2': None, 'segment': array([-0.00054932, -0.00054932, -0.00061035, ...,  0.00079346,
+        0.00076294,  0.00079346], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 70.21667678968011, 'formants': (np.float64(183.61609229351606), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(183.61609229351606), 'fb_f2': None, 'segment': array([-2.4414062e-04, -2.4414062e-04, -2.4414062e-04, ...,
+       -6.1035156e-05, -9.1552734e-05, -6.1035156e-05],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 144.75524971296326, 'formants': (np.float64(173.5228751116681), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(173.5228751116681), 'fb_f2': None, 'segment': array([2.4414062e-04, 2.1362305e-04, 2.1362305e-04, ..., 6.1035156e-05,
+       3.0517578e-05, 0.0000000e+00], shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 140.6939323793565, 'formants': (np.float64(119.25320713238183), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(119.25320713238183), 'fb_f2': None, 'segment': array([-6.4086914e-04, -6.7138672e-04, -7.0190430e-04, ...,
+        6.1035156e-05,  3.0517578e-05,  6.1035156e-05],
+      shape=(1136,), dtype=float32)}
+TUNER RAW: {'f0': 55.64693513361843, 'formants': (np.float64(168.96269715069838), None, None), 'vowel': None, 'vowel_guess': None, 'vowel_confidence': 0.0, 'vowel_sc
+ore': 0.0, 'resonance_score': 0.0, 'overall': 0.0, 'fb_f1': np.float64(168.96269715069838), 'fb_f2': None, 'segment': array([6.1035156e-05, 1.2207031e-04, 1.2207031e-04, ..., 1.2207031e-04,
+       1.2207031e-04, 9.1552734e-05], shape=(1136,), dtype=float32)}
+[AUDIO] Microphone stream stopped
+[AUDIO] Microphone stream stopped

@@ -8,24 +8,9 @@ from tuner.profile_controller import ProfileManager
 
 
 class Tuner:
-    """
-    High-level controller for the live tuner.
-
-    Responsibilities:
-      - Own the FormantAnalysisEngine
-      - Own the LiveAnalyzer (smoothing + plausibility)
-      - Own the ProfileManager
-      - Expose a simple interface for profiles + analysis
-
-    NOTE:
-      This class NO LONGER owns any mic / audio pipeline.
-      Audio is handled entirely by TunerWindow via sounddevice.InputStream,
-      which feeds self.engine.process_frame(...).
-    """
-
-    def __init__(self, voice_type="bass", profiles_dir="profiles", sample_rate=44100):
-        # Core DSP engine
-        self.engine = FormantAnalysisEngine(voice_type=voice_type)
+    def __init__(self, engine=None, voice_type="bass", profiles_dir="profiles", sample_rate=44100):
+        # Shared DSP engine
+        self.engine = engine or FormantAnalysisEngine(voice_type=voice_type)
 
         # Smoothers
         self.pitch_smoother = PitchSmoother(sr=sample_rate)
@@ -46,7 +31,6 @@ class Tuner:
             analyzer=self.engine,
         )
 
-        # State
         self.voice_type = voice_type
         self.active_profile = None
 

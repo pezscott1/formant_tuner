@@ -46,6 +46,10 @@ class PitchSmoother:
         self.audio_buffer = deque(maxlen=hps_window)
         self.sr = sr
 
+    def reset(self):
+        self.current = None
+        self.audio_buffer.clear()
+
     def update(self, f0):
         # Reject NaN or None
         if f0 is None or np.isnan(f0):
@@ -100,6 +104,9 @@ class MedianSmoother:
         self.outlier_thresh = outlier_thresh
         self.buffer = deque(maxlen=window)
 
+    def reset(self):
+        self.buffer.clear()
+
     def update(self, f1, f2):
         f1 = np.nan if f1 is None else float(f1)
         f2 = np.nan if f2 is None else float(f2)
@@ -136,6 +143,11 @@ class LabelSmoother:
     def __init__(self, hold_frames=4, min_confidence=0.2):
         self.hold_frames = hold_frames
         self.min_confidence = min_confidence
+        self.current = None
+        self.last = None
+        self.counter = 0
+
+    def reset(self):
         self.current = None
         self.last = None
         self.counter = 0

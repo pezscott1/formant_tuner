@@ -9,7 +9,7 @@ from tuner.profile_controller import ProfileManager
 
 def test_load_missing_profile(tmp_path):
     pm = ProfileManager(str(tmp_path), analyzer=MagicMock())
-    result = pm._load_profile_json(tmp_path / "ghost_profile.json")
+    result = pm.load_profile_json(tmp_path / "ghost_profile.json")
     assert result == {}  # internal loader returns {} on failure
 
 
@@ -22,7 +22,7 @@ def test_load_malformed_json(tmp_path):
     bad.write_text("{not valid json")
 
     pm = ProfileManager(str(tmp_path), analyzer=MagicMock())
-    result = pm._load_profile_json(bad)
+    result = pm.load_profile_json(bad)
     assert result == {}  # malformed JSON returns empty dict
 
 
@@ -39,7 +39,7 @@ def test_extract_formants_handles_invalid_entries(tmp_path):
         "c": {"f1": None, "f2": None, "f0": None},
     }
 
-    out = pm._extract_formants(raw)
+    out = pm.extract_formants(raw)
 
     assert out["a"] == (300, 2500, None)
     assert out["c"] == (None, None, None)
@@ -165,5 +165,5 @@ def test_profile_exists_false(tmp_path):
 def test_extract_formants_non_dict_type(tmp_path):
     pm = ProfileManager(str(tmp_path), analyzer=MagicMock())
     # Passing a list should return empty dict
-    out = pm._extract_formants(["not", "a", "dict"])
+    out = pm.extract_formants(["not", "a", "dict"])
     assert out == {}

@@ -95,7 +95,7 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Active profile tracking
     # ---------------------------------------------------------
-    def set_active_profile(self, name, *, notify=False):
+    def set_active_profile(self, name):
         """
         Persist the active profile name to active_profile.json.
         UI popups are handled by the controller, not here.
@@ -110,20 +110,22 @@ class ProfileManager:
         Load a profile into the analyzer WITHOUT triggering UI popups.
         """
         self.active_profile_name = base
-        profile_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
-
-        raw = self._load_profile_json(profile_path)
+        raw = self.load_profile_json(base)
 
         # Load voice type
         voice_type = raw.get("voice_type", "bass")
         self.analyzer.voice_type = voice_type
 
         # Load formants
-        normalized = self._extract_formants(raw)
-        self.analyzer.set_user_formants(normalized)
+        normalized = self.extract_formants(raw)
+        self.analyzer.calibrated_profile = normalized
+
+        # Optional: if engine uses this for other logic
+        if hasattr(self.analyzer, "set_user_formants"):
+            self.analyzer.set_user_formants(normalized)
 
         # Persist active profile silently
-        self.set_active_profile(base, notify=False)
+        self.set_active_profile(base)
 
         return base
 
@@ -144,8 +146,8 @@ class ProfileManager:
     # Internal JSON loader
     # ---------------------------------------------------------
     # noinspection PyMethodMayBeStatic
-    def _load_profile_json(self, path):
-        """Load a profile JSON file and return its dict."""
+    def load_profile_json(self, base):
+        path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -156,7 +158,7 @@ class ProfileManager:
     # Extract formants from rich profile JSON
     # ---------------------------------------------------------
     # noinspection PyMethodMayBeStatic
-    def _extract_formants(self, raw_dict):
+    def extract_formants(self, raw_dict):
         """
         Convert rich profile entries like:
             { "a": { "f1":..., "f2":..., "f0":..., ... }, ... }

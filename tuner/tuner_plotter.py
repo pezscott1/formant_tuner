@@ -9,35 +9,41 @@ from utils.music_utils import freq_to_note_name
 # ============================================================
 
 def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _tol):
-    """
-    Update the spectrum plot with:
-      - target formants (blue dashed)
-      - measured formants (red dotted)
-      - pitch + note name in title
-    """
     ax = window.ax_chart
     ax.clear()
 
     f1_t, f2_t, f3_t = target_formants
     f1_m, f2_m, f3_m = measured_formants
 
-    # ---------------- Plot target formants ----------------
+    # ====== NEW: get latest audio segment ======
+    raw = window.analyzer.get_latest_raw()
+    segment = raw.get("segment") if raw else None
+
+    if segment is not None:
+        seg = np.asarray(segment, dtype=float).flatten()
+        if seg.size > 0:
+            # Compute FFT
+            fft = np.abs(np.fft.rfft(seg))
+            freqs = np.fft.rfftfreq(len(seg), 1.0 / window.sample_rate)
+
+            ax.plot(freqs, fft, color="black", linewidth=1.0)
+
+    # ====== Existing formant lines ======
     if f1_t:
-        ax.axvline(f1_t, color="blue", linestyle="--", linewidth=1.2, alpha=0.7)
+        ax.axvline(f1_t, color="blue", linestyle="--", alpha=0.7)
     if f2_t:
-        ax.axvline(f2_t, color="blue", linestyle="--", linewidth=1.2, alpha=0.7)
+        ax.axvline(f2_t, color="blue", linestyle="--", alpha=0.7)
     if f3_t:
-        ax.axvline(f3_t, color="blue", linestyle="--", linewidth=1.2, alpha=0.7)
+        ax.axvline(f3_t, color="blue", linestyle="--", alpha=0.7)
 
-    # ---------------- Plot measured formants ----------------
     if f1_m:
-        ax.axvline(f1_m, color="red", linestyle=":", linewidth=1.2, alpha=0.8)
+        ax.axvline(f1_m, color="red", linestyle=":", alpha=0.8)
     if f2_m:
-        ax.axvline(f2_m, color="red", linestyle=":", linewidth=1.2, alpha=0.8)
+        ax.axvline(f2_m, color="red", linestyle=":", alpha=0.8)
     if f3_m:
-        ax.axvline(f3_m, color="red", linestyle=":", linewidth=1.2, alpha=0.8)
+        ax.axvline(f3_m, color="red", linestyle=":", alpha=0.8)
 
-    # ---------------- Title with pitch + note ----------------
+    # Title
     if pitch and pitch > 0:
         note = freq_to_note_name(pitch)
         ax.set_title(f"Spectrum /{vowel}/ — {note} ({pitch:.1f} Hz)")
@@ -71,6 +77,18 @@ def update_vowel_chart(  # noqa: C901
     """
     f1_t, f2_t, _ = target_formants
     f1_m, f2_m, _ = measured_formants
+
+    def _safe_float(x):
+        try:
+            return float(x)
+        except Exception:
+            return np.nan
+
+    # Sanitize all formants
+    f1_t = _safe_float(f1_t)
+    f2_t = _safe_float(f2_t)
+    f1_m = _safe_float(f1_m)
+    f2_m = _safe_float(f2_m)
 
     # ---------------- Clear old measured point ----------------
     if getattr(window, "vowel_measured_artist", None) is not None:

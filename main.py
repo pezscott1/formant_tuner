@@ -1,62 +1,29 @@
-import os
 from analysis.engine import FormantAnalysisEngine
-from tuner.profile_controller import ProfileManager
-from tuner.live_analyzer import LiveAnalyzer
-from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother
 from tuner.window import TunerWindow
 from tuner.controller import Tuner
 from PyQt5.QtWidgets import QApplication
 
 
-def main():
+if __name__ == "__main__":
     app = QApplication([])
 
-    # ------------------------------------------------------------
-    # 1. Create the analysis engine
-    # ------------------------------------------------------------
+    # 1. Create ONE shared engine
     engine = FormantAnalysisEngine(voice_type="bass")
 
-    # ------------------------------------------------------------
-    # 2. Create the profile manager (REQUIRES profiles_dir + analyzer)
-    # ------------------------------------------------------------
-    profiles_dir = os.path.join(os.getcwd(), "profiles")
-    profile_manager = ProfileManager(profiles_dir, analyzer=engine)
+    # 2. Create ONE shared tuner (owns LiveAnalyzer + ProfileManager)
+    tuner = Tuner(engine=engine, voice_type="bass", profiles_dir="profiles")
 
-    # If an active profile exists, apply it
-    if profile_manager.active_profile_name:
-        profile_manager.apply_profile(profile_manager.active_profile_name)
-    else:
-        # Optional: fall back to a default profile if it exists
-        default = "bass"
-        if profile_manager.profile_exists(default):
-            profile_manager.apply_profile(default)
+    # 3. Apply active or default profile
+    pm = tuner.profile_manager
+    if pm.active_profile_name:
+        pm.apply_profile(None)
+    # else:
+    #    default = "bass"
+    #    if pm.profile_exists(default):
+    #        pm.apply_profile(default)
 
-    # ------------------------------------------------------------
-    # 3. Create smoothing filters
-    # ------------------------------------------------------------
-    pitch_smoother = PitchSmoother()
-    median_smoother = MedianSmoother()
-    label_smoother = LabelSmoother()
-
-    # ------------------------------------------------------------
-    # 4. Create the LiveAnalyzer
-    # ------------------------------------------------------------
-    _live_analyzer = LiveAnalyzer(  # noqa: F841
-        engine,
-        pitch_smoother,
-        median_smoother,
-        label_smoother,
-    )
-
-    # ------------------------------------------------------------
-    # 5. Create the tuner window
-    # ------------------------------------------------------------
-
-    tuner = Tuner(voice_type="bass", profiles_dir="profiles")
+    # 4. Create ONE tuner window using the tuner
     win = TunerWindow(tuner)
     win.show()
+
     app.exec_()
-
-
-if __name__ == "__main__":
-    main()

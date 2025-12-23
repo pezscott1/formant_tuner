@@ -9,13 +9,9 @@ class CalibrationStateMachine:
     Simple phase state machine for calibration:
 
       phases: "prep" → "sing" → "capture" → next vowel → ... → "finished"
-
-    Exposes:
-      - current_vowel
-      - tick() -> event dict
-      - advance() -> event dict
-      - check_timeout(timeout) -> bool
     """
+
+    MAX_RETRIES = 3
 
     def __init__(
         self,
@@ -30,12 +26,13 @@ class CalibrationStateMachine:
         self.capture_seconds_default = capture_seconds
 
         self.index = 0
-        self.phase = "prep"  # "prep", "sing", "capture", "finished"
+        self.phase = "prep"
 
         self.prep_secs = self.prep_seconds_default
         self.sing_secs = self.sing_seconds_default
         self.capture_secs = self.capture_seconds_default
 
+        self.retry_count = 0
         self.capture_start_time = None
         self._last_heartbeat = monotonic()
 
@@ -62,10 +59,7 @@ class CalibrationStateMachine:
             else:
                 self.phase = "sing"
                 self.sing_secs = self.sing_seconds_default
-                return {
-                    "event": "start_sing",
-                    "vowel": self.current_vowel,
-                }
+                return {"event": "start_sing", "vowel": self.current_vowel}
 
         elif self.phase == "sing":
             if self.sing_secs > 0:
@@ -89,6 +83,7 @@ class CalibrationStateMachine:
 
     def advance(self):
         self.index += 1
+        self.retry_count = 0  # reset retries for next vowel
 
         if self.index >= len(self.vowels):
             self.phase = "finished"
@@ -112,11 +107,23 @@ class CalibrationStateMachine:
         return (now - self.capture_start_time) > capture_timeout
 
     def retry_current_vowel(self):
+        """
+        Called when capture fails.
+        Returns:
+            {"event": "retry"} or {"event": "max_retries"}
+        """
+        self.retry_count += 1
+
+        if self.retry_count >= self.MAX_RETRIES:
+            return {"event": "max_retries", "vowel": self.current_vowel}
+
+        # Normal retry
         self.phase = "prep"
         self.prep_secs = self.prep_seconds_default
         self.sing_secs = self.sing_seconds_default
         self.capture_secs = self.capture_seconds_default
         self.capture_start_time = None
+
         return {"event": "retry", "vowel": self.current_vowel}
 
     def is_done(self):

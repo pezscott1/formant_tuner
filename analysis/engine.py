@@ -25,6 +25,7 @@ class FormantAnalysisEngine:
         self.user_formants: \
             Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]] = {}
         self._latest_raw: Optional[Dict[str, Any]] = None
+        self.calibrated_profile = {}
 
     # ---------------------------------------------------------
     # User targets
