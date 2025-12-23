@@ -1,3 +1,4 @@
+# tuner/live_analyzer.py
 from analysis.vowel import is_plausible_formants
 import numpy as np
 
@@ -22,14 +23,6 @@ class LiveAnalyzer:
         # ---------------- Extract raw values ----------------
         f0 = raw_dict.get("f0")
         f1, f2, f3 = raw_dict.get("formants", (None, None, None))
-
-        # ---------------- Plausibility BEFORE smoothing ----------------
-        ok, _ = is_plausible_formants(f1, f2, self.engine.voice_type)
-        if not ok:
-            f1 = None
-            f2 = None
-            if hasattr(self.formant_smoother, "buffer"):
-                self.formant_smoother.buffer.clear()
 
         # ---------------- Smooth pitch ----------------
         f0_s = self.pitch_smoother.update(f0)
@@ -84,6 +77,7 @@ class LiveAnalyzer:
             "vowel_score": vowel_score,
             "resonance_score": resonance_score,
             "overall": overall,
+            "stable": getattr(self.formant_smoother, "formants_stable", False),
             "fb_f1": raw_dict.get("fb_f1"),
             "fb_f2": raw_dict.get("fb_f2"),
         }

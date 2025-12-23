@@ -363,12 +363,12 @@ class TunerWindow(QMainWindow):
                 QMessageBox.warning(self,
                                     "Missing name", "Please enter a profile name.")
                 return
-
             # Launch calibration window
             self.calib_win = CalibrationWindow(
                 profile_name=profile_name,
                 voice_type=voice_type,
-                analyzer=self.analyzer,
+                engine=self.analyzer,
+                analyzer=self.live_analyzer,
                 parent=self,
             )
             self.update_timer.stop()  # pause tuner UI updates
@@ -380,11 +380,11 @@ class TunerWindow(QMainWindow):
 
         # --- Case 2: Update existing profile ---
         voice_type = getattr(self.analyzer, "voice_type", "bass")
-
         self.calib_win = CalibrationWindow(
             profile_name=base,
             voice_type=voice_type,
-            analyzer=self.analyzer,
+            engine=self.analyzer,
+            analyzer=self.live_analyzer,
             parent=self,
         )
         self.update_timer.stop()

@@ -32,44 +32,70 @@ def hps_pitch(signal, sr, max_f0=500, min_f0=50):
 # ---------------------------------------------------------
 class PitchSmoother:
     """
-    Exponential smoother + HPS fallback + stability window.
+    Exponential smoother + HPS fallback + octave correction.
     Eliminates doubling/halving, suppresses jumps, and avoids runaway drift.
     """
 
-    def __init__(self, alpha=0.25, jump_limit=80, sr=44100, hps_window=2048):
+    def __init__(self, alpha=0.25, jump_limit=80, sr=44100, hps_window=2048,
+                 min_f0=50, max_f0=500, voice_type=None):
         self.alpha = alpha
         self.jump_limit = jump_limit
         self.current = None
 
-        # HPS fallback buffer (rolling window)
         self.hps_window = hps_window
         self.audio_buffer = deque(maxlen=hps_window)
         self.sr = sr
+        self.min_f0 = float(min_f0)
+        self.max_f0 = float(max_f0)
+        self.voice_type = voice_type  # optional, can be set later
 
     def reset(self):
         self.current = None
         self.audio_buffer.clear()
+
+    def _octave_correct(self, f0):
+        """
+        Light octave correction:
+        - For bass voices, try to avoid halving < ~90 Hz.
+        - If we're near 2× or ½× of the current, snap to the closer octave.
+        """
+        if f0 is None or np.isnan(f0):
+            return f0
+
+        # Bass-specific heuristic: very low f0 likely halved
+        if self.voice_type == "bass" and f0 < 90:
+            f0_candidate = f0 * 2.0
+            if self.min_f0 <= f0_candidate <= self.max_f0:
+                f0 = f0_candidate
+
+        if self.current is not None and self.jump_limit is not None:
+            # Check if f0 is roughly double or half of current
+            if abs(f0 - 2 * self.current) < 40:
+                f0 = 2 * self.current
+            elif abs(2 * f0 - self.current) < 40:
+                f0 = 0.5 * self.current
+
+        return f0
 
     def update(self, f0):
         # Reject NaN or None
         if f0 is None or np.isnan(f0):
             return self.current
 
-        # Doubling/halving suppression
-        if self.current is not None and self.jump_limit is not None:
-            if abs(f0 - 2 * self.current) < 40:
-                f0 = self.current
-            elif abs(2 * f0 - self.current) < 40:
-                f0 = self.current
+        f0 = float(f0)
 
-        # Sudden jump suppression
+        # First, apply octave correction relative to current + voice_type
+        f0 = self._octave_correct(f0)
+
+        # Sudden jump suppression (after octave correction)
         if self.current is not None and self.jump_limit is not None:
             if abs(f0 - self.current) > self.jump_limit:
                 # Try HPS fallback
                 if len(self.audio_buffer) >= self.hps_window:
-                    hps_f0 = hps_pitch(np.array(self.audio_buffer), self.sr)
+                    hps_f0 = hps_pitch(np.array(self.audio_buffer), self.sr,
+                                       max_f0=int(self.max_f0), min_f0=int(self.min_f0))
                     if hps_f0 is not None:
-                        f0 = hps_f0
+                        f0 = self._octave_correct(hps_f0)
                 else:
                     # Clamp to previous
                     f0 = self.current
@@ -103,6 +129,10 @@ class MedianSmoother:
         self.window = window
         self.outlier_thresh = outlier_thresh
         self.buffer = deque(maxlen=window)
+        self.stability = FormantStabilityTracker(
+            window_size=6, var_threshold=1e5, min_full_frames=3, trim_pct=10)
+        self.formants_stable = False
+        self._stability_score = float("inf")
 
     def reset(self):
         self.buffer.clear()
@@ -127,7 +157,9 @@ class MedianSmoother:
         # Compute smoothed values
         f1_s = None if np.all(np.isnan(arr[:, 0])) else float(np.nanmedian(arr[:, 0]))
         f2_s = None if np.all(np.isnan(arr[:, 1])) else float(np.nanmedian(arr[:, 1]))
-
+        stable_bool, score = self.stability.update(f1_s, f2_s)
+        self.formants_stable = stable_bool
+        self._stability_score = score
         return f1_s, f2_s
 
 
@@ -183,3 +215,61 @@ class LabelSmoother:
             self.counter = 0
 
         return self.current
+
+# Put this in analysis/smoothing.py (or the module that defines your stability logic)
+
+
+class FormantStabilityTracker:
+    def __init__(self, window_size=6, var_threshold=1e5, min_full_frames=3, trim_pct=10):
+        """
+        window_size: number of recent frames to consider
+        var_threshold: allowed variance (sum of F1+F2 variances) to declare stable
+        min_full_frames: minimum number of frames in window that must have both F1 and F2
+        trim_pct: percent to trim from each tail when computing variance (robust)
+        """
+        self.window_size = int(window_size)
+        self.var_threshold = float(var_threshold)
+        self.min_full_frames = int(min_full_frames)
+        self.trim_pct = float(trim_pct)
+
+        self.f1_buf = deque(maxlen=self.window_size)
+        self.f2_buf = deque(maxlen=self.window_size)
+
+    def update(self, f1, f2):
+        # Append np.nan for missing values so we keep alignment
+        self.f1_buf.append(np.nan if f1 is None else float(f1))
+        self.f2_buf.append(np.nan if f2 is None else float(f2))
+
+        f1_arr = np.asarray(self.f1_buf, dtype=float)
+        f2_arr = np.asarray(self.f2_buf, dtype=float)
+        full_mask = np.isfinite(f1_arr) & np.isfinite(f2_arr)
+        full_count = int(np.sum(full_mask))
+
+        if full_count < self.min_full_frames:
+            return False, float("inf")
+
+        f1_full = f1_arr[full_mask]
+        f2_full = f2_arr[full_mask]
+
+        # Robust trimming to remove outliers
+        if self.trim_pct > 0 and f1_full.size > 2:
+            lo = np.percentile(f1_full, self.trim_pct / 2.0)
+            hi = np.percentile(f1_full, 100.0 - (self.trim_pct / 2.0))
+            f1_full = f1_full[(f1_full >= lo) & (f1_full <= hi)]
+
+        # If trimming removed too many frames, fall back to untrimmed
+        if f1_full.size < self.min_full_frames or f2_full.size < self.min_full_frames:
+            f1_full = f1_arr[full_mask]
+            f2_full = f2_arr[full_mask]
+
+        f1_var = float(np.var(f1_full)) if f1_full.size > 0 else float("inf")
+        f2_var = float(np.var(f2_full)) if f2_full.size > 0 else float("inf")
+
+        stability_score = f1_var + f2_var
+        is_stable = stability_score <= self.var_threshold
+
+        return bool(is_stable), float(stability_score)
+
+    def reset(self):
+        self.f1_buf.clear()
+        self.f2_buf.clear()

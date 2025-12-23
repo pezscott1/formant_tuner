@@ -122,7 +122,10 @@ def test_pitch_smoother_hps_fallback(monkeypatch):
     ps.audio_buffer.extend([0.1] * ps.hps_window)
 
     # Fake HPS result
-    monkeypatch.setattr("analysis.smoothing.hps_pitch", lambda sig, sr: 210.0)
+    monkeypatch.setattr(
+        "analysis.smoothing.hps_pitch",
+        lambda sig, sr, **kwargs: 210.0
+    )
 
     # Incoming pitch is a huge jump → fallback should override it
     out = ps.update(500.0)

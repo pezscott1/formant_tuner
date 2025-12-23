@@ -67,23 +67,6 @@ def test_process_raw_missing_formants():
     assert out["vowel"] is None
 
 
-def test_process_raw_plausibility_filtering():
-    la = make_analyzer()
-
-    raw = {
-        "f0": 120,
-        "formants": (50, 80, 2500),
-        "vowel_guess": "a",
-    }
-
-    out = la.process_raw(raw)
-
-    f1, f2, f3 = out["formants"]
-    assert f1 is None
-    assert f2 is None
-    assert f3 == 2500
-
-
 def test_label_smoothing_applies():
     la = make_analyzer()
 

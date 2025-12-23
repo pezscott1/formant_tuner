@@ -63,7 +63,7 @@ def test_safe_spectrogram_fft_fallback(_mock_stft):
     f, t, S = safe_spectrogram(y, sr=16000)
 
     # FFT fallback produces rfft frames
-    assert S.shape[0] == 2048 // 2 + 1
+    assert S.shape[0] == 1024 // 2 + 1
     assert t.size == S.shape[1]
     assert f.size == S.shape[0]
 

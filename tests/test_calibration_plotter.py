@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import types
-import time
-
 from calibration.plotter import update_artists
 
 

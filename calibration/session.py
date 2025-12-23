@@ -29,12 +29,11 @@ def merge_formants(old_vals, new_vals, _vowel):
     new_f1, new_f2, new_f0 = new_vals
 
     # If new is missing or implausible → keep old
-    ok_new, _ = is_plausible_formants(new_f1, new_f2)
+    ok_new, _ = is_plausible_formants(new_f1, new_f2, vowel=_vowel)
     if not ok_new:
         return old_vals
 
-    # If old is missing or implausible → use new
-    ok_old, _ = is_plausible_formants(old_f1, old_f2)
+    ok_old, _ = is_plausible_formants(old_f1, old_f2, vowel=_vowel)
     if not ok_old:
         return new_vals
 
@@ -148,6 +147,12 @@ class CalibrationSession:
 
         return base_name
 
+    def increment_retry(self, vowel: str) -> None:
+        if vowel in self.retries_map:
+            self.retries_map[vowel] += 1
+        else:
+            self.retries_map[vowel] = 1
+
 
 def normalize_profile_for_save(user_formants, retries_map=None):  # noqa: C901
     out = {}
@@ -176,7 +181,7 @@ def normalize_profile_for_save(user_formants, retries_map=None):  # noqa: C901
             f1, f2 = f2, f1
 
         retries = int(retries_map.get(vowel, 0) or 0)
-        ok, reason = is_plausible_formants(f1, f2)
+        ok, reason = is_plausible_formants(f1, f2, vowel=vowel)
         reason_text = "ok" if ok else reason
 
         out[vowel] = {

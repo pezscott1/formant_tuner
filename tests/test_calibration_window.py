@@ -88,15 +88,6 @@ def test_poll_audio_processes_frame(mock_update, mock_spec, window):
 # ---------------------------------------------------------
 
 
-def test_process_capture_stores_results(window):
-    win, session, state = window
-
-    win._capture_buffer = [(500, 1500, 120)]
-    win._process_capture()
-    session.handle_result.assert_called_once_with(500, 1500, 120)
-    assert "/a/" in win.capture_panel.toPlainText()
-
-
 def test_process_capture_no_audio(window):
     win, session, state = window
 

@@ -16,13 +16,12 @@ from PyQt5.QtCore import QTimer, pyqtSignal
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-
+from tuner.live_analyzer import LiveAnalyzer
 from analysis.smoothing import LabelSmoother, PitchSmoother, MedianSmoother
 from analysis.vowel import is_plausible_formants
 from calibration.session import CalibrationSession
 from calibration.state_machine import CalibrationStateMachine
 from calibration.plotter import update_artists, safe_spectrogram
-from analysis.engine import FormantAnalysisEngine
 
 
 # Alias table still useful for debugging / live display, even if
@@ -40,10 +39,9 @@ class CalibrationWindow(QMainWindow):
     profile_calibrated = pyqtSignal(str)
 
     def __init__(self, profile_name, voice_type="bass",
-                 analyzer=None, parent=None):
+                 engine=None, analyzer=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Calibration")
-
         # Rolling state
         self._last_frame = None
         self._last_result = None
@@ -54,30 +52,31 @@ class CalibrationWindow(QMainWindow):
         self._stable_vowel = None
         self._stable_count = 0
         self._stable_required = 5
-
         # Core vowel set
         self.vowels = ["i", "ɛ", "ɑ", "ɔ", "u"]
-
-        # Core objects
-        self.analyzer = analyzer
         self.session = CalibrationSession(
             profile_name=profile_name,
             voice_type=voice_type,
             vowels=self.vowels,
         )
         self.state = CalibrationStateMachine(self.vowels)
-
         # Shared engine
-        self.engine = analyzer or FormantAnalysisEngine(voice_type=voice_type)
-
-        # Capture behavior
-        self.capture_timeout = 3.0
-
-        # Smoothers
-        self.label_smoother = LabelSmoother(hold_frames=4)
+        self.engine = engine
+        # Build smoothers
         self.pitch_smoother = PitchSmoother(alpha=0.25)
         self.formant_smoother = MedianSmoother(window=5)
-
+        self.label_smoother = LabelSmoother(hold_frames=4)
+        if analyzer is None:
+            self.analyzer = LiveAnalyzer(
+                engine=self.engine,
+                pitch_smoother=self.pitch_smoother,
+                formant_smoother=self.formant_smoother,
+                label_smoother=self.label_smoother,
+            )
+        else:
+            self.analyzer = analyzer
+        # Capture behavior
+        self.capture_timeout = 3.0
         # -----------------------------------------------------
         # UI Setup
         # -----------------------------------------------------
@@ -228,54 +227,57 @@ class CalibrationWindow(QMainWindow):
         """
 
         raw = self.engine.get_latest_raw()
+        print("RAW:", raw)
         if raw is None:
             return
-        print("RAW:", raw.get("f0"), raw.get("formants"))
-        self._last_result = raw
-        f0 = raw.get("f0")
-        f1, f2, f3 = raw.get("formants", (None, None, None))
-        self._last_frame = (f1, f2, f0)
+        # Process through LiveAnalyzer (adds smoothing + stability)
+        frame = self.analyzer.process_raw(raw)
+
+        self._last_result = frame
+        f0 = frame["f0"]
+        f1, f2, f3 = frame["formants"]
 
         # -----------------------------------------------------
         # Debug vowel guess (but do NOT use it for gating)
         # -----------------------------------------------------
         vowel_guess_raw = raw.get("vowel_guess")
-        vowel_guess = self.label_smoother.update(vowel_guess_raw)
+        self.label_smoother.update(vowel_guess_raw)
 
         target = self.state.current_vowel
+        # inside _poll_audio, after frame = self.analyzer.process_raw(raw)
+        print("DBG frame:", {
+            "f0": frame.get("f0"),
+            "f1": frame["formants"][0],
+            "f2": frame["formants"][1],
+            "vowel_guess": raw.get("vowel_guess"),
+        })
 
-        if target == "ɛ":
-            print(
-                f"[DEBUG /ɛ/] guess_raw={vowel_guess_raw!r}, "
-                f"guess_smooth={vowel_guess!r}, "
-                f"f1={f1}, f2={f2}, f0={f0}"
-            )
-
-        if target == "ɑ":
-            print(
-                f"[DEBUG /ɑ/] guess_raw={vowel_guess_raw!r}, "
-                f"guess_smooth={vowel_guess!r}, "
-                f"f1={f1}, f2={f2}, f0={f0}"
-            )
-
+        # right before gating
+        print("DBG gating check:", {
+            "target": target,
+            "f0": f0, "f1": f1, "f2": f2,
+        })
         # -----------------------------------------------------
         # Capture gating (NO classifier, NO stability)
         # -----------------------------------------------------
-        if (
-            target is not None
-            and f1 is not None and f2 is not None and f0 is not None
-            and 40 <= f0 <= 800
-        ):
-            ok, _ = is_plausible_formants(
-                f1,
-                f2,
+        if not hasattr(self, "_partial_buffer"):
+            self._partial_buffer = []
+        # preferred: full frames
+        if target is not None and f1 is not None and f2 is not None:
+            ok, reason = is_plausible_formants(
+                f1, f2,
                 voice_type=self.session.voice_type,
                 vowel=target,
                 calibrated=getattr(self.session, "calibrated_profile", None),
             )
+            print("DBG DECIDE", target, f1, f2, f0, "ok=", ok, "reason=", reason)
             if ok:
-                self._capture_buffer.append((float(f1), float(f2), float(f0)))
-
+                self._capture_buffer.append((f1, f2, f0))
+        # fallback: store partial frames
+        elif target is not None and (f1 is not None or f2 is not None):
+            self._partial_buffer.append((f1, f2, f0))
+            if len(self._partial_buffer) > 120:
+                self._partial_buffer.pop(0)
         # -----------------------------------------------------
         # Spectrogram
         # -----------------------------------------------------
@@ -338,6 +340,28 @@ class CalibrationWindow(QMainWindow):
 
         # Capture vowel NOW so all messages stay consistent
         vowel = self.state.current_vowel
+        # Snapshot buffer BEFORE any clearing happens
+        buffer_snapshot = list(self._capture_buffer)
+        if not self._capture_buffer and getattr(self, "_partial_buffer", None):
+            f1_vals = np.array([p[0] for p in self._partial_buffer if p[0] is not None], dtype=float)
+            f2_vals = np.array([p[1] for p in self._partial_buffer if p[1] is not None], dtype=float)
+            f0_vals = np.array([p[2] for p in self._partial_buffer if p[2] is not None], dtype=float)
+
+            if f1_vals.size > 0 and f2_vals.size > 0:
+                f1_med = float(np.median(f1_vals))
+                f2_med = float(np.median(f2_vals))
+                f0_med = float(np.median(f0_vals)) if f0_vals.size > 0 else None
+                accepted, skipped, msg = self.session.handle_result(f1_med, f2_med, f0_med)
+                self.status_panel.appendPlainText(msg)
+                print("DBG handle_result:",
+                      {"accepted": accepted, "skipped": skipped, "session_index": self.session.current_index})
+                self.capture_panel.appendPlainText(
+                    f"/{vowel}/ F1={f1_med:.1f}, F2={f2_med:.1f}, F0={(f0_med or 0):.1f}"
+                )
+                self._partial_buffer.clear()
+                self.state.advance()
+                self.phase_timer.start(1000)
+                return
 
         # -----------------------------------------------------
         # No audio captured
@@ -346,7 +370,7 @@ class CalibrationWindow(QMainWindow):
             self.status_panel.appendPlainText(
                 f"No audio captured for /{vowel}/ — retrying"
             )
-            _ev = self.state.retry_current_vowel()
+            self.state.retry_current_vowel()
             self.phase_timer.start(1000)
             return
 
@@ -381,7 +405,9 @@ class CalibrationWindow(QMainWindow):
         f1_arr = f1_arr[mask]
         f2_arr = f2_arr[mask]
         f0_arr = f0_arr[mask] if f0_arr.size == mask.size else f0_arr
-
+        print(f"DBG capture snapshot len: {len(buffer_snapshot)}")
+        print(f"DBG f1_arr size: {f1_arr.size}, f2_arr size: {f2_arr.size}, f0_arr size: {f0_arr.size}")
+        print(f"DBG mask sum: {mask.sum()} / {mask.size}")
         # -----------------------------------------------------
         # No plausible frames
         # -----------------------------------------------------
@@ -389,15 +415,13 @@ class CalibrationWindow(QMainWindow):
             self.status_panel.appendPlainText(
                 f"Retrying: no plausible frames for /{vowel}/"
             )
+            snapshot = buffer_snapshot
             self._capture_buffer.clear()
             ev = self.state.retry_current_vowel()
 
             # Max retries?
             if ev["event"] == "max_retries":
-                f1_best, f2_best, f0_best = self._pick_best_attempt()
-                self.status_panel.appendPlainText(
-                    f"Max retries reached — accepting best /{vowel}/"
-                )
+                f1_best, f2_best, f0_best = self._pick_best_attempt(snapshot)
                 accepted, skipped, msg = self.session.handle_result(
                     f1_best, f2_best, f0_best
                 )
@@ -474,8 +498,7 @@ class CalibrationWindow(QMainWindow):
         self._capture_buffer.clear()
 
         if accepted:
-            idx = self.session.current_index - 1
-            vowel = self.session.vowels[idx]
+            vowel = self.state.current_vowel
             self.capture_panel.appendPlainText(
                 f"/{vowel}/ F1={f1_med:.1f}, F2={f2_med:.1f}, F0={(f0_med or 0):.1f}"
             )
@@ -507,15 +530,15 @@ class CalibrationWindow(QMainWindow):
         self.phase_timer.start(1000)
         return
 
-    def _pick_best_attempt(self):
+    def _pick_best_attempt(self, buffer=None):
         """
-        Choose the best attempt from the capture buffer.
-        Simple heuristic: median of all captured frames.
+        Choose the best attempt from the capture buffer or a provided snapshot.
         """
-        if not self._capture_buffer:
+        buf = buffer if buffer is not None else self._capture_buffer
+        if not buf:
             return None, None, None
 
-        f1_vals, f2_vals, f0_vals = zip(*self._capture_buffer)
+        f1_vals, f2_vals, f0_vals = zip(*buf)
         f1_med = float(np.median(f1_vals))
         f2_med = float(np.median(f2_vals))
         f0_med = float(np.median(f0_vals))
@@ -539,7 +562,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Finish and save profile
     # ---------------------------------------------------------
-    def _finish(self):
+    def _finish(self):  # noqa: C901
         """
         Save profile, stop timers, stop audio, reset smoothers,
         and notify parent.
