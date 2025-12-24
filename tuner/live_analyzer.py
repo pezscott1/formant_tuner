@@ -1,5 +1,4 @@
 # tuner/live_analyzer.py
-from analysis.vowel import is_plausible_formants
 import numpy as np
 
 

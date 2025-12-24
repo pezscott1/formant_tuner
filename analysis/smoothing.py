@@ -220,11 +220,13 @@ class LabelSmoother:
 
 
 class FormantStabilityTracker:
-    def __init__(self, window_size=6, var_threshold=1e5, min_full_frames=3, trim_pct=10):
+    def __init__(self, window_size=6,
+                 var_threshold=1e5, min_full_frames=3, trim_pct=10):
         """
         window_size: number of recent frames to consider
         var_threshold: allowed variance (sum of F1+F2 variances) to declare stable
-        min_full_frames: minimum number of frames in window that must have both F1 and F2
+        min_full_frames: minimum number of frames
+        in window that must have both F1 and F2
         trim_pct: percent to trim from each tail when computing variance (robust)
         """
         self.window_size = int(window_size)

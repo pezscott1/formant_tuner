@@ -105,7 +105,8 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
             if is_stable and f1_target:
                 if not hasattr(self, "_f1_line") or self._f1_line is None:
                     self._f1_line = self.ax_spec.axhline(
-                        f1_target, color="cyan", linestyle="--", linewidth=1.2, alpha=0.7
+                        f1_target, color="cyan",
+                        linestyle="--", linewidth=1.2, alpha=0.7
                     )
                 else:
                     self._f1_line.set_ydata([f1_target, f1_target])
@@ -113,7 +114,8 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
             if is_stable and f2_target:
                 if not hasattr(self, "_f2_line") or self._f2_line is None:
                     self._f2_line = self.ax_spec.axhline(
-                        f2_target, color="lime", linestyle="--", linewidth=1.2, alpha=0.7
+                        f2_target, color="lime",
+                        linestyle="--", linewidth=1.2, alpha=0.7
                     )
                 else:
                     self._f2_line.set_ydata([f2_target, f2_target])
@@ -207,7 +209,7 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
 # -------------------------
 # Spectrogram and expected formants
 # -------------------------
-def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=3.0):
+def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=3.0):  # noqa: C901
     """
     Compute a safe, speech-optimized spectrogram with:
       - pre-emphasis

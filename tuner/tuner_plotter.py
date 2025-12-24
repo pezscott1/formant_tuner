@@ -8,7 +8,8 @@ from utils.music_utils import freq_to_note_name
 # Spectrum Plot
 # ============================================================
 
-def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _tol):
+def update_spectrum(
+        window, vowel, target_formants, measured_formants, pitch, _tol):  # noqa: C901
     ax = window.ax_chart
     ax.clear()
 

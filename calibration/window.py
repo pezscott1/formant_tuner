@@ -348,20 +348,26 @@ class CalibrationWindow(QMainWindow):
         # Snapshot buffer BEFORE any clearing happens
         buffer_snapshot = list(self._capture_buffer)
         if not self._capture_buffer and getattr(self, "_partial_buffer", None):
-            f1_vals = np.array([p[0] for p in self._partial_buffer if p[0] is not None], dtype=float)
-            f2_vals = np.array([p[1] for p in self._partial_buffer if p[1] is not None], dtype=float)
-            f0_vals = np.array([p[2] for p in self._partial_buffer if p[2] is not None], dtype=float)
+            f1_vals = np.array([p[0] for p in
+                                self._partial_buffer if p[0] is not None], dtype=float)
+            f2_vals = np.array([p[1] for p in
+                                self._partial_buffer if p[1] is not None], dtype=float)
+            f0_vals = np.array([p[2] for p in
+                                self._partial_buffer if p[2] is not None], dtype=float)
 
             if f1_vals.size > 0 and f2_vals.size > 0:
                 f1_med = float(np.median(f1_vals))
                 f2_med = float(np.median(f2_vals))
                 f0_med = float(np.median(f0_vals)) if f0_vals.size > 0 else None
-                accepted, skipped, msg = self.session.handle_result(f1_med, f2_med, f0_med)
+                accepted, skipped, msg = (
+                    self.session.handle_result(f1_med, f2_med, f0_med))
                 self.status_panel.appendPlainText(msg)
                 print("DBG handle_result:",
-                      {"accepted": accepted, "skipped": skipped, "session_index": self.session.current_index})
+                      {"accepted": accepted, "skipped":
+                          skipped, "session_index": self.session.current_index})
                 self.capture_panel.appendPlainText(
-                    f"/{vowel}/ F1={f1_med:.1f}, F2={f2_med:.1f}, F0={(f0_med or 0):.1f}"
+                    f"/{vowel}/ F1={f1_med:.1f}"
+                    f", F2={f2_med:.1f}, F0={(f0_med or 0):.1f}"
                 )
                 self._partial_buffer.clear()
                 self.state.advance()
@@ -380,7 +386,8 @@ class CalibrationWindow(QMainWindow):
                 self.session.increment_retry(vowel)
             else:
                 # fallback: direct map increment
-                self.session.retries_map[vowel] = self.session.retries_map.get(vowel, 0) + 1
+                self.session.retries_map[vowel] = (
+                        self.session.retries_map.get(vowel, 0) + 1)
 
             self.state.retry_current_vowel()
             self.phase_timer.start(1000)
@@ -421,10 +428,12 @@ class CalibrationWindow(QMainWindow):
             f0_arr = f0_arr[mask]
         else:
             # Reconstruct F0 array aligned to F1/F2 frames
-            f0_arr = np.array([p[2] for p, keep in zip(buffer_snapshot, mask) if keep and p[2] is not None],
+            f0_arr = np.array([p[2] for p, keep in
+                               zip(buffer_snapshot, mask) if keep and p[2] is not None],
                               dtype=float)
         print(f"DBG capture snapshot len: {len(buffer_snapshot)}")
-        print(f"DBG f1_arr size: {f1_arr.size}, f2_arr size: {f2_arr.size}, f0_arr size: {f0_arr.size}")
+        print(f"DBG f1_arr size: {f1_arr.size}, "
+              f"f2_arr size: {f2_arr.size}, f0_arr size: {f0_arr.size}")
         print(f"DBG mask sum: {mask.sum()} / {mask.size}")
         # -----------------------------------------------------
         # No plausible frames
@@ -436,7 +445,8 @@ class CalibrationWindow(QMainWindow):
             if hasattr(self.session, "increment_retry"):
                 self.session.increment_retry(vowel)
             else:
-                self.session.retries_map[vowel] = self.session.retries_map.get(vowel, 0) + 1
+                self.session.retries_map[vowel] = (
+                        self.session.retries_map.get(vowel, 0) + 1)
             snapshot = buffer_snapshot
             self._capture_buffer.clear()
             ev = self.state.retry_current_vowel()
@@ -467,7 +477,8 @@ class CalibrationWindow(QMainWindow):
             if hasattr(self.session, "increment_retry"):
                 self.session.increment_retry(vowel)
             else:
-                self.session.retries_map[vowel] = self.session.retries_map.get(vowel, 0) + 1
+                self.session.retries_map[vowel] = (
+                        self.session.retries_map.get(vowel, 0) + 1)
 
             self._capture_buffer.clear()
             self.state.retry_current_vowel()
@@ -524,14 +535,16 @@ class CalibrationWindow(QMainWindow):
         # -----------------------------------------------------
         # Submit to session
         # -----------------------------------------------------
-        accepted, skipped, msg = self.session.handle_result(f1_med, f2_med, f0_med)
+        accepted, skipped, msg = (
+            self.session.handle_result(f1_med, f2_med, f0_med))
         self.status_panel.appendPlainText(msg)
         self._capture_buffer.clear()
 
         if accepted:
             vowel = self.state.current_vowel
             self.capture_panel.appendPlainText(
-                f"/{vowel}/ F1={f1_med:.1f}, F2={f2_med:.1f}, F0={(f0_med or 0):.1f}"
+                f"/{vowel}/ F1={f1_med:.1f}, "
+                f"F2={f2_med:.1f}, F0={(f0_med or 0):.1f}"
             )
             self.state.advance()
             self.phase_timer.start(1000)
@@ -553,7 +566,8 @@ class CalibrationWindow(QMainWindow):
                 f1_best, f2_best, f0_best
             )
             self.capture_panel.appendPlainText(
-                f"/{vowel}/ F1={f1_best:.1f}, F2={f2_best:.1f}, F0={(f0_best or 0):.1f}"
+                f"/{vowel}/ F1={f1_best:.1f}, "
+                f"F2={f2_best:.1f}, F0={(f0_best or 0):.1f}"
             )
             self.status_panel.appendPlainText(msg)
             self._capture_buffer.clear()
