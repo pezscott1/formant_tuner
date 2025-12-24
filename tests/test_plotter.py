@@ -191,3 +191,23 @@ def test_update_vowel_chart_nan_safe(qtbot):
         resonance_score=0.5,
         overall=0.5,
     )
+
+
+def test_update_vowel_chart_skips_nan(qtbot):
+    class Dummy:
+        ax_vowel = type("A", (), {"scatter": lambda *a, **k: None,
+                                  "plot": lambda *a, **k: [None],
+                                  "set_title": lambda *a, **k: None})()
+        canvas = type("C", (), {"draw_idle": lambda *a, **k: None})()
+        vowel_measured_artist = None
+        vowel_line_artist = None
+
+    from tuner.tuner_plotter import update_vowel_chart
+
+    win = Dummy()
+    update_vowel_chart(win, "i",
+                       target_formants=(None, None, None),
+                       measured_formants=(float("nan"), float("nan"), None),
+                       vowel_score=0.1,
+                       resonance_score=0.2,
+                       overall=0.3)
