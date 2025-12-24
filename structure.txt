@@ -5,29 +5,34 @@ formant_tuner/
 │   ├── lpc.py               # LPC + envelope + cepstral
 │   ├── pitch.py             # pitch estimation
 │   ├── vowel.py             # vowel ranges, guessing
+│   ├── vowel_data.py
 │   ├── scoring.py           # plausibility, tuning, live scoring
 │   ├── smoothing.py         # all smoothers
 │   └── utils.py             # helpers
-│
-├── audio/
-│   ├── mic_stream.py        # sounddevice wrapper
-│   ├── segmenter.py         # rolling buffer, segmentation
-│   ├── worker.py            # background processing worker
-│   └── controller.py        # start/stop mic
 │
 ├── calibration/
 │   ├── session.py           # calibration logic (retry, state machine)
 │   ├── plotter.py           # spectrogram + vowel scatter
 │   ├── state_machine.py     # prep/sing/capture phases
-│   └── window.py            # thin PyQt wrapper
+│   ├── dialog.py
+│   └── window.py
 │
 ├── tuner/
+│   ├── controller.py
 │   ├── live_analyzer.py     # smoothing + plausibility + UI updates
 │   ├── profile_controller.py
 │   ├── tuner_plotter.py
 │   └── window.py            # thin PyQt wrapper
 │
-└── utils/
-    ├── audio_utils.py
-    ├── file_utils.py
-    └── music_utils.py
+├──  utils/
+│     └── music_utils.py
+│
+└── main.py
+│
+└── pytest.ini
+│
+└── requirements.txt
+│
+└── structure.txt
+│
+└── __init__.py

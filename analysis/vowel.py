@@ -84,10 +84,13 @@ def is_plausible_formants(
     Check plausibility of F1/F2 values for a given voice type and vowel.
     Uses:
       - global physiological limits
-      - vowel-specific ranges
+      - vowel-specific ranges (reference + tolerance)
       - calibrated profile (if provided)
     """
 
+    # -------------------------
+    # Basic validity checks
+    # -------------------------
     if f1 is None or f2 is None:
         return False, "missing formant"
 
@@ -102,16 +105,34 @@ def is_plausible_formants(
     if f1 < 120 or f2 < 300:
         return False, "formants too low"
 
-    # Vowel-specific ranges
-    if vowel is None:
-        return True, "ok"
-
+    # -------------------------
+    # Get vowel-specific ranges
+    # -------------------------
     ranges = get_vowel_ranges(voice_type, vowel, calibrated)
-    if not ranges:
+
+    # If no vowel or no ranges, accept
+    if vowel is None or not ranges:
         return True, "ok"
 
     f1_low, f1_high, f2_low, f2_high = ranges
 
+    # -------------------------
+    # Back vowels: F2 is the anchor
+    # -------------------------
+    if vowel in ("ɔ", "u"):
+        # F2 is the main cue: if it's wrong, reject
+        if not (f2_low <= f2 <= f2_high):
+            return False, "f2-out-of-range"
+
+        # F1 can drift more; if it's outside, we still accept but note drift
+        if not (f1_low <= f1 <= f1_high):
+            return True, "f1-drift-allowed"
+
+        return True, "ok"
+
+    # -------------------------
+    # Standard vowels
+    # -------------------------
     if not (f1_low <= f1 <= f1_high):
         return False, f"f1 out of range ({f1:.0f} Hz)"
 
