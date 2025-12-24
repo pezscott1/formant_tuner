@@ -16,9 +16,14 @@ def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _t
     f1_m, f2_m, f3_m = measured_formants
 
     # ====== NEW: get latest audio segment ======
-    raw = window.analyzer.get_latest_raw()
-    segment = raw.get("segment") if raw else None
+    raw = None
+    if getattr(window, "analyzer", None) is not None:
+        try:
+            raw = window.analyzer.get_latest_raw()
+        except Exception:
+            raw = None
 
+    segment = raw.get("segment") if raw else None
     if segment is not None:
         seg = np.asarray(segment, dtype=float).flatten()
         if seg.size > 0:
@@ -29,7 +34,7 @@ def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _t
             ax.plot(freqs, fft, color="black", linewidth=1.0)
 
     # ====== Existing formant lines ======
-    if f1_t:
+    if f1_t is not None and not np.isnan(f1_t):
         ax.axvline(f1_t, color="blue", linestyle="--", alpha=0.7)
     if f2_t:
         ax.axvline(f2_t, color="blue", linestyle="--", alpha=0.7)

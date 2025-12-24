@@ -92,3 +92,9 @@ def test_segment_stored(_mock_pitch, _mock_lpc):
     assert "segment" in out
     assert isinstance(out["segment"], np.ndarray)
     assert out["segment"].shape == frame.shape
+
+
+def test_engine_handles_none_formants():
+    eng = make_engine()
+    out = eng.process_frame(np.zeros(1024), 16000)
+    assert out["formants"] == (None, None, None)

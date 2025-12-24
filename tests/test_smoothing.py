@@ -195,3 +195,9 @@ def test_label_smoother_hysteresis():
     out = ls.update("i", 1.0)
 
     assert out == "i"
+
+
+def test_octave_correction_large_jump():
+    ps = PitchSmoother(jump_limit=50)
+    ps.current = 100
+    assert ps._octave_correct(300) == 300

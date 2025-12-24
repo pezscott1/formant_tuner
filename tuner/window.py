@@ -242,6 +242,8 @@ class TunerWindow(QMainWindow):
 
         names = self.profile_manager.list_profiles()
         for base in names:
+            if base == "test_bass":
+                continue
             display = self.profile_manager.display_name(base)
             item = QListWidgetItem(display)
             item.setData(Qt.UserRole, base)
@@ -257,9 +259,6 @@ class TunerWindow(QMainWindow):
                     self.profile_list.setCurrentItem(item)
                     break
         elif names:
-            # Default to first real profile
-            # base = names[0]
-            # self._apply_profile_base(base)
             pass
 
     def _set_active_profile(self, base: str):
@@ -300,14 +299,13 @@ class TunerWindow(QMainWindow):
 
     def _apply_selected_profile_item(self, item: QListWidgetItem):
         base = item.data(Qt.UserRole)
+
         if base is None:
-            # "New Profile" double-clicked: leave for calibration workflow
-            QMessageBox.information(
-                self,
-                "New profile",
-                "Use Calibrate with “New Profile” selected to create a profile.",
-            )
+            # "New Profile" clicked — just select it, do NOT show popup
+            # Leave behavior to the Calibrate button handler
             return
+
+        # Normal profile: activate immediately
         self._apply_profile_base(base)
 
     def _apply_profile_base(self, base: str):
@@ -346,13 +344,24 @@ class TunerWindow(QMainWindow):
         """
         Launch calibration workflow.
 
+        - If nothing is selected → show helpful popup
         - If “New Profile” is selected → ask for name + voice type
         - If an existing profile is selected → update that profile
-        - When calibration finishes → refresh list + apply profile
         """
         item = self.profile_list.currentItem()
-        base = item.data(Qt.UserRole) if item else None
-        # --- Case 1: New Profile ---
+
+        # --- Case 0: Nothing selected ---
+        if item is None:
+            QMessageBox.information(
+                self,
+                "No profile selected",
+                "Please select a profile before calibrating.",
+            )
+            return
+
+        base = item.data(Qt.UserRole)
+
+        # --- Case 1: New Profile selected ---
         if base is None:
             dlg = ProfileDialog(self)
             if dlg.exec_() != dlg.Accepted:
@@ -360,10 +369,14 @@ class TunerWindow(QMainWindow):
 
             profile_name, voice_type = dlg.get_values()
             if not profile_name:
-                QMessageBox.warning(self,
-                                    "Missing name", "Please enter a profile name.")
+                QMessageBox.warning(
+                    self,
+                    "Missing name",
+                    "Please enter a profile name.",
+                )
                 return
-            # Launch calibration window
+
+            # Launch calibration window for new profile
             self.calib_win = CalibrationWindow(
                 profile_name=profile_name,
                 voice_type=voice_type,
@@ -371,7 +384,7 @@ class TunerWindow(QMainWindow):
                 analyzer=self.live_analyzer,
                 parent=self,
             )
-            self.update_timer.stop()  # pause tuner UI updates
+            self.update_timer.stop()
             self.start_mic()
             print("[AUDIO] Microphone stream started")
             self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)

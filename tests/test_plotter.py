@@ -140,3 +140,54 @@ def test_safe_spectrogram_fallback_fft(monkeypatch):
 
     assert S.shape[0] > 0
     assert S.shape[1] > 0
+
+
+def test_update_spectrum_no_analyzer(qtbot):
+    class Dummy:
+        ax_chart = MagicMock()
+        canvas = MagicMock()
+        sample_rate = 16000
+        analyzer = None
+
+    from tuner.tuner_plotter import update_spectrum
+    win = Dummy()
+
+    update_spectrum(win, "i", (300, 2500, None), (320, 2400, None), 140, None)
+
+
+def test_update_spectrum_analyzer_raises(qtbot):
+    class BadAnalyzer:
+        def get_latest_raw(self):
+            raise RuntimeError("boom")
+
+    class Dummy:
+        ax_chart = MagicMock()
+        canvas = MagicMock()
+        sample_rate = 16000
+        analyzer = BadAnalyzer()
+
+    from tuner.tuner_plotter import update_spectrum
+    win = Dummy()
+
+    update_spectrum(win, "i", (300, 2500, None), (320, 2400, None), 140, None)
+
+
+def test_update_vowel_chart_nan_safe(qtbot):
+    class Dummy:
+        ax_vowel = MagicMock()
+        canvas = MagicMock()
+        vowel_measured_artist = None
+        vowel_line_artist = None
+
+    from tuner.tuner_plotter import update_vowel_chart
+    win = Dummy()
+
+    update_vowel_chart(
+        win,
+        "i",
+        (None, None, None),
+        (np.nan, np.nan, None),
+        vowel_score=0.5,
+        resonance_score=0.5,
+        overall=0.5,
+    )
