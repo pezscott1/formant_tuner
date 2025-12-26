@@ -146,8 +146,8 @@ def test_update_vowel_chart_artist_removal():
         overall=0.85,
     )
 
-    _first_point = window.vowel_measured_artist
-    _first_line = window.vowel_line_artist
+    first_point = window.vowel_measured_artist  # noqa: F841
+    first_line = window.vowel_line_artist  # noqa: F841
 
     # Second call should remove old artists and create new ones
     update_vowel_chart(

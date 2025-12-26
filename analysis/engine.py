@@ -52,7 +52,8 @@ class FormantAnalysisEngine:
     # ---------------------------------------------------------
     # Core processing
     # ---------------------------------------------------------
-    def process_frame(self, signal: np.ndarray, sr: int) -> Dict[str, Any]:  # noqa: C901
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
         """
         Process a single audio frame.
 

@@ -17,7 +17,7 @@ def test_tuner_initializes_components(
     mock_profiles = MagicMock()
     mock_profiles_cls.return_value = mock_profiles
 
-    t = Tuner(voice_type="bass", profiles_dir="profiles")
+    t = Tuner(voice_type="bass", profiles_dir="profiles")  # noqa: F841
 
     # Engine constructed once
     mock_engine_cls.assert_called_once()
