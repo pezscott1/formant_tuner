@@ -210,6 +210,7 @@ class CalibrationWindow(QMainWindow):
     # Poll shared engine
     # ---------------------------------------------------------
     def _poll_audio(self):
+        print("ENGINE STREAM ACTIVE:", self.engine.stream_active)
         # Pull latest analyzer frame (NOT engine)
         raw = self.analyzer.get_latest_raw()
         if raw is None:
