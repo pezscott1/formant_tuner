@@ -1,5 +1,6 @@
 
-from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother, FormantStabilityTracker
+from analysis.smoothing import (PitchSmoother, MedianSmoother,
+                                LabelSmoother, FormantStabilityTracker)
 
 
 def test_pitch_smoother_basic():

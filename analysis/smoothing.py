@@ -286,8 +286,10 @@ class FormantStabilityTracker:
         f3_full = f3_arr[full_mask]
 
         # Ridge collapse detection
-        ridge = lambda x: np.all((2400 < x) & (x < 2800))
-        if ridge(f1_full) and ridge(f2_full) and ridge(f3_full):
+        def is_ridge_band(x):
+            return np.all((2400 < x) & (x < 2800))
+
+        if is_ridge_band(f1_full) and is_ridge_band(f2_full) and is_ridge_band(f3_full):
             return False, float("inf")
 
         # Robust trimming

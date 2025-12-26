@@ -19,7 +19,8 @@ class LiveAnalyzer:
       - expose processed frames via a queue for the UI
     """
 
-    def __init__(self, engine, pitch_smoother, formant_smoother, label_smoother, sample_rate=48000):
+    def __init__(
+            self, engine, pitch_smoother, formant_smoother, label_smoother, sample_rate=48000):
         self.engine = engine
         self.pitch_smoother = pitch_smoother
         self.formant_smoother = formant_smoother
