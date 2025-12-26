@@ -34,16 +34,17 @@ def test_extract_formants_handles_invalid_entries(tmp_path):
     pm = ProfileManager(str(tmp_path), analyzer=MagicMock())
 
     raw = {
-        "a": {"f1": 300, "f2": 2500},  # missing f0
-        "b": "not a dict",            # invalid entry
+        "a": {"f1": 300, "f2": 2500},   # missing f0
+        "b": "not a dict",             # invalid entry
         "c": {"f1": None, "f2": None, "f0": None},
     }
 
     out = pm.extract_formants(raw)
 
-    assert out["a"] == (300, 2500, None)
-    assert out["c"] == (None, None, None)
-    assert "b" not in out  # invalid entry skipped
+    # Expect (f1, f2, f0, confidence, stability)
+    assert out["a"] == (300, 2500, None, 0.0, float("inf"))
+    assert "b" not in out
+    assert out["c"] == (None, None, None, 0.0, float("inf"))
 
 
 # ---------------------------------------------------------
@@ -120,15 +121,12 @@ def test_apply_profile_calls_analyzer(tmp_path):
     pm = ProfileManager(str(tmp_path), analyzer=mock_analyzer)
 
     result = pm.apply_profile("bass")
-
     assert result == "bass"
-    mock_analyzer.set_user_formants.assert_called_once_with({
-        "a": (300, 2500, 120),
-        "e": (400, 2300, 130),
-    })
 
-    # active profile should be updated
-    assert pm.active_profile_name == "bass"
+    mock_analyzer.set_user_formants.assert_called_once_with({
+        "a": (300, 2500, 120, 0.0, float("inf")),
+        "e": (400, 2300, 130, 0.0, float("inf")),
+    })
 
 # ---------------------------------------------------------
 # delete_profile removes JSON, model, and clears active profile

@@ -1,52 +1,29 @@
 # tests/test_music_utils.py
 from unittest.mock import MagicMock
+import matplotlib.pyplot as plt
+import numpy as np
+
 from utils.music_utils import (
     hz_to_midi,
     freq_to_note_name,
     render_piano,
 )
-import matplotlib.pyplot as plt
 
+
+# ---------------------------------------------------------
+# hz_to_midi tests
+# ---------------------------------------------------------
 
 def test_hz_to_midi_basic():
-    assert hz_to_midi(440) == 69  # A4
+    assert hz_to_midi(440) == 69      # A4
+    assert hz_to_midi(880) == 81      # A5
+    assert hz_to_midi(220) == 57      # A3
 
 
-def test_hz_to_midi_none_or_zero():
+def test_hz_to_midi_invalid_inputs():
     assert hz_to_midi(None) is None
     assert hz_to_midi(0) is None
-
-
-def test_hz_to_midi_negative():
-    assert hz_to_midi(-100) is None
-
-
-def test_render_piano_runs_without_error():
-    ax = MagicMock()
-    render_piano(ax, midi_note=60)  # Middle C
-    # Just ensure it calls plotting methods
-    assert ax.plot.called or ax.add_patch.called
-
-
-def test_hz_to_midi_standard():
-    assert hz_to_midi(440) == 69
-
-
-def test_hz_to_midi_none_zero_negative():
-    assert hz_to_midi(None) is None
-    assert hz_to_midi(0) is None
-    assert hz_to_midi(-50) is None
-
-
-def test_hz_to_midi_fractional():
-    midi = hz_to_midi(445)
-    assert isinstance(midi, int)
-
-
-def test_render_piano_calls_plotting():
-    ax = MagicMock()
-    render_piano(ax, midi_note=60)
-    assert ax.add_patch.called or ax.plot.called
+    assert hz_to_midi(-10) is None
 
 
 def test_hz_to_midi_fractional_rounding():
@@ -56,10 +33,64 @@ def test_hz_to_midi_fractional_rounding():
 
 def test_hz_to_midi_extreme_values():
     # Very small frequencies produce very negative MIDI numbers
-    assert isinstance(hz_to_midi(1e-9), int)
+    midi = hz_to_midi(1e-9)
+    assert isinstance(midi, int)
 
 
-def test_render_piano_basic():
+# ---------------------------------------------------------
+# freq_to_note_name tests
+# ---------------------------------------------------------
+
+def test_freq_to_note_name_basic():
+    assert freq_to_note_name(440) == "A4"
+    assert freq_to_note_name(261.63) == "C4"  # Middle C approx
+
+
+def test_freq_to_note_name_accidentals():
+    assert freq_to_note_name(277) in ("C#4", "D♭4", "Db4")
+    assert freq_to_note_name(370) in ("F#4", "Gb4")
+    assert freq_to_note_name(415) in ("G#4", "Ab4")
+
+
+def test_freq_to_note_name_rounding_boundaries():
+    assert freq_to_note_name(439.5) == "A4"
+    assert freq_to_note_name(440.4) == "A4"
+
+
+def test_freq_to_note_name_invalid():
+    assert freq_to_note_name(0) == "N/A"
+    assert freq_to_note_name(-5) == "N/A"
+    assert freq_to_note_name(1e9) == "N/A"  # MIDI out of range
+
+
+def test_freq_to_note_name_extremes():
+    assert isinstance(freq_to_note_name(20), str)
+    assert isinstance(freq_to_note_name(20000), str)
+
+
+# ---------------------------------------------------------
+# render_piano tests
+# ---------------------------------------------------------
+
+def test_render_piano_no_crash():
+    fig, ax = plt.subplots()
+    render_piano(ax, midi_note=None)
+    plt.close(fig)
+
+
+def test_render_piano_highlights_white_key():
+    fig, ax = plt.subplots()
+    render_piano(ax, midi_note=60)  # C4
+    plt.close(fig)
+
+
+def test_render_piano_highlights_black_key():
+    fig, ax = plt.subplots()
+    render_piano(ax, midi_note=61)  # C#4
+    plt.close(fig)
+
+
+def test_render_piano_calls_plotting():
     ax = MagicMock()
     render_piano(ax, midi_note=60)
     assert ax.add_patch.called or ax.plot.called
@@ -81,85 +112,3 @@ def test_render_piano_handles_negative_midi():
     ax = MagicMock()
     render_piano(ax, midi_note=-10)
     assert ax.add_patch.called or ax.plot.called
-
-
-def test_freq_to_note_name_rounding_boundaries():
-    from utils.music_utils import freq_to_note_name
-
-    # Slightly below A4
-    assert freq_to_note_name(439.5) == "A4"
-    # Slightly above A4
-    assert freq_to_note_name(440.4) == "A4"
-
-
-def test_freq_to_note_name_invalid_inputs():
-    from utils.music_utils import freq_to_note_name
-
-    assert freq_to_note_name(0) is None or isinstance(freq_to_note_name(0), str)
-    assert freq_to_note_name(-10) is None or isinstance(freq_to_note_name(-10), str)
-
-
-def test_freq_to_note_name_extremes():
-
-    assert freq_to_note_name(20)  # Should return some note, not crash
-    assert freq_to_note_name(20000)  # Should return some note, not crash
-
-# -------------------------
-# hz_to_midi tests
-# -------------------------
-
-
-def test_hz_to_midi_basic_notes():
-    assert hz_to_midi(440) == 69      # A4
-    assert hz_to_midi(880) == 81      # A5
-    assert hz_to_midi(220) == 57      # A3
-
-
-def test_hz_to_midi_invalid_inputs():
-    assert hz_to_midi(None) is None
-    assert hz_to_midi(0) is None
-    assert hz_to_midi(-10) is None
-
-# -------------------------
-# freq_to_note_name tests
-# -------------------------
-
-
-def test_freq_to_note_name_basic():
-    assert freq_to_note_name(440) == "A4"
-    assert freq_to_note_name(261.63) == "C4"  # Middle C approx
-
-
-def test_freq_to_note_name_accidentals():
-    assert freq_to_note_name(277) in ("C#4", "D♭4", "Db4")
-    assert freq_to_note_name(370) in ("F#4", "Gb4")
-    assert freq_to_note_name(415) in ("G#4", "Ab4")
-
-
-def test_freq_to_note_name_invalid():
-    assert freq_to_note_name(0) == "N/A"
-    assert freq_to_note_name(-5) == "N/A"
-    assert freq_to_note_name(1e9) == "N/A"  # MIDI out of range
-
-# -------------------------
-# render_piano tests
-# -------------------------
-
-
-def test_render_piano_no_crash():
-    fig, ax = plt.subplots()
-    render_piano(ax, midi_note=None)
-    plt.close(fig)
-
-
-def test_render_piano_highlights_white_key():
-    fig, ax = plt.subplots()
-    render_piano(ax, midi_note=60)  # C4
-    # No crash = success; visual correctness is structural
-    plt.close(fig)
-
-
-def test_render_piano_highlights_black_key():
-    fig, ax = plt.subplots()
-    render_piano(ax, midi_note=61)  # C#4
-    plt.close(fig)

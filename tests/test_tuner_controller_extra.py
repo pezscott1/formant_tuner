@@ -1,76 +1,160 @@
-from unittest.mock import MagicMock
+
+from unittest.mock import MagicMock, patch
 from tuner.controller import Tuner
 
 
-def test_load_profile_sets_active_and_updates_engine_voice_type(tmp_path):
-    # Mock ProfileManager.apply_profile to return a base name
-    tuner = Tuner(voice_type="tenor", profiles_dir=str(tmp_path))
-    tuner.profile_manager.apply_profile = MagicMock(return_value="bass")
+# ---------------------------------------------------------
+# Profile listing
+# ---------------------------------------------------------
+@patch("tuner.controller.ProfileManager")
+@patch("tuner.controller.LiveAnalyzer")
+@patch("tuner.controller.FormantAnalysisEngine")
+def test_tuner_lists_profiles(mock_engine_cls, mock_analyzer_cls, mock_profiles_cls):
+    mock_engine = MagicMock()
+    mock_engine_cls.return_value = mock_engine
 
-    result = tuner.load_profile("bass")
+    mock_analyzer = MagicMock()
+    mock_analyzer_cls.return_value = mock_analyzer
 
-    assert result == "bass"
-    assert tuner.active_profile == "bass"
-    # load_profile should restore engine.voice_type
-    assert tuner.engine.voice_type == "tenor"
+    mock_profiles = MagicMock()
+    mock_profiles.list_profiles.return_value = ["bass_default", "tenor_1"]
+    mock_profiles_cls.return_value = mock_profiles
 
-
-def test_load_profile_returns_non_string(tmp_path):
-    # If apply_profile returns something non-string,
-    # engine.voice_type should NOT be touched
-    tuner = Tuner(voice_type="tenor", profiles_dir=str(tmp_path))
-    tuner.profile_manager.apply_profile = MagicMock(return_value=None)
-
-    result = tuner.load_profile("bass")
-
-    assert result is None
-    assert tuner.engine.voice_type == "tenor"  # unchanged
-
-
-def test_start_and_stop_are_noops(tmp_path):
-    tuner = Tuner(profiles_dir=str(tmp_path))
-
-    # Should not raise or return anything meaningful
-    assert tuner.start() is None
-    assert tuner.stop() is None
-
-
-def test_poll_latest_processed_returns_none_when_no_raw(tmp_path):
-    tuner = Tuner(profiles_dir=str(tmp_path))
-
-    tuner.engine.get_latest_raw = MagicMock(return_value=None)
-
-    assert tuner.poll_latest_processed() is None
-
-
-def test_poll_latest_processed_calls_live_analyzer(tmp_path):
-    tuner = Tuner(profiles_dir=str(tmp_path))
-
-    fake_raw = {"f0": 120}
-    tuner.engine.get_latest_raw = MagicMock(return_value=fake_raw)
-    tuner.live_analyzer.process_raw = MagicMock(return_value={"processed": True})
-
-    out = tuner.poll_latest_processed()
-
-    tuner.live_analyzer.process_raw.assert_called_once_with(fake_raw)
-    assert out == {"processed": True}
-
-
-def test_tuner_controller_no_profile():
     t = Tuner()
-    t.engine._latest_raw = {"f0": 200, "formants": (500, 1500, 2500)}
+    profiles = t.list_profiles()
 
-    out = t.poll_latest_processed()
-    assert out["f0"] == 200
-    assert out["formants"] == (500, 1500, 2500)
+    assert profiles == ["bass_default", "tenor_1"]
+    mock_profiles.list_profiles.assert_called_once()
 
 
-def test_tuner_controller_with_profile():
+# ---------------------------------------------------------
+# Profile deletion
+# ---------------------------------------------------------
+@patch("tuner.controller.ProfileManager")
+@patch("tuner.controller.LiveAnalyzer")
+@patch("tuner.controller.FormantAnalysisEngine")
+def test_tuner_deletes_profile(mock_engine_cls, mock_analyzer_cls, mock_profiles_cls):
+    mock_engine = MagicMock()
+    mock_engine_cls.return_value = mock_engine
+
+    mock_analyzer = MagicMock()
+    mock_analyzer_cls.return_value = mock_analyzer
+
+    mock_profiles = MagicMock()
+    mock_profiles_cls.return_value = mock_profiles
+
     t = Tuner()
-    t.active_profile = {"ɑ": {"f1": 500, "f2": 1500}}
+    t.delete_profile("my_profile")
 
-    t.engine._latest_raw = {"f0": 200, "formants": (500, 1500, 2500)}
+    mock_profiles.delete_profile.assert_called_once_with("my_profile")
 
-    out = t.poll_latest_processed()
-    assert out["profile_vowel"] == "ɑ"
-    assert out["profile_confidence"] > 0
+
+# ---------------------------------------------------------
+# Switching profiles updates active_profile
+# ---------------------------------------------------------
+@patch("tuner.controller.ProfileManager")
+@patch("tuner.controller.LiveAnalyzer")
+@patch("tuner.controller.FormantAnalysisEngine")
+def test_tuner_switches_profiles(mock_engine_cls, mock_analyzer_cls, mock_profiles_cls):
+    mock_engine = MagicMock()
+    mock_engine_cls.return_value = mock_engine
+
+    mock_analyzer = MagicMock()
+    mock_analyzer_cls.return_value = mock_analyzer
+
+    mock_profiles = MagicMock()
+    mock_profiles.apply_profile.side_effect = [
+        {"a": {"f1": 700, "f2": 1100}},   # first profile
+        {"i": {"f1": 300, "f2": 2500}},   # second profile
+    ]
+    mock_profiles_cls.return_value = mock_profiles
+
+    t = Tuner()
+
+    p1 = t.load_profile("profile_a")
+    assert p1 == {"a": {"f1": 700, "f2": 1100}}
+    assert t.active_profile == p1
+
+    p2 = t.load_profile("profile_i")
+    assert p2 == {"i": {"f1": 300, "f2": 2500}}
+    assert t.active_profile == p2
+
+
+# ---------------------------------------------------------
+# Switching profiles changes classification behavior
+# ---------------------------------------------------------
+@patch("tuner.controller.ProfileManager")
+@patch("tuner.controller.LiveAnalyzer")
+@patch("tuner.controller.FormantAnalysisEngine")
+def test_tuner_profile_switch_changes_classification(
+    mock_engine_cls, mock_analyzer_cls, mock_profiles_cls
+):
+    mock_engine = MagicMock()
+    mock_engine_cls.return_value = mock_engine
+
+    # Engine always returns a raw frame
+    mock_engine.get_latest_raw.return_value = {"dummy": True}
+
+    # Analyzer returns stable formants
+    processed = {
+        "f0": 200.0,
+        "formants": (500, 1500, 2500),
+        "vowel": "a",
+        "confidence": 0.9,
+        "stable": True,
+    }
+    mock_analyzer = MagicMock()
+    mock_analyzer.process_raw.return_value = processed
+    mock_analyzer_cls.return_value = mock_analyzer
+
+    # ProfileManager returns two different profiles
+    mock_profiles = MagicMock()
+    mock_profiles.apply_profile.side_effect = [
+        {"a": {"f1": 700, "f2": 1100}},   # first profile
+        {"i": {"f1": 300, "f2": 2500}},   # second profile
+    ]
+    mock_profiles_cls.return_value = mock_profiles
+
+    t = Tuner()
+
+    # Load first profile
+    t.load_profile("profile_a")
+    out1 = t.poll_latest_processed()
+    vowel1 = out1["profile_vowel"]
+
+    # Load second profile
+    t.load_profile("profile_i")
+    out2 = t.poll_latest_processed()
+    vowel2 = out2["profile_vowel"]
+
+    # Classification should differ between profiles
+    assert vowel1 != vowel2
+
+
+# ---------------------------------------------------------
+# Voice type override behavior
+# ---------------------------------------------------------
+@patch("tuner.controller.ProfileManager")
+@patch("tuner.controller.LiveAnalyzer")
+@patch("tuner.controller.FormantAnalysisEngine")
+def test_tuner_load_profile_resets_voice_type_when_profile_returns_string(
+    mock_engine_cls, mock_analyzer_cls, mock_profiles_cls
+):
+    mock_engine = MagicMock()
+    mock_engine.voice_type = "bass"
+    mock_engine_cls.return_value = mock_engine
+
+    mock_analyzer = MagicMock()
+    mock_analyzer_cls.return_value = mock_analyzer
+
+    mock_profiles = MagicMock()
+    # Simulate apply_profile returning a string (error or message)
+    mock_profiles.apply_profile.return_value = "error: missing profile"
+    mock_profiles_cls.return_value = mock_profiles
+
+    t = Tuner(voice_type="tenor")
+
+    t.load_profile("bad_profile")
+
+    # Controller resets engine.voice_type to tuner.voice_type
+    assert mock_engine.voice_type == "tenor"

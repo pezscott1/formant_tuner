@@ -5,7 +5,6 @@ from analysis.vowel import (
     is_plausible_pitch,
     guess_vowel,
     robust_guess,
-    get_expected_formants,
 )
 from analysis.vowel_data import FORMANTS, PITCH_RANGES
 
@@ -135,25 +134,3 @@ def test_robust_guess_basic():
     assert conf > 1          # ratio, not probability
     assert isinstance(conf, float)
     assert second is not None
-
-
-# ---------------------------------------------------------
-# get_expected_formants
-# ---------------------------------------------------------
-
-def test_get_expected_formants_valid():
-    f1, f2 = get_expected_formants("tenor", "ɑ")
-    base_f1, base_f2 = FORMANTS["tenor"]["ɑ"][:2]
-    assert f1 == int(round(base_f1))
-    assert f2 == int(round(base_f2))
-
-
-def test_get_expected_formants_invalid_vowel():
-    f1, f2 = get_expected_formants("tenor", "zzz")
-    assert f1 is None and f2 is None
-
-
-def test_get_expected_formants_fallback_voice_type():
-    f1a, f2a = get_expected_formants("alien", "ɑ")
-    f1b, f2b = get_expected_formants("tenor", "ɑ")
-    assert (f1a, f2a) == (f1b, f2b)

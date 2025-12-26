@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
-import traceback
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
@@ -426,14 +426,17 @@ class TunerWindow(QMainWindow):
                 if status:
                     print("[AUDIO STATUS]", status)
 
-                # Ensure float64
-                mono = indata[:, 0].astype(np.float64, copy=False)
+                mono = indata[:, 0].copy()
+
+                try:
+                    self.live_analyzer.pitch_smoother.push_audio(mono)
+                except Exception as error:
+                    print("[AUDIO BUFFER ERROR]", error)
 
                 try:
                     self.analyzer.process_frame(mono, self.sample_rate)
                 except Exception as error:
-                    print("[AUDIO CALLBACK ERROR]", repr(error))
-                    traceback.print_exc()
+                    print("[AUDIO CALLBACK ERROR]", error)
 
             try:
                 self.stream = sd.InputStream(

@@ -38,68 +38,46 @@ class ProfileManager:
 
     @staticmethod
     def display_name(base):
-        """Convert 'tenor_user1' -> 'tenor user1'."""
         return base.replace("_", " ")
 
     @staticmethod
     def base_from_display(display):
-        """Convert 'tenor user1' -> 'tenor_user1'."""
         if display.startswith("➕"):
             return None
         return display.replace(" ", "_")
 
-    # Alias for UI compatibility
     base_name_from_display = base_from_display
 
     # ---------------------------------------------------------
     # Existence checks
     # ---------------------------------------------------------
     def profile_exists(self, base):
-        """Return True if <base>_profile.json exists."""
         path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         return os.path.exists(path)
 
     # ---------------------------------------------------------
-    # Saving profiles (used by calibration)
+    # Saving profiles
     # ---------------------------------------------------------
     def save_profile(self, base, data, model_bytes=None):
-        """
-        Save a profile:
-          - data: dict to write as JSON (rich format)
-          - model_bytes: optional binary model data
-        """
-
-        # ✅ Ensure voice_type is stored in the JSON
-        #    This makes it recoverable when the profile is reloaded.
         if "voice_type" not in data:
             data["voice_type"] = self.analyzer.voice_type
 
         json_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         model_path = json_path.replace("_profile.json", "_model.pkl")
 
-        # Write JSON
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        # Write model if provided
         if model_bytes is not None:
             with open(model_path, "wb") as f:
                 f.write(model_bytes)
 
-        # Update active profile
         self.set_active_profile(base)
 
     # ---------------------------------------------------------
     # Active profile tracking
     # ---------------------------------------------------------
-    # ---------------------------------------------------------
-    # Active profile tracking
-    # ---------------------------------------------------------
     def set_active_profile(self, name):
-        """
-        Persist the active profile name to active_profile.json.
-        UI popups are handled by the controller, not here.
-        """
         self.active_profile_name = name
         path = os.path.join(self.profiles_dir, self.ACTIVE_FILE)
         with open(path, "w", encoding="utf-8") as f:
@@ -116,21 +94,22 @@ class ProfileManager:
         voice_type = raw.get("voice_type", "bass")
         self.analyzer.voice_type = voice_type
 
-        # Load formants
+        # Load formants (with confidence + stability)
         normalized = self.extract_formants(raw)
         self.analyzer.calibrated_profile = normalized
 
-        # Optional: if engine uses this for other logic
+        # Optional: engine may use this for scoring
         if hasattr(self.analyzer, "set_user_formants"):
             self.analyzer.set_user_formants(normalized)
 
-        # Persist active profile silently
-        self.set_active_profile(base)
+        # Reset smoothing state (important!)
+        if hasattr(self.analyzer, "reset"):
+            self.analyzer.reset()
 
+        self.set_active_profile(base)
         return base
 
     def _load_active_profile(self):
-        """Load active profile from disk if present."""
         path = os.path.join(self.profiles_dir, self.ACTIVE_FILE)
         if not os.path.exists(path):
             return
@@ -145,7 +124,6 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Internal JSON loader
     # ---------------------------------------------------------
-    # noinspection PyMethodMayBeStatic
     def load_profile_json(self, base):
         path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         try:
@@ -157,13 +135,12 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Extract formants from rich profile JSON
     # ---------------------------------------------------------
-    # noinspection PyMethodMayBeStatic
     def extract_formants(self, raw_dict):
         """
         Convert rich profile entries like:
-            { "a": { "f1":..., "f2":..., "f0":..., ... }, ... }
+            { "a": { "f1":..., "f2":..., "f0":..., "confidence":..., "stability":... }, ... }
         into:
-            { "a": (f1, f2, f0), ... }
+            { "a": (f1, f2, f0, confidence, stability), ... }
         """
         out = {}
         if not isinstance(raw_dict, dict):
@@ -172,13 +149,16 @@ class ProfileManager:
         for vowel, entry in raw_dict.items():
             if not isinstance(entry, dict):
                 continue
+            if vowel == "voice_type":
+                continue
 
             f1 = entry.get("f1")
             f2 = entry.get("f2")
-            f0 = entry.get("f0")  # ✅ pitch, not f3
+            f0 = entry.get("f0")
+            conf = entry.get("confidence", 0.0)
+            stab = entry.get("stability", float("inf"))
 
-            # Store as (f1, f2, f0)
-            out[vowel] = (f1, f2, f0)
+            out[vowel] = (f1, f2, f0, conf, stab)
 
         return out
 
@@ -186,7 +166,6 @@ class ProfileManager:
     # Deletion
     # ---------------------------------------------------------
     def delete_profile(self, base):
-        """Delete the JSON + model file for a profile."""
         json_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         model_path = json_path.replace("_profile.json", "_model.pkl")
 
@@ -195,7 +174,6 @@ class ProfileManager:
         if os.path.exists(model_path):
             os.remove(model_path)
 
-        # If it was active, clear active_profile.json
         if self.active_profile_name == base:
             self.active_profile_name = None
             active_path = os.path.join(self.profiles_dir, self.ACTIVE_FILE)

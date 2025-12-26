@@ -1,14 +1,19 @@
 # analysis/vowel.py
-import logging
-from typing import Optional, Mapping, Any, Dict, Tuple
-
 import numpy as np
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, Tuple
 
 from analysis.vowel_data import FORMANTS, PITCH_RANGES
 
-logger = logging.getLogger(__name__)
 
-FORMANT_TOLERANCE = 0.3  # base ±30%
+FORMANT_TOLERANCE = 0.30  # ±30% default
+
+
+@dataclass
+class VowelResult:
+    vowel: Optional[str]
+    confidence: float
+    reason: str
 
 
 # ---------------------------------------------------------
@@ -21,22 +26,19 @@ def get_vowel_ranges(
 ) -> Optional[Tuple[float, float, float, float]]:
     """
     Return plausible F1/F2 ranges for a given voice type and vowel.
-    If a calibrated profile is provided, use it as the center.
+    Calibration overrides reference centers.
     """
-
-    # 1. If calibrated profile exists, use it
+    # 1. Calibration-aware
     if calibrated and vowel in calibrated:
         f1 = calibrated[vowel].get("f1")
         f2 = calibrated[vowel].get("f2")
         if f1 and f2:
-            # Wider windows for back/rounded vowels
             if vowel == "ɑ":
-                tol = 0.80   # very generous during calibration
+                tol = 0.80
             elif vowel in ("ɔ", "u"):
                 tol = 0.50
             else:
                 tol = FORMANT_TOLERANCE
-
             return (
                 f1 * (1 - tol),
                 f1 * (1 + tol),
@@ -44,7 +46,7 @@ def get_vowel_ranges(
                 f2 * (1 + tol),
             )
 
-    # 2. Otherwise use preset reference formants
+    # 2. Reference fallback
     vt = voice_type.lower()
     if vt not in FORMANTS:
         vt = "tenor"
@@ -82,82 +84,50 @@ def is_plausible_formants(
 ):
     """
     Check plausibility of F1/F2 values for a given voice type and vowel.
-    Uses:
-      - global physiological limits
-      - vowel-specific ranges (reference + tolerance)
-      - calibrated profile (if provided)
     """
-
-    # -------------------------
-    # Basic validity checks
-    # -------------------------
     if f1 is None or f2 is None:
         return False, "missing formant"
-
     if np.isnan(f1) or np.isnan(f2):
         return False, "nan formant"
-
-    # Swapped formants
     if f1 > f2:
-        return False, "f1 > f2 (swapped)"
-
-    # Global physiological minimums
+        return False, "swapped"
     if f1 < 120 or f2 < 300:
-        return False, "formants too low"
+        return False, "too low"
 
-    # -------------------------
-    # Get vowel-specific ranges
-    # -------------------------
     ranges = get_vowel_ranges(voice_type, vowel, calibrated)
-
-    # If no vowel or no ranges, accept
     if vowel is None or not ranges:
         return True, "ok"
 
     f1_low, f1_high, f2_low, f2_high = ranges
 
-    # -------------------------
     # Back vowels: F2 is the anchor
-    # -------------------------
     if vowel in ("ɔ", "u"):
-        # F2 is the main cue: if it's wrong, reject
         if not (f2_low <= f2 <= f2_high):
             return False, "f2-out-of-range"
-
-        # F1 can drift more; if it's outside, we still accept but note drift
         if not (f1_low <= f1 <= f1_high):
-            return True, "f1-drift-allowed"
-
+            return True, "f1-drift"
         return True, "ok"
 
-    # -------------------------
     # Standard vowels
-    # -------------------------
     if not (f1_low <= f1 <= f1_high):
-        return False, f"f1 out of range ({f1:.0f} Hz)"
-
+        return False, f"f1 out of range ({f1:.0f})"
     if not (f2_low <= f2 <= f2_high):
-        return False, f"f2 out of range ({f2:.0f} Hz)"
+        return False, f"f2 out of range ({f2:.0f})"
 
     return True, "ok"
 
 
 def is_plausible_pitch(f0: Optional[float], voice_type: str = "tenor"):
-    """Check plausibility of pitch F0 for a given voice type."""
     if f0 is None or np.isnan(f0):
         return False, "missing pitch"
-
-    vt = voice_type.lower()
-    low, high = PITCH_RANGES.get(vt, (100.0, 600.0))
-
+    low, high = PITCH_RANGES.get(voice_type.lower(), (100.0, 600.0))
     if not (low <= f0 <= high):
-        return False, f"f0 out of range ({f0:.0f} Hz)"
-
+        return False, f"f0 out of range ({f0:.0f})"
     return True, "ok"
 
 
 # ---------------------------------------------------------
-# Legacy vowel guessing (kept for compatibility)
+# Vowel guessing
 # ---------------------------------------------------------
 def guess_vowel(
     f1: Optional[float],
@@ -165,10 +135,7 @@ def guess_vowel(
     voice_type: str = "bass",
     last_guess: Optional[str] = None,
 ) -> Optional[str]:
-    """
-    Guess the closest vowel based on measured F1/F2 and reference formants.
-    Falls back to last_guess if inputs are missing or implausible.
-    """
+    """Legacy vowel guesser."""
     if f1 is None or f2 is None:
         return last_guess
     if np.isnan(f1) or np.isnan(f2):
@@ -192,11 +159,9 @@ def robust_guess(
     measured_formants,
     voice_type: str = "bass",
 ):
-    """Guess vowel robustly from measured formants."""
+    """Robust vowel guesser with confidence."""
     vt = voice_type if voice_type in FORMANTS else "tenor"
-    ref_map = {
-        v: (f1, f2) for v, (f1, f2, *_) in FORMANTS[vt].items()
-    }
+    ref_map = {v: (f1, f2) for v, (f1, f2, *_) in FORMANTS[vt].items()}
 
     valid = [f for f in measured_formants if f is not None and not np.isnan(f)]
     if len(valid) < 2:
@@ -210,30 +175,3 @@ def robust_guess(
     best, second = sorted(scores.items(), key=lambda kv: kv[1])[:2]
     confidence = second[1] / (best[1] + 1e-6)
     return best[0], float(confidence), second[0]
-
-
-# ---------------------------------------------------------
-# Expected formants (reference only)
-# ---------------------------------------------------------
-def get_expected_formants(
-    voice_type_local: Optional[str],
-    vowel: str,
-    f0: Optional[float] = None,
-    user_offsets_local: Optional[Mapping[str, Any]] = None,
-):
-    """
-    Return expected F1/F2 for a given voice type and vowel.
-    (Calibration-aware logic is handled elsewhere.)
-    """
-    _ = f0
-    _ = user_offsets_local
-
-    vt = voice_type_local.lower() if voice_type_local else "tenor"
-    preset = FORMANTS.get(vt, FORMANTS.get("tenor"))
-    base = preset.get(vowel)
-
-    if not base:
-        return None, None
-
-    f1, f2 = float(base[0]), float(base[1])
-    return int(round(f1)), int(round(f2))

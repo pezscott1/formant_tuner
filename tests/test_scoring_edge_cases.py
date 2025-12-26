@@ -1,4 +1,3 @@
-# tests/test_scoring_edge_cases.py
 from tuner.live_analyzer import LiveAnalyzer
 from analysis.engine import FormantAnalysisEngine
 from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother
@@ -17,24 +16,43 @@ def make_analyzer(profile=None):
 
 def test_no_profile_means_zero_scores():
     la = make_analyzer(profile=None)
-    out = la.process_raw({"f0": 100, "formants": (500, 1500, 200), "vowel_guess": "i"})
+    out = la.process_raw({
+        "f0": 100,
+        "formants": (500, 1500, 200),
+        "vowel_guess": "i",
+        "vowel_confidence": 1.0,
+    })
     assert out["overall"] == 0.0
 
 
 def test_missing_vowel_in_profile():
     la = make_analyzer(profile={"i": (300, 2500, 100)})
-    out = la.process_raw({"f0": 100, "formants": (500, 1500, 200), "vowel_guess": "ɛ"})
+    out = la.process_raw({
+        "f0": 100,
+        "formants": (500, 1500, 200),
+        "vowel_guess": "ɛ",
+        "vowel_confidence": 1.0,
+    })
     assert out["overall"] == 0.0
 
 
 def test_missing_formants_zero_scores():
     la = make_analyzer(profile={"i": (300, 2500, 100)})
-    out = la.process_raw({"f0": 100, "formants":
-                         (None, None, None), "vowel_guess": "i"})
+    out = la.process_raw({
+        "f0": 100,
+        "formants": (None, None, None),
+        "vowel_guess": "i",
+        "vowel_confidence": 1.0,
+    })
     assert out["overall"] == 0.0
 
 
 def test_valid_scoring_produces_positive_values():
     la = make_analyzer(profile={"i": (300, 2500, 100)})
-    out = la.process_raw({"f0": 100, "formants": (310, 2490, 100), "vowel_guess": "i"})
+    out = la.process_raw({
+        "f0": 100,
+        "formants": (310, 2490, 100),
+        "vowel_guess": "i",
+        "vowel_confidence": 1.0,
+    })
     assert out["overall"] > 0.0

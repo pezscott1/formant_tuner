@@ -1,20 +1,40 @@
-# analysis/estimate_pitch
+# analysis/pitch.py
 import numpy as np
+from dataclasses import dataclass
+from typing import Optional
 
 
-def estimate_pitch(frame, sr, fmin=50, fmax=800):  # noqa: C901
+@dataclass
+class PitchResult:
+    f0: Optional[float]
+    confidence: float
+    method: str
+    debug: dict
+
+
+def estimate_pitch(
+    frame: np.ndarray,
+    sr: int,
+    fmin: float = 50.0,
+    fmax: float = 800.0,
+    debug: bool = False,
+) -> PitchResult:
     """
-    Robust autocorrelation-based pitch estimator.
-
-    For very short frames, fall back to the original simple estimator
-    so tests like `test_very_short_frame_returns_high_pitch` still pass.
+    Robust autocorrelation-based pitch estimator with:
+      - short-frame fallback
+      - clipping suppression
+      - parabolic interpolation
+      - confidence scoring
     """
     frame = np.asarray(frame, dtype=float)
     n = frame.size
-    if n == 0:
-        return None
 
-    # Fallback to original behavior for very short frames
+    if n == 0:
+        return PitchResult(None, 0.0, "none", {"reason": "empty"})
+
+    # -------------------------
+    # Very short frame fallback
+    # -------------------------
     if n < 256:
         frame = frame - np.mean(frame)
         corr = np.correlate(frame, frame, mode="full")
@@ -22,22 +42,28 @@ def estimate_pitch(frame, sr, fmin=50, fmax=800):  # noqa: C901
         d = np.diff(corr)
         pos = np.where(d > 0)[0]
         if pos.size == 0:
-            return None
+            return PitchResult(None, 0.0, "short", {"reason": "no rising slope"})
         start = pos[0]
         peak = np.argmax(corr[start:]) + start
-        if peak == 0:
-            return None
-        return float(sr / peak)
+        if peak <= 0:
+            return PitchResult(None, 0.0, "short", {"reason": "peak <= 0"})
+        f0 = sr / peak
+        if not (fmin <= f0 <= fmax):
+            return PitchResult(None, 0.0, "short", {"reason": "out_of_range"})
+        return PitchResult(float(f0), 0.4, "short", {"peak": peak})
 
-    # --- improved path for normal frames (as before) ---
+    # -------------------------
+    # Normal path
+    # -------------------------
     frame = frame - np.mean(frame)
 
+    # Clipping suppression
     clip_level = 0.6 * np.max(np.abs(frame))
     if clip_level > 0:
         frame = np.where(
             frame >= clip_level,
             frame - clip_level,
-            np.where(frame <= -clip_level, frame + clip_level, 0.0),
+            np.where(frame <= -clip_level, frame + clip_level, frame),
         )
 
     corr = np.correlate(frame, frame, mode="full")
@@ -45,17 +71,18 @@ def estimate_pitch(frame, sr, fmin=50, fmax=800):  # noqa: C901
 
     min_lag = int(sr / fmax)
     max_lag = int(sr / fmin)
-    if max_lag >= len(corr):
-        max_lag = len(corr) - 1
+    max_lag = min(max_lag, len(corr) - 1)
+
     if min_lag >= max_lag:
-        return None
+        return PitchResult(None, 0.0, "none", {"reason": "lag window invalid"})
 
     segment = corr[min_lag:max_lag]
     if segment.size == 0:
-        return None
+        return PitchResult(None, 0.0, "none", {"reason": "empty segment"})
 
     peak_idx = np.argmax(segment) + min_lag
 
+    # Parabolic interpolation
     if 1 <= peak_idx < len(corr) - 1:
         y0, y1, y2 = corr[peak_idx - 1], corr[peak_idx], corr[peak_idx + 1]
         denom = (y0 - 2 * y1 + y2)
@@ -63,10 +90,22 @@ def estimate_pitch(frame, sr, fmin=50, fmax=800):  # noqa: C901
             peak_idx = peak_idx + 0.5 * (y0 - y2) / denom
 
     if peak_idx <= 0:
-        return None
+        return PitchResult(None, 0.0, "none", {"reason": "peak <= 0"})
 
     f0 = sr / peak_idx
     if not (fmin <= f0 <= fmax):
-        return None
+        return PitchResult(None, 0.0, "none", {"reason": "out_of_range"})
 
-    return float(f0)
+    # Confidence: normalized autocorrelation peak
+    raw_peak = corr[int(round(peak_idx))]
+    conf = float(np.clip(raw_peak / (corr[0] + 1e-6), 0.0, 1.0))
+
+    dbg = {}
+    if debug:
+        dbg = {
+            "peak_idx": peak_idx,
+            "raw_peak": float(raw_peak),
+            "corr0": float(corr[0]),
+        }
+
+    return PitchResult(float(f0), conf, "autocorr", dbg)

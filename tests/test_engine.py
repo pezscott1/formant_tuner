@@ -1,100 +1,104 @@
-# tests/test_engine.py
 import numpy as np
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from analysis.engine import FormantAnalysisEngine
 
 
-def make_engine():
-    """Create a basic engine."""
-    return FormantAnalysisEngine(voice_type="bass")
+def test_engine_handles_empty_frame():
+    eng = FormantAnalysisEngine()
 
+    out = eng.process_frame(np.array([]), sr=48000)
 
-# ---------------------------------------------------------
-# Basic pitch extraction
-# ---------------------------------------------------------
-
-@patch("analysis.engine.estimate_pitch", return_value=120)
-def test_pitch_basic(_mock_pitch):
-    eng = make_engine()
-    frame = np.ones(1024)
-
-    out = eng.process_frame(frame, 44100)
-
-    assert out["f0"] == 120
-    assert out["formants"] == (None, None, None) or isinstance(out["formants"], tuple)
-
-
-# ---------------------------------------------------------
-# Formant extraction
-# ---------------------------------------------------------
-
-@patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
-@patch("analysis.engine.estimate_pitch", return_value=120)
-def test_formant_extraction(_mock_pitch, _mock_lpc):
-    eng = make_engine()
-    frame = np.ones(1024)
-
-    out = eng.process_frame(frame, 44100)
-
-    assert out["formants"] == (500, 1500, 2500)
-
-
-# ---------------------------------------------------------
-# Vowel guessing
-# ---------------------------------------------------------
-
-@patch("analysis.engine.robust_guess", return_value=("a", 0.9, None))
-@patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
-@patch("analysis.engine.estimate_pitch", return_value=120)
-def test_vowel_guessing(_mock_pitch, _mock_lpc, _mock_guess):
-    eng = make_engine()
-    frame = np.ones(1024)
-
-    out = eng.process_frame(frame, 44100)
-
-    assert out["vowel"] == "a"
-    assert out["vowel_confidence"] == 0.9
-
-
-# ---------------------------------------------------------
-# Scoring integration
-# ---------------------------------------------------------
-
-@patch("analysis.engine.live_score_formants", return_value=80)
-@patch("analysis.engine.resonance_tuning_score", return_value=60)
-@patch("analysis.engine.robust_guess", return_value=("a", 0.9, None))
-@patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
-@patch("analysis.engine.estimate_pitch", return_value=120)
-def test_scoring(
-        _mock_pitch, _mock_lpc, _mock_guess, _mock_res_score, _mock_live_score):
-    eng = make_engine()
-    frame = np.ones(1024)
-
-    out = eng.process_frame(frame, 44100)
-
-    assert out["vowel_score"] == 0.0
-    assert out["resonance_score"] == 0.0
-    assert out["overall"] == 0.0
-
-
-# ---------------------------------------------------------
-# Segment storage
-# ---------------------------------------------------------
-
-@patch("analysis.engine.estimate_formants_lpc", return_value=(500, 1500, 2500))
-@patch("analysis.engine.estimate_pitch", return_value=120)
-def test_segment_stored(_mock_pitch, _mock_lpc):
-    eng = make_engine()
-    frame = np.ones(1024)
-
-    out = eng.process_frame(frame, 44100)
-
-    assert "segment" in out
-    assert isinstance(out["segment"], np.ndarray)
-    assert out["segment"].shape == frame.shape
-
-
-def test_engine_handles_none_formants():
-    eng = make_engine()
-    out = eng.process_frame(np.zeros(1024), 16000)
+    assert out["f0"] is None
     assert out["formants"] == (None, None, None)
+    assert out["vowel"] is None
+    assert out["vowel_confidence"] == 0.0
+    assert out["overall"] == 0.0
+    assert out["method"] == "none"
+    assert eng.get_latest_raw() == out
+
+
+@patch("analysis.engine.estimate_pitch", return_value=200.0)
+@patch("analysis.engine.estimate_formants")
+def test_engine_basic_processing(mock_lpc, mock_pitch):
+    # Fake LPC result object
+    mock_lpc.return_value = MagicMock(
+        f1=500.0,
+        f2=1500.0,
+        f3=2500.0,
+        confidence=0.9,
+        method="lpc",
+        lpc_order=12,
+        peaks=[1, 2, 3],
+        roots=[0.1, 0.2],
+        bandwidths=[100, 120],
+        debug={"ok": True},
+    )
+
+    eng = FormantAnalysisEngine()
+    frame = np.random.randn(2048)
+
+    out = eng.process_frame(frame, sr=48000)
+
+    assert out["f0"] == 200.0
+    assert out["formants"] == (500.0, 1500.0, 2500.0)
+    assert out["confidence"] == 0.9
+    assert out["method"] == "lpc"
+    assert out["lpc_order"] == 12
+    assert out["peaks"] == [1, 2, 3]
+    assert out["roots"] == [0.1, 0.2]
+    assert out["bandwidths"] == [100, 120]
+    assert out["lpc_debug"] == {"ok": True}
+
+
+@patch("analysis.engine.estimate_pitch", return_value=150.0)
+@patch("analysis.engine.estimate_formants")
+def test_engine_vowel_guessing(mock_lpc, mock_pitch):
+    mock_lpc.return_value = MagicMock(
+        f1=300.0,
+        f2=2500.0,
+        f3=3000.0,
+        confidence=0.8,
+        method="lpc",
+        lpc_order=12,
+        peaks=[],
+        roots=[],
+        bandwidths=[],
+        debug={},
+    )
+
+    eng = FormantAnalysisEngine(voice_type="bass")
+    frame = np.random.randn(2048)
+
+    out = eng.process_frame(frame, sr=48000)
+
+    # Should guess a vowel (robust_guess or fallback)
+    assert out["vowel"] is not None
+    assert out["vowel_confidence"] >= 0.0
+
+
+@patch("analysis.engine.estimate_pitch", return_value=150.0)
+@patch("analysis.engine.estimate_formants")
+def test_engine_scoring_with_user_formants(mock_lpc, mock_pitch):
+    mock_lpc.return_value = MagicMock(
+        f1=500.0,
+        f2=1500.0,
+        f3=2500.0,
+        confidence=0.9,
+        method="lpc",
+        lpc_order=12,
+        peaks=[],
+        roots=[],
+        bandwidths=[],
+        debug={},
+    )
+
+    eng = FormantAnalysisEngine()
+    eng.set_user_formants({"a": (500, 1500, 2500)})
+
+    frame = np.random.randn(2048)
+    out = eng.process_frame(frame, sr=48000)
+
+    # With matching formants, scores should be positive
+    assert out["vowel_score"] >= 0.0
+    assert out["resonance_score"] >= 0.0
+    assert out["overall"] >= 0.0

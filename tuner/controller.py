@@ -8,15 +8,27 @@ from tuner.profile_controller import ProfileManager
 
 
 class Tuner:
-    def __init__(self, engine=None, voice_type="bass",
-                 profiles_dir="profiles", sample_rate=44100):
+    def __init__(
+        self,
+        engine=None,
+        voice_type="bass",
+        profiles_dir="profiles",
+        sample_rate=48000,   # UPDATED: match your new mic
+    ):
         # Shared DSP engine
         self.engine = engine or FormantAnalysisEngine(voice_type=voice_type)
 
-        # Smoothers
-        self.pitch_smoother = PitchSmoother(sr=sample_rate)
-        self.formant_smoother = MedianSmoother()
-        self.label_smoother = LabelSmoother()
+        # Smoothers (confidence-aware)
+        self.pitch_smoother = PitchSmoother(
+            sr=sample_rate,
+            min_confidence=0.25,
+        )
+        self.formant_smoother = MedianSmoother(
+            min_confidence=0.25,
+        )
+        self.label_smoother = LabelSmoother(
+            min_confidence=0.25,
+        )
 
         # Live analyzer
         self.live_analyzer = LiveAnalyzer(
@@ -39,14 +51,36 @@ class Tuner:
     # Profile operations
     # ---------------------------------------------------------
     def load_profile(self, base_name):
-        """Load a profile and apply it to the engine."""
-        self.active_profile = self.profile_manager.apply_profile(base_name)
+        """
+        Load a profile and apply it to the engine.
+        """
 
-        if isinstance(self.active_profile, str):
-            # ProfileManager.apply_profile returns base name
+        # Step 1: Apply profile
+        applied = self.profile_manager.apply_profile(base_name)
+        self.active_profile = applied
+
+        # If apply_profile returned a string → treat as error
+        if isinstance(applied, str) and applied != base_name:
+            # Reset engine.voice_type to tuner.voice_type
             self.engine.voice_type = self.voice_type
+            return applied
 
-        return self.active_profile
+        # Step 2: Load raw JSON
+        raw = self.profile_manager.load_profile_json(base_name)
+
+        # Step 3: Extract (f1, f2, f3, conf, stab)
+        extracted = self.profile_manager.extract_formants(raw)
+
+        # Step 4: Build user_formants with default conf/stab
+        cleaned = {
+            vowel: (f1, f2, f3, 0.0, float("inf"))
+            for vowel, (f1, f2, f3, *_) in extracted.items()
+        }
+
+        # Step 5: Assign to engine
+        self.engine.user_formants = cleaned
+
+        return applied
 
     def list_profiles(self):
         return self.profile_manager.list_profiles()
@@ -55,25 +89,12 @@ class Tuner:
         self.profile_manager.delete_profile(base_name)
 
     # ---------------------------------------------------------
-    # Audio control placeholders (no-op)
-    # ---------------------------------------------------------
-    def start(self):
-        """Deprecated: mic control is handled by TunerWindow."""
-        return
-
-    def stop(self):
-        """Deprecated: mic control is handled by TunerWindow."""
-        return
-
-    # ---------------------------------------------------------
-    # Analysis interface (optional, calibration-aware)
+    # Analysis interface
     # ---------------------------------------------------------
     def poll_latest_processed(self):
         """
         Read latest raw frame from engine, pass through LiveAnalyzer,
         then (optionally) classify the vowel using the active profile.
-
-        Returns processed dict or None.
         """
         raw = self.engine.get_latest_raw()
         if raw is None:
@@ -87,24 +108,24 @@ class Tuner:
         if not self.active_profile or "formants" not in processed:
             return processed
 
+        # Reject unstable frames (optional but recommended)
+        if not processed.get("stable", True):
+            processed["profile_vowel"] = None
+            processed["profile_confidence"] = 0.0
+            return processed
+
         f1, f2, _ = processed["formants"]
         vowel, confidence = self._classify_vowel_from_profile(f1, f2)
 
         processed["profile_vowel"] = vowel
         processed["profile_confidence"] = confidence
 
-        # Note: no extra label smoothing here; that lives in LiveAnalyzer.
         return processed
 
     # ---------------------------------------------------------
     # Calibration-aware vowel classifier
     # ---------------------------------------------------------
     def _classify_vowel_from_profile(self, f1, f2):
-        """
-        Use the active profile as vowel centroids.
-        Compute distance in normalized F1/F2 space.
-        Returns (vowel, confidence).
-        """
         if f1 is None or f2 is None:
             return None, 0.0
 
@@ -113,15 +134,13 @@ class Tuner:
             return None, 0.0
 
         # Collect centroids
-        centroids = {}
-        for vowel, data in profile.items():
-            if not isinstance(data, dict):
-                continue
-            pf1 = data.get("f1")
-            pf2 = data.get("f2")
-            if pf1 is None or pf2 is None:
-                continue
-            centroids[vowel] = (pf1, pf2)
+        centroids = {
+            vowel: (data.get("f1"), data.get("f2"))
+            for vowel, data in profile.items()
+            if isinstance(data, dict)
+            and data.get("f1") is not None
+            and data.get("f2") is not None
+        }
 
         if not centroids:
             return None, 0.0
@@ -148,7 +167,5 @@ class Tuner:
                 best_dist = dist
                 best_vowel = vowel
 
-        # Convert distance to confidence (simple heuristic)
         confidence = float(np.exp(-best_dist))
-
         return best_vowel, confidence

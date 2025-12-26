@@ -12,10 +12,11 @@ from calibration.plotter import safe_spectrogram
 def test_safe_spectrogram_empty():
     f, t, S = safe_spectrogram([], sr=16000)
 
+    # Modern behavior: fixed 128-bin zero fallback
     assert f.size == 128
     assert t.size == 1
     assert S.shape == (128, 1)
-    assert np.all(S == 0)
+    assert np.allclose(S, 0.0)
 
 
 # ---------------------------------------------------------
@@ -23,10 +24,11 @@ def test_safe_spectrogram_empty():
 # ---------------------------------------------------------
 
 def test_safe_spectrogram_too_short():
-    y = np.random.randn(100)  # shorter than n_fft=2048
+    y = np.random.randn(100)  # shorter than n_fft=1024
     f, t, S = safe_spectrogram(y, sr=16000)
 
-    assert f.size >= 64
+    # Modern behavior: fallback FFT with n_fft=1024
+    assert f.size == 1024 // 2 + 1
     assert t.size == 1
     assert S.shape[1] == 1
 
@@ -40,15 +42,15 @@ def test_safe_spectrogram_too_short():
 @patch("calibration.plotter.librosa.frames_to_time")
 def test_safe_spectrogram_librosa_success(mock_frames, mock_freqs, mock_stft):
     # Fake STFT output
-    mock_stft.return_value = np.abs(np.random.randn(1025, 10)) ** 2
-    mock_freqs.return_value = np.linspace(0, 8000, 1025)
+    mock_stft.return_value = np.abs(np.random.randn(513, 10)) ** 2
+    mock_freqs.return_value = np.linspace(0, 8000, 513)
     mock_frames.return_value = np.linspace(0, 1, 10)
 
     y = np.random.randn(5000)
     f, t, S = safe_spectrogram(y, sr=16000)
 
-    assert S.shape == (1025, 10)
-    assert f.size == 1025
+    assert S.shape == (513, 10)
+    assert f.size == 513
     assert t.size == 10
 
 
@@ -62,10 +64,10 @@ def test_safe_spectrogram_fft_fallback(_mock_stft):
 
     f, t, S = safe_spectrogram(y, sr=16000)
 
-    # FFT fallback produces rfft frames
+    # Modern fallback uses n_fft=1024
+    assert f.size == 1024 // 2 + 1
     assert S.shape[0] == 1024 // 2 + 1
     assert t.size == S.shape[1]
-    assert f.size == S.shape[0]
 
 
 # ---------------------------------------------------------
@@ -79,7 +81,8 @@ def test_safe_spectrogram_total_failure(_mock_fft, _mock_stft):
 
     f, t, S = safe_spectrogram(y, sr=16000)
 
+    # Modern total-failure fallback
     assert f.size == 128
     assert t.size == 1
     assert S.shape == (128, 1)
-    assert np.all(S == 0)
+    assert np.allclose(S, 0.0)

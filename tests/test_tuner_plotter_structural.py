@@ -160,5 +160,5 @@ def test_update_vowel_chart_artist_removal():
         overall=0.85,
     )
 
-    assert window.vowel_measured_artist is not first_point
-    assert window.vowel_line_artist is not first_line
+    assert window.vowel_measured_artist is None
+    assert window.vowel_line_artist is None
