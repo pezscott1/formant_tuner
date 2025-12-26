@@ -78,7 +78,7 @@ class CalibrationWindow(QMainWindow):
             )
         else:
             self.analyzer = analyzer
-
+        self.analyzer.reset()  # LiveAnalyzer.reset()
         # Capture timeout
         self.capture_timeout = 3.0
 
@@ -221,114 +221,87 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
-    def _poll_audio(self):  # noqa: C901
-        raw = self.engine.get_latest_raw()
+    def _poll_audio(self):
+        # Pull latest analyzer frame (NOT engine)
+        raw = self.analyzer.get_latest_raw()
         if raw is None:
             return
 
-        print("RAW BEFORE UNWRAP:", type(raw.get("f0")), raw.get("f0"))
-        print("RAW FORMANTS BEFORE UNWRAP:",
-              type(raw.get("formants")), raw.get("formants"))
-
-        # --------- Unwrap pitch (PitchResult → float) ---------
+        # Unwrap pitch
         pitch = raw.get("f0")
         if pitch is not None and hasattr(pitch, "f0"):
-            raw["f0"] = pitch.f0
-            raw["pitch_confidence"] = pitch.confidence
+            raw_f0 = pitch.f0
         else:
-            # If it's already a float or None, don't touch it
-            raw["pitch_confidence"] = raw.get("pitch_confidence", 0.0)
+            raw_f0 = raw.get("f0")
 
-        # --------- Unwrap formants only if it's a FormantResult ---------
+        # Unwrap formants
         form = raw.get("formants")
         if form is not None and hasattr(form, "f1"):
-            # FormantResult case
-            raw["formants"] = (form.f1, form.f2, form.f3)
-            raw["confidence"] = getattr(form, "confidence", raw.get("confidence", 0.0))
+            f1, f2, f3 = form.f1, form.f2, form.f3
+            lpc_conf = getattr(form, "confidence", raw.get("confidence", 0.0))
         else:
-            # Tuple/list or already-unwrapped formants: leave as-is
-            # Do NOT overwrite raw["formants"] here
-            raw["confidence"] = raw.get("confidence", 0.0)
+            f1, f2, f3 = raw.get("formants", (None, None, None))
+            lpc_conf = raw.get("confidence", 0.0)
 
-        # --------- Now run through LiveAnalyzer ---------
-        frame = self.analyzer.process_raw(raw)
-        self._last_result = frame
+        stable = raw.get("stable", True)
 
-        f0 = frame["f0"]
-        f1, f2, f3 = frame["formants"]
-        lpc_conf = frame["confidence"]
-        stable = frame["stable"]
-
+        # Debug
         print("DEBUG:", f1, f2, f3, lpc_conf, stable)
 
-        # ---------------------------------------------------------
-        # Capture gating
-        # ---------------------------------------------------------
+        # -----------------------------
+        # Capture gating (calibration)
+        # -----------------------------
         target = self.state.current_vowel
         if (
                 target is not None
                 and f1 is not None
                 and f2 is not None
                 and lpc_conf >= 0.25
-                and stable
         ):
-            ok, _ = is_plausible_formants(
-                f1, f2,
-                voice_type=self.session.voice_type,
-                vowel=target,
-            )
-            if ok:
-                self._capture_buffer.append((f1, f2, f0))
-                print("CAPTURED FRAME:", target, f1, f2, f0)
+            self._capture_buffer.append((f1, f2, raw_f0))
+            print("CAPTURED FRAME (CALIB):", target, f1, f2, raw_f0)
 
-        # ---------------------------------------------------------
+        # -----------------------------
         # Spectrogram
-        # ---------------------------------------------------------
+        # -----------------------------
         segment = raw.get("segment")
         if segment is None:
             return
 
-        try:
-            seg_arr = np.asarray(segment, dtype=float).flatten()
-            if seg_arr.size == 0:
-                return
+        seg_arr = np.asarray(segment, dtype=float).flatten()
+        if seg_arr.size == 0:
+            return
 
-            self._spec_buffer = np.concatenate((self._spec_buffer, seg_arr))
+        self._spec_buffer = np.concatenate((self._spec_buffer, seg_arr))
 
-            sr = 48000
-            max_seconds = 1.0
-            max_samples = int(sr * max_seconds)
+        sr = 48000
+        max_seconds = 1.0
+        max_samples = int(sr * max_seconds)
 
-            if self._spec_buffer.size > max_samples:
-                self._spec_buffer = self._spec_buffer[-max_samples:]
+        if self._spec_buffer.size > max_samples:
+            self._spec_buffer = self._spec_buffer[-max_samples:]
 
-            if self._spec_buffer.size > 1024:
-                freqs, times, S = safe_spectrogram(
-                    self._spec_buffer,
-                    sr,
-                    n_fft=1024,
-                    hop_length=256,
-                )
+        if self._spec_buffer.size > 1024:
+            freqs, times, S = safe_spectrogram(
+                self._spec_buffer,
+                sr,
+                n_fft=1024,
+                hop_length=256,
+            )
+            update_artists(
+                self,
+                freqs,
+                times,
+                S,
+                f1,
+                f2,
+                target,
+            )
 
-                update_artists(
-                    self,
-                    freqs,
-                    times,
-                    S,
-                    f1,
-                    f2,
-                    target,
-                )
-
-        except Exception:
-            traceback.print_exc()
-
+        # Draw throttled
         now = time.time()
         if now - self._last_draw >= self._min_draw_interval:
-            try:
-                self.canvas.draw_idle()
-            except Exception:
-                pass
+            self.canvas.draw_idle()
             self._last_draw = now
 
     # ---------------------------------------------------------

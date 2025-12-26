@@ -63,34 +63,36 @@ class PitchSmoother:
     # -------------------------
     # Update logic (test‑expected)
     # -------------------------
-    def update(self, new, confidence=None):
-        if confidence is None:
-            confidence = 1.0
+    def update(self, new, confidence=1.0):
+        # --- unwrap PitchResult objects ---
+        if hasattr(new, "frequency"):
+            new = new.frequency
 
-        # Confidence gating
+        # ignore None
+        if new is None:
+            return self.current
+
+        try:
+            new = float(new)
+        except Exception:
+            return self.current
+
+        # first frame
+        if self.current is None:
+            self.current = new
+            return self.current
+
+        # confidence gating
         if confidence < self.min_confidence:
             return self.current
 
-        # First frame
-        if self.current is None:
-            self.current = float(new) if new is not None else None
+        # jump suppression
+        if abs(new - self.current) > self.jump_limit:
             return self.current
 
-        # Octave correction overrides smoothing
-        corrected = self._octave_correct(new)
-        if corrected != new:
-            self.current = corrected
-            return corrected
-
-        # Jump suppression only when jump_limit is small (<50)
-        if not self.hps_enabled and self.jump_limit < 50:
-            if abs(new - self.current) > self.jump_limit:
-                return self.current
-
         # EMA smoothing
-        out = self.alpha * new + (1 - self.alpha) * self.current
-        self.current = out
-        return out
+        self.current = self.alpha * new + (1 - self.alpha) * self.current
+        return self.current
 
 
 # ---------------------------------------------------------
@@ -98,10 +100,11 @@ class PitchSmoother:
 # ---------------------------------------------------------
 class MedianSmoother:
     """
-    Rolling median smoother for F1/F2 with:
+    Rolling median smoother for F1/F2/F3 with:
       - outlier rejection
       - LPC confidence gating
       - ridge suppression for 48 kHz mics
+      - 3‑formant stability tracking
     """
 
     def __init__(self, window=5, outlier_thresh=500, min_confidence=0.25):
@@ -109,52 +112,80 @@ class MedianSmoother:
         self.outlier_thresh = outlier_thresh
         self.min_confidence = min_confidence
 
-        self.buffer = deque(maxlen=window)
+        # Three independent rolling buffers
+        self.buf_f1 = deque(maxlen=window)
+        self.buf_f2 = deque(maxlen=window)
+        self.buf_f3 = deque(maxlen=window)
+
+        # Stability tracker (now 3‑formant aware)
         self.stability = FormantStabilityTracker(
             window_size=6,
             var_threshold=1e5,
             min_full_frames=3,
             trim_pct=10,
         )
+
         self.formants_stable = False
         self._stability_score = float("inf")
 
     def reset(self):
-        self.buffer.clear()
+        self.buf_f1.clear()
+        self.buf_f2.clear()
+        self.buf_f3.clear()
 
-    def update(self, f1, f2, confidence=1.0):
+    def update(self, f1=None, f2=None, f3=None, confidence=1.0):
         # Reject low-confidence LPC frames
         if confidence < self.min_confidence:
-            return None, None
+            return None, None, None
 
+        # Convert to floats or NaN
         f1 = np.nan if f1 is None else float(f1)
         f2 = np.nan if f2 is None else float(f2)
+        f3 = np.nan if f3 is None else float(f3)
 
         # Suppress 2600 Hz ridge (mic artifact)
         if 2400 < f1 < 2800:
             f1 = np.nan
         if 2400 < f2 < 2800:
             f2 = np.nan
+        if 2400 < f3 < 2800:
+            f3 = np.nan
 
-        self.buffer.append((f1, f2))
-        arr = np.array(self.buffer, dtype=float)
+        # Append to buffers
+        self.buf_f1.append(f1)
+        self.buf_f2.append(f2)
+        self.buf_f3.append(f3)
 
-        # Outlier rejection
-        if len(arr) >= 3:
-            med_f1 = np.nanmedian(arr[:, 0])
-            med_f2 = np.nanmedian(arr[:, 1])
+        # Convert to arrays
+        arr_f1 = np.asarray(self.buf_f1, dtype=float)
+        arr_f2 = np.asarray(self.buf_f2, dtype=float)
+        arr_f3 = np.asarray(self.buf_f3, dtype=float)
 
-            arr[:, 0][np.abs(arr[:, 0] - med_f1) > self.outlier_thresh] = np.nan
-            arr[:, 1][np.abs(arr[:, 1] - med_f2) > self.outlier_thresh] = np.nan
+        # Outlier rejection for each formant
+        def reject_outliers(arr):
+            if arr.size < 3 or not np.any(np.isfinite(arr)):
+                return arr
+            med = np.nanmedian(arr)
+            mask = np.abs(arr - med) > self.outlier_thresh
+            arr = arr.copy()
+            arr[mask] = np.nan
+            return arr
 
-        f1_s = None if np.all(np.isnan(arr[:, 0])) else float(np.nanmedian(arr[:, 0]))
-        f2_s = None if np.all(np.isnan(arr[:, 1])) else float(np.nanmedian(arr[:, 1]))
+        arr_f1 = reject_outliers(arr_f1)
+        arr_f2 = reject_outliers(arr_f2)
+        arr_f3 = reject_outliers(arr_f3)
 
-        stable_bool, score = self.stability.update(f1_s, f2_s)
+        # Compute medians
+        f1_s = None if np.all(np.isnan(arr_f1)) else float(np.nanmedian(arr_f1))
+        f2_s = None if np.all(np.isnan(arr_f2)) else float(np.nanmedian(arr_f2))
+        f3_s = None if np.all(np.isnan(arr_f3)) else float(np.nanmedian(arr_f3))
+
+        # Stability tracking (now 3‑formant aware)
+        stable_bool, score = self.stability.update(f1_s, f2_s, f3_s)
         self.formants_stable = stable_bool
         self._stability_score = score
 
-        return f1_s, f2_s
+        return f1_s, f2_s, f3_s
 
 
 # ---------------------------------------------------------
@@ -211,10 +242,11 @@ class LabelSmoother:
 # ---------------------------------------------------------
 class FormantStabilityTracker:
     """
-    Tracks stability of F1/F2 over time.
-    Now detects:
-      - ridge collapse (F1/F2 both near 2600 Hz)
+    Tracks stability of F1/F2/F3 over time.
+    Detects:
+      - ridge collapse (all formants near 2600 Hz)
       - low-confidence frames
+      - high variance instability
     """
 
     def __init__(
@@ -231,15 +263,19 @@ class FormantStabilityTracker:
 
         self.f1_buf = deque(maxlen=self.window_size)
         self.f2_buf = deque(maxlen=self.window_size)
+        self.f3_buf = deque(maxlen=self.window_size)
 
-    def update(self, f1, f2):
+    def update(self, f1, f2, f3):
         self.f1_buf.append(np.nan if f1 is None else float(f1))
         self.f2_buf.append(np.nan if f2 is None else float(f2))
+        self.f3_buf.append(np.nan if f3 is None else float(f3))
 
         f1_arr = np.asarray(self.f1_buf, dtype=float)
         f2_arr = np.asarray(self.f2_buf, dtype=float)
+        f3_arr = np.asarray(self.f3_buf, dtype=float)
 
-        full_mask = np.isfinite(f1_arr) & np.isfinite(f2_arr)
+        # Only frames where all 3 formants are finite
+        full_mask = np.isfinite(f1_arr) & np.isfinite(f2_arr) & np.isfinite(f3_arr)
         full_count = int(np.sum(full_mask))
 
         if full_count < self.min_full_frames:
@@ -247,27 +283,32 @@ class FormantStabilityTracker:
 
         f1_full = f1_arr[full_mask]
         f2_full = f2_arr[full_mask]
+        f3_full = f3_arr[full_mask]
 
         # Ridge collapse detection
-        if np.all((2400 < f1_full) & (f1_full < 2800)) and np.all(
-            (2400 < f2_full) & (f2_full < 2800)
-        ):
+        ridge = lambda x: np.all((2400 < x) & (x < 2800))
+        if ridge(f1_full) and ridge(f2_full) and ridge(f3_full):
             return False, float("inf")
 
         # Robust trimming
-        if self.trim_pct > 0 and f1_full.size > 2:
-            lo = np.percentile(f1_full, self.trim_pct / 2.0)
-            hi = np.percentile(f1_full, 100 - self.trim_pct / 2.0)
-            f1_full = f1_full[(f1_full >= lo) & (f1_full <= hi)]
+        def trim(arr):
+            if arr.size <= 2 or self.trim_pct <= 0:
+                return arr
+            lo = np.percentile(arr, self.trim_pct / 2.0)
+            hi = np.percentile(arr, 100 - self.trim_pct / 2.0)
+            trimmed = arr[(arr >= lo) & (arr <= hi)]
+            return trimmed if trimmed.size >= self.min_full_frames else arr
 
-        if f1_full.size < self.min_full_frames:
-            f1_full = f1_arr[full_mask]
-            f2_full = f2_arr[full_mask]
+        f1_full = trim(f1_full)
+        f2_full = trim(f2_full)
+        f3_full = trim(f3_full)
 
+        # Variance-based stability
         f1_var = float(np.var(f1_full)) if f1_full.size > 0 else float("inf")
         f2_var = float(np.var(f2_full)) if f2_full.size > 0 else float("inf")
+        f3_var = float(np.var(f3_full)) if f3_full.size > 0 else float("inf")
 
-        stability_score = f1_var + f2_var
+        stability_score = f1_var + f2_var + f3_var
         is_stable = stability_score <= self.var_threshold
 
         return bool(is_stable), float(stability_score)
@@ -275,3 +316,4 @@ class FormantStabilityTracker:
     def reset(self):
         self.f1_buf.clear()
         self.f2_buf.clear()
+        self.f3_buf.clear()

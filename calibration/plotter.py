@@ -64,41 +64,23 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
     ny, nx = arr_db.shape
 
     # ---------------------------------------------------------
-    # Create or update mesh
+    # Always recreate mesh (simplest, most robust)
     # ---------------------------------------------------------
-    if self._spec_mesh is None:
-        self.ax_spec.clear()
-        self._spec_mesh = self.ax_spec.pcolormesh(
-            times_small,
-            freqs[mask],
-            arr_db,
-            shading="auto",
-            cmap="magma"
+    self.ax_spec.clear()
+    self._spec_mesh = self.ax_spec.pcolormesh(
+        times_small,
+        freqs[mask],
+        arr_db,
+        shading="auto",
+        cmap="magma",
+    )
+
+    if not hasattr(self, "_spec_colorbar") or self._spec_colorbar is None:
+        self._spec_colorbar = self.ax_spec.figure.colorbar(
+            self._spec_mesh, ax=self.ax_spec, fraction=0.046, pad=0.04
         )
-
-        if not hasattr(self, "_spec_colorbar") or self._spec_colorbar is None:
-            self._spec_colorbar = self.ax_spec.figure.colorbar(
-                self._spec_mesh, ax=self.ax_spec, fraction=0.046, pad=0.04
-            )
-
     else:
-        try:
-            expected_size = ny * nx
-            current_size = self._spec_mesh.get_array().size
-
-            if current_size != expected_size:
-                self.ax_spec.clear()
-                self._spec_mesh = self.ax_spec.pcolormesh(
-                    times_small,
-                    freqs[mask],
-                    arr_db,
-                    shading="auto",
-                    cmap="magma"
-                )
-            else:
-                self._spec_mesh.set_array(arr_db.ravel())
-        except Exception:
-            traceback.print_exc()
+        self._spec_colorbar.update_normal(self._spec_mesh)
 
     # ---------------------------------------------------------
     # Formant overlays during capture (target lines)

@@ -428,8 +428,14 @@ class TunerWindow(QMainWindow):
                 if status:
                     print("[AUDIO STATUS]", status)
 
+                # Ensure float64
                 mono = indata[:, 0].astype(np.float64, copy=False)
-                self.live_analyzer.submit_audio_segment(mono)
+
+                try:
+                    self.analyzer.process_frame(mono, self.sample_rate)
+                except Exception as error:
+                    print("[AUDIO CALLBACK ERROR]", repr(error))
+                    traceback.print_exc()
 
             try:
                 self.stream = sd.InputStream(
@@ -438,7 +444,6 @@ class TunerWindow(QMainWindow):
                     callback=callback,
                 )
                 self.stream.start()
-                self.live_analyzer.start_worker()  # NEW
                 print("[AUDIO] Microphone stream started")
             except Exception as e:
                 self.stream = None
@@ -460,32 +465,26 @@ class TunerWindow(QMainWindow):
                 pass
             finally:
                 self.stream = None
-                self.live_analyzer.stop_worker()  # NEW
                 self.live_analyzer.reset()
 
     # ---------------------------------------------------------
     # Display update
     # ---------------------------------------------------------
     def _update_display(self):  # noqa: C901
-        # Only update if mic is running
         if self.stream is None or not self.stream.active:
             return
 
-        # Pull the most recent processed frame
-        processed = None
-        try:
-            while True:
-                processed = self.live_analyzer.processed_queue.get_nowait()
-        except Exception:
-            pass
+        raw = self.analyzer.get_latest_raw()
+        if raw is None:
+            return
 
-        if not processed:
+        processed = self.live_analyzer.process_raw(raw)
+        if processed is None:
             return
 
         f0 = processed["f0"]
         f1, f2, f3 = processed["formants"]
-        vowel_raw = processed["vowel_guess"]
-        vowel_smooth = processed["vowel"]
+        vowel = processed["vowel"]
         vowel_score = processed["vowel_score"]
         resonance_score = processed["resonance_score"]
         overall = processed["overall"]
@@ -497,7 +496,7 @@ class TunerWindow(QMainWindow):
         try:
             update_spectrum(
                 window=self,
-                vowel=vowel_raw,
+                vowel=vowel,
                 target_formants=target_formants,
                 measured_formants=measured_formants,
                 pitch=f0,
@@ -510,7 +509,7 @@ class TunerWindow(QMainWindow):
         try:
             update_vowel_chart(
                 window=self,
-                vowel=vowel_smooth,
+                vowel=vowel,
                 target_formants=target_formants,
                 measured_formants=measured_formants,
                 vowel_score=vowel_score,

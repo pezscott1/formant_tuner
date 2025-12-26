@@ -7,17 +7,16 @@ def test_median_smoother_handles_none():
 
     out = sm.update(None, None, confidence=1.0)
     # Stored as nan, smoothed result is None
-    assert out == (None, None)
+    assert out == (None, None, None)
 
 
 def test_median_smoother_stores_nan_for_none():
     sm = MedianSmoother()
 
     sm.update(None, None, confidence=1.0)
-    f1, f2 = sm.buffer[-1]
-
-    assert np.isnan(f1)
-    assert np.isnan(f2)
+    assert np.isnan(sm.buf_f1[-1])
+    assert np.isnan(sm.buf_f2[-1])
+    assert np.isnan(sm.buf_f3[-1])
 
 
 def test_median_smoother_all_nan_buffer():
@@ -28,7 +27,7 @@ def test_median_smoother_all_nan_buffer():
     sm.update(None, None, confidence=1.0)
 
     out = sm.update(None, None, confidence=1.0)
-    assert out == (None, None)
+    assert out == (None, None, None)
 
 
 def test_pitch_smoother_rejects_low_confidence():
