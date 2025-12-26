@@ -44,15 +44,15 @@ class FormantAnalysisEngine:
     # ---------------------------------------------------------
     def set_user_formants(
         self,
-        formant_map: Dict[str, Tuple[Optional[float], Optional[float], Optional[float]]],
-    ) -> None:
+        formant_map: Dict[str, Tuple[Optional[float],
+                                     Optional[float], Optional[float]]],) -> None:
         """Set user-specific target formants for each vowel."""
         self.user_formants = formant_map or {}
 
     # ---------------------------------------------------------
     # Core processing
     # ---------------------------------------------------------
-    def process_frame(self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+    def process_frame(self, signal: np.ndarray, sr: int) -> Dict[str, Any]:  # noqa: C901
         """
         Process a single audio frame.
 

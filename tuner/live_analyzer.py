@@ -26,7 +26,6 @@ class LiveAnalyzer:
         # New fields from engine
         lpc_conf = float(raw_dict.get("confidence", 0.0))
         vowel_raw = raw_dict.get("vowel_guess")
-        _vowel_conf = float(raw_dict.get("vowel_confidence", 0.0))
 
         # ---------------- Smooth pitch ----------------
         f0_s = self.pitch_smoother.update(
@@ -66,16 +65,6 @@ class LiveAnalyzer:
         f1_for_score = f1_s if f1_s is not None else f1
         f2_for_score = f2_s if f2_s is not None else f2
 
-        # ---------------- Profile-based scoring ----------------
-        profile = getattr(self.engine, "calibrated_profile", None)
-        vowel_score = 0.0
-        resonance_score = 0.0
-        overall = 0.0
-
-        # Fallback: if smoothing rejected formants but raw ones exist, use raw
-        f1_for_score = f1_s if f1_s is not None else f1
-        f2_for_score = f2_s if f2_s is not None else f2
-
         if (
                 profile
                 and vowel_s in profile
@@ -87,18 +76,18 @@ class LiveAnalyzer:
             # Support multiple formats:
             #   - dict: {"f1":..., "f2":..., "f3":..., ...}
             #   - tuple/list: (f1, f2, f0, conf, stab) or (f1, f2, f3)
-            tf1 = tf2 = tf3 = None
+            tf1 = tf2 = tf3 = None  # noqa: F841
 
             if isinstance(entry, dict):
                 tf1 = entry.get("f1")
                 tf2 = entry.get("f2")
-                tf3 = entry.get("f3")
+                tf3 = entry.get("f3")  # noqa: F841
             elif isinstance(entry, (tuple, list)):
                 if len(entry) >= 3:
                     tf1, tf2, tf3 = entry[:3]
                 elif len(entry) == 2:
                     tf1, tf2 = entry
-                    tf3 = None
+                    tf3 = None  # noqa: F841
 
             # Only score if we actually got numeric targets
             if tf1 is not None and tf2 is not None:
@@ -111,7 +100,8 @@ class LiveAnalyzer:
 
         # ---------------- Stability ----------------
         stable = getattr(self.formant_smoother, "formants_stable", False)
-        stability_score = getattr(self.formant_smoother, "_stability_score", float("inf"))
+        stability_score = (
+            getattr(self.formant_smoother, "_stability_score", float("inf")))
 
         # ---------------- Return processed dict ----------------
         return {

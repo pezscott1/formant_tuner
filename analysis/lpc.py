@@ -78,7 +78,7 @@ class LPCConfig:
 # Core public API
 # ---------------------------------------------------------------------------
 
-def estimate_formants(
+def estimate_formants(  # noqa: C901
     y: NDArray[np.float64] | NDArray[np.float32],
     sr: int,
     config: Optional[LPCConfig] = None,
@@ -121,7 +121,8 @@ def estimate_formants(
     # Adaptive LPC order
     order = _choose_lpc_order(sr, win_len, config)
     if len(frame) < 3 * order:
-        return _empty_result("none", lpc_order=order, reason="insufficient_samples_for_order")
+        return _empty_result("none",
+                             lpc_order=order, reason="insufficient_samples_for_order")
 
     # LPC coefficients via Levinson–Durbin
     A = _compute_lpc(frame, order)
@@ -161,7 +162,8 @@ def estimate_formants(
         return _fallback_formants(frame, sr, config, order, reason="no_valid_poles")
 
     freqs_sorted = np.sort(freqs_f)
-    bw_sorted = np.array([bw for _, bw in sorted(zip(freqs_f, bw_f), key=lambda t: t[0])])
+    bw_sorted = np.array(
+        [bw for _, bw in sorted(zip(freqs_f, bw_f), key=lambda t: t[0])])
 
     # Derive F1/F2/F3 with a sanity check against mic-induced ridge behavior
     f1, f2, f3 = _extract_formants_from_poles(freqs_sorted, config)
@@ -171,7 +173,8 @@ def estimate_formants(
         return _fallback_formants(frame, sr, config, order, reason="f1_too_high_lpc")
 
     if f1 is None and f2 is None:
-        return _fallback_formants(frame, sr, config, order, reason="no_formants_from_poles")
+        return _fallback_formants(
+            frame, sr, config, order, reason="no_formants_from_poles")
 
     # Spectral envelope peaks (for confidence + plotting)
     peak_freqs, peak_heights = smoothed_spectrum_peaks(

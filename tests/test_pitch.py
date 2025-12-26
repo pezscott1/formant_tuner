@@ -35,4 +35,3 @@ def test_autocorrelation_peak_at_zero_returns_none():
 
     res = estimate_pitch(frame, 44100)
     assert res.f0 is None
-

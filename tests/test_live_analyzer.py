@@ -1,4 +1,3 @@
-import numpy as np
 from unittest.mock import MagicMock
 from tuner.live_analyzer import LiveAnalyzer
 from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother

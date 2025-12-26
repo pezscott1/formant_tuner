@@ -10,25 +10,18 @@ from tuner.profile_controller import ProfileManager
 class Tuner:
     def __init__(
         self,
-        engine=None,
         voice_type="bass",
         profiles_dir="profiles",
-        sample_rate=48000,   # UPDATED: match your new mic
+        sample_rate=48000,
+        engine=None,
     ):
-        # Shared DSP engine
+        # Engine: allow injection for tests, otherwise construct
         self.engine = engine or FormantAnalysisEngine(voice_type=voice_type)
 
-        # Smoothers (confidence-aware)
-        self.pitch_smoother = PitchSmoother(
-            sr=sample_rate,
-            min_confidence=0.25,
-        )
-        self.formant_smoother = MedianSmoother(
-            min_confidence=0.25,
-        )
-        self.label_smoother = LabelSmoother(
-            min_confidence=0.25,
-        )
+        # Smoothers
+        self.pitch_smoother = PitchSmoother(sr=sample_rate, min_confidence=0.25)
+        self.formant_smoother = MedianSmoother(min_confidence=0.25)
+        self.label_smoother = LabelSmoother(min_confidence=0.25)
 
         # Live analyzer
         self.live_analyzer = LiveAnalyzer(

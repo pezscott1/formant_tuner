@@ -125,9 +125,6 @@ class ProfileManager:
     # Internal JSON loader
     # ---------------------------------------------------------
     def load_profile_json(self, base_name):
-        import os, json
-        from pathlib import Path
-
         # ----------------------------------------------------
         # CASE 1: base_name is a Path object → load directly
         # ----------------------------------------------------
@@ -170,7 +167,8 @@ class ProfileManager:
     def extract_formants(self, raw_dict):
         """
         Convert rich profile entries like:
-            { "a": { "f1":..., "f2":..., "f0":..., "confidence":..., "stability":... }, ... }
+            { "a": { "f1":..., "f2":...,
+            "f0":..., "confidence":..., "stability":... }, ... }
         into:
             { "a": (f1, f2, f0, confidence, stability), ... }
         """

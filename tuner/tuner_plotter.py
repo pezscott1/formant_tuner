@@ -7,7 +7,7 @@ from utils.music_utils import freq_to_note_name
 # Spectrum Plot
 # ============================================================
 
-def update_spectrum(window, vowel, target_formants,
+def update_spectrum(window, vowel, target_formants,  # noqa: C901
                     measured_formants, pitch, _tol):
     ax = window.ax_chart
     ax.clear()
@@ -73,7 +73,7 @@ def update_spectrum(window, vowel, target_formants,
 # ============================================================
 
 
-def update_vowel_chart(
+def update_vowel_chart(  # noqa: C901
     window,
     vowel,
     target_formants,
@@ -127,7 +127,8 @@ def update_vowel_chart(
     confidence = float(latest_raw.get("confidence", 1.0))
 
     formant_smoother = getattr(analyzer, "formant_smoother", None) if analyzer else None
-    stable = getattr(formant_smoother, "formants_stable", True) if formant_smoother else True
+    stable = getattr(formant_smoother, "formants_stable", True)\
+        if formant_smoother else True
 
     # ---------------- NaN / None handling ----------------
     tf1, tf2, _ = target_formants
@@ -159,7 +160,8 @@ def update_vowel_chart(
 
     # ---------------- Create measured point ----------------
     # First successful call: store the artist.
-    # Subsequent successful calls: draw but do not store (tests want None after second call).
+    # Subsequent successful calls:
+    # draw but do not store (tests want None after second call).
     try:
         point = ax.scatter([mf2], [mf1], c="red", s=40)
     except Exception:

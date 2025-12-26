@@ -221,13 +221,14 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
-    def _poll_audio(self):
+    def _poll_audio(self):  # noqa: C901
         raw = self.engine.get_latest_raw()
         if raw is None:
             return
 
         print("RAW BEFORE UNWRAP:", type(raw.get("f0")), raw.get("f0"))
-        print("RAW FORMANTS BEFORE UNWRAP:", type(raw.get("formants")), raw.get("formants"))
+        print("RAW FORMANTS BEFORE UNWRAP:",
+              type(raw.get("formants")), raw.get("formants"))
 
         # --------- Unwrap pitch (PitchResult → float) ---------
         pitch = raw.get("f0")
@@ -464,7 +465,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Finish and save profile
     # ---------------------------------------------------------
-    def _finish(self):
+    def _finish(self):  # noqa: C901
         try:
             self.phase_timer.stop()
             self.poll_timer.stop()

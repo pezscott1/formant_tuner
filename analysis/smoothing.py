@@ -38,7 +38,7 @@ class PitchSmoother:
         self.min_confidence = min_confidence
         self.hps_enabled = hps_enabled
         self.current = None
-        _sr = sr
+        self._sr = sr
 
     # -------------------------
     # Octave correction (test‑expected)
@@ -56,6 +56,9 @@ class PitchSmoother:
             return 0.5 * self.current
 
         return new
+
+    def reset(self):
+        self.current = None
 
     # -------------------------
     # Update logic (test‑expected)

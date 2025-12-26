@@ -6,7 +6,8 @@ from tuner.controller import Tuner
 @patch("tuner.controller.ProfileManager")
 @patch("tuner.controller.LiveAnalyzer")
 @patch("tuner.controller.FormantAnalysisEngine")
-def test_tuner_initializes_components(mock_engine_cls, mock_analyzer_cls, mock_profiles_cls):
+def test_tuner_initializes_components(
+        mock_engine_cls, mock_analyzer_cls, mock_profiles_cls):
     mock_engine = MagicMock()
     mock_engine_cls.return_value = mock_engine
 
@@ -16,7 +17,7 @@ def test_tuner_initializes_components(mock_engine_cls, mock_analyzer_cls, mock_p
     mock_profiles = MagicMock()
     mock_profiles_cls.return_value = mock_profiles
 
-    _t = Tuner(voice_type="bass", profiles_dir="profiles")
+    t = Tuner(voice_type="bass", profiles_dir="profiles")
 
     # Engine constructed once
     mock_engine_cls.assert_called_once()
@@ -26,7 +27,8 @@ def test_tuner_initializes_components(mock_engine_cls, mock_analyzer_cls, mock_p
     assert mock_analyzer_cls.call_args[1]["engine"] is mock_engine
 
     # ProfileManager receives profiles_dir and analyzer=engine
-    mock_profiles_cls.assert_called_once_with(profiles_dir="profiles", analyzer=mock_engine)
+    mock_profiles_cls.assert_called_once_with(
+        profiles_dir="profiles", analyzer=mock_engine)
 
 
 @patch("tuner.controller.ProfileManager")

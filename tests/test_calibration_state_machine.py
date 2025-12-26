@@ -52,7 +52,8 @@ def test_sing_phase_counts_down_then_transitions_to_capture():
 
 
 def test_capture_phase_counts_down_then_returns_ready():
-    sm = CalibrationStateMachine(["a"], prep_seconds=0, sing_seconds=0, capture_seconds=2)
+    sm = CalibrationStateMachine(
+        ["a"], prep_seconds=0, sing_seconds=0, capture_seconds=2)
     sm.phase = "capture"
 
     out = sm.tick()
@@ -66,7 +67,8 @@ def test_capture_phase_counts_down_then_returns_ready():
 
 
 def test_advance_moves_to_next_vowel_and_resets_timers():
-    sm = CalibrationStateMachine(["a", "i"], prep_seconds=3, sing_seconds=2, capture_seconds=2)
+    sm = CalibrationStateMachine(
+        ["a", "i"], prep_seconds=3, sing_seconds=2, capture_seconds=2)
 
     sm.phase = "capture"
     sm.index = 0

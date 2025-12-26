@@ -51,8 +51,6 @@ def test_update_artists_basic_spectrogram():
     update_artists(plotter, freqs, times, S, f1=None, f2=None, vowel=None)
 
     assert plotter._spec_mesh is not None
-    # Title is dynamic, so only check prefix
-    title = plotter.ax_spec.set_title.call_args[0][0]
     assert plotter.ax_spec.get_title().startswith("Spectrogram")
 
 

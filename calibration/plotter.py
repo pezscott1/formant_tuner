@@ -215,7 +215,7 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
 # -------------------------
 
 
-def safe_spectrogram(y, sr, n_fft=1024,
+def safe_spectrogram(y, sr, n_fft=1024,  # noqa: C901
                      hop_length=256, window_seconds=3.0):
     """
     Speech-optimized spectrogram with:

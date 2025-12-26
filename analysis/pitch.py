@@ -12,7 +12,7 @@ class PitchResult:
     debug: dict
 
 
-def estimate_pitch(
+def estimate_pitch(  # noqa: C901
     frame: np.ndarray,
     sr: int,
     fmin: float = 50.0,

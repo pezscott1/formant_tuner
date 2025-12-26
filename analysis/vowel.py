@@ -75,7 +75,7 @@ def get_vowel_ranges(
 # ---------------------------------------------------------
 # Plausibility checks
 # ---------------------------------------------------------
-def is_plausible_formants(
+def is_plausible_formants(  # noqa: C901
     f1: Optional[float],
     f2: Optional[float],
     voice_type: str = "tenor",
