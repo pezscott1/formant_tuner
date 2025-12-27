@@ -1,15 +1,16 @@
-[coverage:run]
-omit =
-    main.py
 [run]
 branch = True
 omit =
+    # UI shells (not testable)
     tuner/window.py
     calibration/window.py
     calibration/plotter.py
     tuner/tuner_plotter.py
     calibration/dialog.py
     diagnostic.py
+    main.py
+    # Skip tests from coverage
+    tests/*
 
 [report]
 exclude_lines =
