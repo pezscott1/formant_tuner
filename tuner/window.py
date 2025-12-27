@@ -363,6 +363,8 @@ class TunerWindow(QMainWindow):
                 voice_type=voice_type,
                 engine=self.analyzer,
                 analyzer=self.live_analyzer,
+                profile_manager=self.profile_manager,
+                existing_profile=None,
                 parent=self,
             )
             self.update_timer.stop()
@@ -373,11 +375,15 @@ class TunerWindow(QMainWindow):
 
         # Existing profile
         voice_type = getattr(self.analyzer, "voice_type", "bass")
+        existing_data = self.profile_manager.load_profile(base) or {}
+
         self.calib_win = CalibrationWindow(
             profile_name=base,
             voice_type=voice_type,
             engine=self.analyzer,
             analyzer=self.live_analyzer,
+            profile_manager=self.profile_manager,
+            existing_profile=existing_data,
             parent=self,
         )
         self.update_timer.stop()
@@ -391,16 +397,18 @@ class TunerWindow(QMainWindow):
         """
         self._populate_profiles()
         self._apply_profile_base(base_name)
+
+        # Reset smoothing state
         self.live_analyzer.reset()
 
-        if hasattr(self.analyzer, "start_stream"):
-            try:
-                self.analyzer.start_stream()
-            except Exception as e:
-                print("[AUDIO] Failed to restart analyzer stream:", e)
-
+        # Restart UI updates
         self.update_timer.start()
-        self.stop_mic()
+
+        # Stop mic cleanly
+        try:
+            self.stop_mic()
+        except Exception:
+            pass
 
     # ---------------------------------------------------------
     # Tolerance handling
@@ -418,6 +426,7 @@ class TunerWindow(QMainWindow):
     # ---------------------------------------------------------
     # Mic handling
     # ---------------------------------------------------------
+
     def start_mic(self):
         with self.stream_lock:
             if self.stream is not None:

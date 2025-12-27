@@ -125,22 +125,33 @@ def live_score_formants(target_formants, measured_formants, tolerance=50):
       - confidence-aware (if provided)
       - smoother falloff
       - avoids punishing missing F3
+      - robust to NaN formants
     """
-    score = 0
+    score = 0.0
     count = 0
 
     for m, t in zip(measured_formants, target_formants):
+        # Skip missing or non-finite values
         if m is None or t is None:
+            continue
+        if not np.isfinite(m) or not np.isfinite(t):
             continue
 
         dist = abs(m - t)
 
         # Gaussian falloff
         s = np.exp(-(dist ** 2) / (2 * (tolerance ** 2)))
-        score += s * 100
+        score += float(s) * 100.0
         count += 1
 
-    return int(score / count) if count > 0 else 0
+    if count == 0:
+        return 0
+
+    avg = score / count
+    if not np.isfinite(avg):
+        return 0
+
+    return int(avg)
 
 
 # ---------------------------------------------------------
@@ -153,7 +164,7 @@ def resonance_tuning_score(formants, pitch, tolerance=50):
       - more harmonics (1–12)
       - smoother Gaussian weighting
       - avoids punishing missing formants
-      - robust to PitchResult objects
+      - robust to PitchResult objects and NaNs
     """
 
     # -------------------------
@@ -170,23 +181,31 @@ def resonance_tuning_score(formants, pitch, tolerance=50):
     if not isinstance(pitch, (int, float, np.floating)):
         return 0
 
-    if np.isnan(pitch):
+    if not np.isfinite(pitch):
         return 0
 
     # -------------------------
     # Harmonic scoring
     # -------------------------
-    harmonics = np.array([n * pitch for n in range(1, 12)])
-    score = 0
+    harmonics = np.array([n * pitch for n in range(1, 12)], dtype=float)
+    score = 0.0
     count = 0
 
     for f in formants:
-        if f is None:
+        # Skip missing or non-finite formants
+        if f is None or not np.isfinite(f):
             continue
 
-        d = np.min(np.abs(harmonics - f))
+        d = float(np.min(np.abs(harmonics - f)))
         s = np.exp(-(d ** 2) / (2 * (tolerance ** 2)))
-        score += s * 100
+        score += float(s) * 100.0
         count += 1
 
-    return int(score / count) if count > 0 else 0
+    if count == 0:
+        return 0
+
+    avg = score / count
+    if not np.isfinite(avg):
+        return 0
+
+    return int(avg)

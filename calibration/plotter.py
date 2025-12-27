@@ -61,7 +61,6 @@ def update_artists(self, freqs, times, s, f1, f2, vowel):  # noqa: C901
     arr_db_max = np.max(arr_db)
     db_floor = arr_db_max - 60
     arr_db = np.clip(arr_db, db_floor, arr_db_max)
-    ny, nx = arr_db.shape
 
     # ---------------------------------------------------------
     # Always recreate mesh (simplest, most robust)

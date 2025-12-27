@@ -373,11 +373,14 @@ class TunerWindow(QMainWindow):
 
         # Existing profile
         voice_type = getattr(self.analyzer, "voice_type", "bass")
+        existing_data = self.profile_manager.load_profile(base)
+
         self.calib_win = CalibrationWindow(
             profile_name=base,
             voice_type=voice_type,
             engine=self.analyzer,
             analyzer=self.live_analyzer,
+            existing_profile=existing_data,  # NEW
             parent=self,
         )
         self.update_timer.stop()
@@ -418,6 +421,7 @@ class TunerWindow(QMainWindow):
     # ---------------------------------------------------------
     # Mic handling
     # ---------------------------------------------------------
+
     def start_mic(self):
         with self.stream_lock:
             if self.stream is not None:

@@ -93,10 +93,20 @@ class FormantAnalysisEngine:
             }
             self._latest_raw = result
             return result
-
         # ---------------- Pitch ----------------
-        f0 = estimate_pitch(signal, sr)
+        pitch_res = estimate_pitch(signal, sr)
 
+        # Unwrap and sanitize
+        f0 = pitch_res.f0
+        if f0 is not None:
+            try:
+                f0 = float(f0)
+            except Exception:
+                f0 = None
+
+        # If f0 exists but is not finite, drop it
+        if f0 is None or not np.isfinite(f0):
+            f0 = None
         # ---------------- Formants (new LPC API) ----------------
         lpc_result = estimate_formants(
             signal,
@@ -110,9 +120,8 @@ class FormantAnalysisEngine:
         f3 = lpc_result.f3
 
         fb_f1, fb_f2 = f1, f2  # feedback copies
+        # ---------------- Vowel guess + confidence ----------------
 
-        # ---------------- Vowel guess + confidence ----------------
-        # ---------------- Vowel guess + confidence ----------------
         def _is_valid_scalar(x):
             # Accept plain Python numbers and numpy scalar types
             if x is None:
@@ -155,11 +164,18 @@ class FormantAnalysisEngine:
             vowel_score = live_score_formants(
                 target_formants, (f1, f2, f3), tolerance=50
             )
-            resonance_score = resonance_tuning_score(
-                (f1, f2, f3), f0, tolerance=50
-            )
-            overall = 0.5 * vowel_score + 0.5 * resonance_score
 
+            if f0 is None:
+                resonance_score = 0.0
+            else:
+                try:
+                    resonance_score = resonance_tuning_score(
+                        (f1, f2, f3), f0, tolerance=50
+                    )
+                except Exception:
+                    resonance_score = 0.0
+
+            overall = 0.5 * vowel_score + 0.5 * resonance_score
         # ---------------- Build result ----------------
         result = {
             "f0": f0,

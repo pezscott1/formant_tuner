@@ -1,0 +1,624 @@
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine_edge_cases.py:132:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <analysis.engine.FormantAnalysisEngine object at 0x000001C6A541EA50>
+signal = array([-0.30914034, -0.51283128,  0.82138251, ..., -0.87011887,
+       -0.95319462, -1.55581545], shape=(2048,))
+sr = 48000
+
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+        """
+        Process a single audio frame.
+
+        Returns a raw dict consumed by LiveAnalyzer:
+          {
+            "f0": float or None,
+            "formants": (f1, f2, f3),
+            "vowel": str or None,
+            "vowel_guess": str or None,
+            "vowel_confidence": float,
+            "vowel_score": float,
+            "resonance_score": float,
+            "overall": float,
+            "fb_f1": float or None,
+            "fb_f2": float or None,
+            "segment": signal.copy(),
+            "confidence": float,
+            "method": str,
+            "lpc_debug": dict,
+          }
+        """
+        if signal is None or len(signal) == 0:
+            result = {
+                "f0": None,
+                "formants": (None, None, None),
+                "vowel": None,
+                "vowel_guess": None,
+                "vowel_confidence": 0.0,
+                "vowel_score": 0.0,
+                "resonance_score": 0.0,
+                "overall": 0.0,
+                "fb_f1": None,
+                "fb_f2": None,
+                "confidence": 0.0,
+                "method": "none",
+                "lpc_debug": {},
+            }
+            self._latest_raw = result
+            return result
+        # ---------------- Pitch ----------------
+        pitch_res = estimate_pitch(signal, sr)
+
+        # Unwrap and sanitize
+>       f0 = pitch_res.f0
+             ^^^^^^^^^^^^
+E       AttributeError: 'float' object has no attribute 'f0'
+
+analysis\engine.py:100: AttributeError
+__________________ test_engine_propagates_formant_confidence __________________
+
+mock_lpc = <MagicMock name='estimate_formants' id='1952690689552'>
+mock_pitch = <MagicMock name='estimate_pitch' id='1952690690272'>
+
+    @patch("analysis.engine.estimate_pitch", return_value=180.0)
+    @patch("analysis.engine.estimate_formants")
+    def test_engine_propagates_formant_confidence(mock_lpc, mock_pitch):
+        mock_lpc.return_value = MagicMock(
+            f1=600.0,
+            f2=1400.0,
+            f3=2600.0,
+            confidence=0.42,
+            method="lpc",
+            lpc_order=12,
+            peaks=[1],
+            roots=[0.1],
+            bandwidths=[120],
+            debug={"ok": True},
+        )
+
+        eng = FormantAnalysisEngine()
+        frame = np.random.randn(2048)
+
+>       out = eng.process_frame(frame, sr=48000)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine_extra.py:28:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <analysis.engine.FormantAnalysisEngine object at 0x000001C6A541C830>
+signal = array([-7.71456091e-01, -4.36186932e-01, -1.80116564e-01, ...,
+       -1.30386852e-03,  1.39904415e+00, -7.34169120e-01], shape=(2048,))
+sr = 48000
+
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+        """
+        Process a single audio frame.
+
+        Returns a raw dict consumed by LiveAnalyzer:
+          {
+            "f0": float or None,
+            "formants": (f1, f2, f3),
+            "vowel": str or None,
+            "vowel_guess": str or None,
+            "vowel_confidence": float,
+            "vowel_score": float,
+            "resonance_score": float,
+            "overall": float,
+            "fb_f1": float or None,
+            "fb_f2": float or None,
+            "segment": signal.copy(),
+            "confidence": float,
+            "method": str,
+            "lpc_debug": dict,
+          }
+        """
+        if signal is None or len(signal) == 0:
+            result = {
+                "f0": None,
+                "formants": (None, None, None),
+                "vowel": None,
+                "vowel_guess": None,
+                "vowel_confidence": 0.0,
+                "vowel_score": 0.0,
+                "resonance_score": 0.0,
+                "overall": 0.0,
+                "fb_f1": None,
+                "fb_f2": None,
+                "confidence": 0.0,
+                "method": "none",
+                "lpc_debug": {},
+            }
+            self._latest_raw = result
+            return result
+        # ---------------- Pitch ----------------
+        pitch_res = estimate_pitch(signal, sr)
+
+        # Unwrap and sanitize
+>       f0 = pitch_res.f0
+             ^^^^^^^^^^^^
+E       AttributeError: 'float' object has no attribute 'f0'
+
+analysis\engine.py:100: AttributeError
+_________________ test_engine_handles_extreme_formant_values __________________
+
+mock_lpc = <MagicMock name='estimate_formants' id='1952690560592'>
+mock_pitch = <MagicMock name='estimate_pitch' id='1952690556080'>
+
+    @patch("analysis.engine.estimate_pitch", return_value=120.0)
+    @patch("analysis.engine.estimate_formants")
+    def test_engine_handles_extreme_formant_values(mock_lpc, mock_pitch):
+        mock_lpc.return_value = MagicMock(
+            f1=99999.0,
+            f2=-500.0,
+            f3=1e6,
+            confidence=0.2,
+            method="lpc",
+            lpc_order=14,
+            peaks=[],
+            roots=[],
+            bandwidths=[],
+            debug={},
+        )
+
+        eng = FormantAnalysisEngine()
+        frame = np.random.randn(4096)
+
+>       out = eng.process_frame(frame, sr=48000)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine_extra.py:61:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <analysis.engine.FormantAnalysisEngine object at 0x000001C6A56D6D20>
+signal = array([-0.30051049, -1.19053167,  1.19305847, ..., -0.93539692,
+       -0.86406403, -0.78287298], shape=(4096,))
+sr = 48000
+
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+        """
+        Process a single audio frame.
+
+        Returns a raw dict consumed by LiveAnalyzer:
+          {
+            "f0": float or None,
+            "formants": (f1, f2, f3),
+            "vowel": str or None,
+            "vowel_guess": str or None,
+            "vowel_confidence": float,
+            "vowel_score": float,
+            "resonance_score": float,
+            "overall": float,
+            "fb_f1": float or None,
+            "fb_f2": float or None,
+            "segment": signal.copy(),
+            "confidence": float,
+            "method": str,
+            "lpc_debug": dict,
+          }
+        """
+        if signal is None or len(signal) == 0:
+            result = {
+                "f0": None,
+                "formants": (None, None, None),
+                "vowel": None,
+                "vowel_guess": None,
+                "vowel_confidence": 0.0,
+                "vowel_score": 0.0,
+                "resonance_score": 0.0,
+                "overall": 0.0,
+                "fb_f1": None,
+                "fb_f2": None,
+                "confidence": 0.0,
+                "method": "none",
+                "lpc_debug": {},
+            }
+            self._latest_raw = result
+            return result
+        # ---------------- Pitch ----------------
+        pitch_res = estimate_pitch(signal, sr)
+
+        # Unwrap and sanitize
+>       f0 = pitch_res.f0
+             ^^^^^^^^^^^^
+E       AttributeError: 'float' object has no attribute 'f0'
+
+analysis\engine.py:100: AttributeError
+_______________ test_engine_low_confidence_disables_vowel_guess _______________
+
+mock_lpc = <MagicMock name='estimate_formants' id='1952690697376'>
+mock_pitch = <MagicMock name='estimate_pitch' id='1952690692816'>
+
+    @patch("analysis.engine.estimate_pitch", return_value=150.0)
+    @patch("analysis.engine.estimate_formants")
+    def test_engine_low_confidence_disables_vowel_guess(mock_lpc, mock_pitch):
+        mock_lpc.return_value = MagicMock(
+            f1=500.0,
+            f2=1500.0,
+            f3=2500.0,
+            confidence=0.05,  # too low for vowel guessing
+            method="lpc",
+            lpc_order=10,
+            peaks=[],
+            roots=[],
+            bandwidths=[],
+            debug={},
+        )
+
+        eng = FormantAnalysisEngine()
+        frame = np.random.randn(2048)
+
+>       out = eng.process_frame(frame, sr=48000)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine_extra.py:90:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <analysis.engine.FormantAnalysisEngine object at 0x000001C6A56F4200>
+signal = array([-0.23370789,  0.95202163, -2.29493654, ..., -0.33066004,
+        0.89170792, -0.45916867], shape=(2048,))
+sr = 48000
+
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+        """
+        Process a single audio frame.
+
+        Returns a raw dict consumed by LiveAnalyzer:
+          {
+            "f0": float or None,
+            "formants": (f1, f2, f3),
+            "vowel": str or None,
+            "vowel_guess": str or None,
+            "vowel_confidence": float,
+            "vowel_score": float,
+            "resonance_score": float,
+            "overall": float,
+            "fb_f1": float or None,
+            "fb_f2": float or None,
+            "segment": signal.copy(),
+            "confidence": float,
+            "method": str,
+            "lpc_debug": dict,
+          }
+        """
+        if signal is None or len(signal) == 0:
+            result = {
+                "f0": None,
+                "formants": (None, None, None),
+                "vowel": None,
+                "vowel_guess": None,
+                "vowel_confidence": 0.0,
+                "vowel_score": 0.0,
+                "resonance_score": 0.0,
+                "overall": 0.0,
+                "fb_f1": None,
+                "fb_f2": None,
+                "confidence": 0.0,
+                "method": "none",
+                "lpc_debug": {},
+            }
+            self._latest_raw = result
+            return result
+        # ---------------- Pitch ----------------
+        pitch_res = estimate_pitch(signal, sr)
+
+        # Unwrap and sanitize
+>       f0 = pitch_res.f0
+             ^^^^^^^^^^^^
+E       AttributeError: 'float' object has no attribute 'f0'
+
+analysis\engine.py:100: AttributeError
+___________________ test_engine_output_structure_is_stable ____________________
+
+mock_lpc = <MagicMock name='estimate_formants' id='1952690191392'>
+mock_pitch = <MagicMock name='estimate_pitch' id='1952690189520'>
+
+    @patch("analysis.engine.estimate_pitch", return_value=None)
+    @patch("analysis.engine.estimate_formants")
+    def test_engine_output_structure_is_stable(mock_lpc, mock_pitch):
+        mock_lpc.return_value = MagicMock(
+            f1=None,
+            f2=None,
+            f3=None,
+            confidence=0.0,
+            method="lpc",
+            lpc_order=12,
+            peaks=[],
+            roots=[],
+            bandwidths=[],
+            debug={},
+        )
+
+        eng = FormantAnalysisEngine()
+        frame = np.random.randn(1024)
+
+>       out = eng.process_frame(frame, sr=48000)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine_extra.py:120:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <analysis.engine.FormantAnalysisEngine object at 0x000001C6AA9078C0>
+signal = array([-0.90565121, -1.58207134,  0.48962689, ...,  0.70271119,
+        0.25217244, -1.44272774], shape=(1024,))
+sr = 48000
+
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+        """
+        Process a single audio frame.
+
+        Returns a raw dict consumed by LiveAnalyzer:
+          {
+            "f0": float or None,
+            "formants": (f1, f2, f3),
+            "vowel": str or None,
+            "vowel_guess": str or None,
+            "vowel_confidence": float,
+            "vowel_score": float,
+            "resonance_score": float,
+            "overall": float,
+            "fb_f1": float or None,
+            "fb_f2": float or None,
+            "segment": signal.copy(),
+            "confidence": float,
+            "method": str,
+            "lpc_debug": dict,
+          }
+        """
+        if signal is None or len(signal) == 0:
+            result = {
+                "f0": None,
+                "formants": (None, None, None),
+                "vowel": None,
+                "vowel_guess": None,
+                "vowel_confidence": 0.0,
+                "vowel_score": 0.0,
+                "resonance_score": 0.0,
+                "overall": 0.0,
+                "fb_f1": None,
+                "fb_f2": None,
+                "confidence": 0.0,
+                "method": "none",
+                "lpc_debug": {},
+            }
+            self._latest_raw = result
+            return result
+        # ---------------- Pitch ----------------
+        pitch_res = estimate_pitch(signal, sr)
+
+        # Unwrap and sanitize
+>       f0 = pitch_res.f0
+             ^^^^^^^^^^^^
+E       AttributeError: 'NoneType' object has no attribute 'f0'
+
+analysis\engine.py:100: AttributeError
+___________________ test_engine_receives_calibrated_profile ___________________
+
+mock_lpc = <MagicMock name='estimate_formants' id='1952690180352'>
+mock_pitch = <MagicMock name='estimate_pitch' id='1952644516320'>
+
+    @patch("analysis.engine.estimate_pitch", return_value=120.0)
+    @patch("analysis.engine.estimate_formants")
+    def test_engine_receives_calibrated_profile(mock_lpc, mock_pitch):
+        """Engine must use the calibrated profile set by ProfileManager."""
+        mock_lpc.return_value = MagicMock(
+            f1=500.0,
+            f2=1500.0,
+            f3=2500.0,
+            confidence=0.9,
+            method="lpc",
+            lpc_order=12,
+            peaks=[],
+            roots=[],
+            bandwidths=[],
+            debug={},
+        )
+
+        eng = FormantAnalysisEngine()
+        eng.set_user_formants({"a": (500, 1500, 2500)})
+
+        frame = np.random.randn(2048)
+>       out = eng.process_frame(frame, sr=48000)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine_singleton_wiring.py:48:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <analysis.engine.FormantAnalysisEngine object at 0x000001C6A56823C0>
+signal = array([-2.98935955, -1.78708535, -0.16300012, ...,  0.18650219,
+        0.72318895,  0.55869148], shape=(2048,))
+sr = 48000
+
+    def process_frame(  # noqa: C901
+            self, signal: np.ndarray, sr: int) -> Dict[str, Any]:
+        """
+        Process a single audio frame.
+
+        Returns a raw dict consumed by LiveAnalyzer:
+          {
+            "f0": float or None,
+            "formants": (f1, f2, f3),
+            "vowel": str or None,
+            "vowel_guess": str or None,
+            "vowel_confidence": float,
+            "vowel_score": float,
+            "resonance_score": float,
+            "overall": float,
+            "fb_f1": float or None,
+            "fb_f2": float or None,
+            "segment": signal.copy(),
+            "confidence": float,
+            "method": str,
+            "lpc_debug": dict,
+          }
+        """
+        if signal is None or len(signal) == 0:
+            result = {
+                "f0": None,
+                "formants": (None, None, None),
+                "vowel": None,
+                "vowel_guess": None,
+                "vowel_confidence": 0.0,
+                "vowel_score": 0.0,
+                "resonance_score": 0.0,
+                "overall": 0.0,
+                "fb_f1": None,
+                "fb_f2": None,
+                "confidence": 0.0,
+                "method": "none",
+                "lpc_debug": {},
+            }
+            self._latest_raw = result
+            return result
+        # ---------------- Pitch ----------------
+        pitch_res = estimate_pitch(signal, sr)
+
+        # Unwrap and sanitize
+>       f0 = pitch_res.f0
+             ^^^^^^^^^^^^
+E       AttributeError: 'float' object has no attribute 'f0'
+
+analysis\engine.py:100: AttributeError
+__________________ test_calibration_does_not_trigger_popups ___________________
+
+tmp_path = WindowsPath('C:/Users/pezsc/AppData/Local/Temp/pytest-of-pezsc/pytest-197/test_calibration_does_not_trig0')
+
+    def test_calibration_does_not_trigger_popups(tmp_path):
+        # Create tuner with mocked window
+        tuner = Tuner(profiles_dir=str(tmp_path))
+        tuner.window = MagicMock()
+        tuner.window.show_profile_set_popup = MagicMock()
+
+        # Replace profile manager and attach mocked window
+        tuner.profile_manager = ProfileManager(
+            str(tmp_path), analyzer=tuner.engine
+        )
+        tuner.profile_manager.window = tuner.window
+
+        # Create calibration session
+        session = CalibrationSession(
+            profile_name="test",
+            voice_type="bass",
+            vowels=["a", "e"],
+        )
+
+        # Simulate successful captures (must pass vowel explicitly)
+        session.handle_result("a", 500, 1500, 120, confidence=1.0, stability=0.0)
+        session.handle_result("e", 400, 2300, 130, confidence=1.0, stability=0.0)
+
+        # Save profile
+>       base = session.save_profile()
+               ^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_profile_popup_behavior.py:31:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <calibration.session.CalibrationSession object at 0x000001C6AA9C1880>
+
+    def save_profile(self):
+        # Use self.data (not self.results)
+        normalized = normalize_profile_for_save(self.data, self.retries_map)
+        normalized["voice_type"] = self.voice_type
+
+        # Prevent double suffixing
+        if self.profile_name.endswith(f"_{self.voice_type}"):
+            base_name = self.profile_name
+        else:
+            base_name = f"{self.profile_name}_{self.voice_type}"
+
+        if self.profile_manager is None:
+>           raise RuntimeError("profile_manager is not set on CalibrationSession")
+E           RuntimeError: profile_manager is not set on CalibrationSession
+
+calibration\session.py:128: RuntimeError
+============================== warnings summary ===============================
+tests/test_safe_spectrogram.py::test_safe_spectrogram_too_short
+  C:\Users\pezsc\AppData\Local\Programs\Python\Python312\Lib\site-packages\librosa\core\spectrum.py:266: UserWarning: n_fft=1024 is too large for input signal of length=100
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.12.0-final-0 _______________
+
+Name                                          Stmts   Miss  Cover   Missing
+---------------------------------------------------------------------------
+__init__.py                                       0      0   100%
+analysis\engine.py                               71     28    61%   102-105, 127-133, 140-152, 163-178
+analysis\lpc.py                                 212     36    83%   50, 94, 98, 102, 124, 139-141, 144, 173, 176, 203, 242-254, 271, 284-286, 312, 324, 337, 346, 348, 350, 384, 388-390, 402, 523
+analysis\pitch.py                                61     13    79%   33, 46-53, 77, 81, 93, 105
+analysis\scoring.py                              98     17    83%   29-39, 48, 51, 77, 138, 152, 178, 182, 209
+analysis\smoothing.py                           184     51    72%   10-27, 47-58, 69, 71, 79-80, 150, 152, 170-174, 298-318, 321-323
+analysis\vowel.py                                92     21    77%   33-42, 62-65, 91, 105-109, 113, 115, 142
+analysis\vowel_data.py                            3      0   100%
+calibration\dialog.py                            23     19    17%   16-41, 45
+calibration\plotter.py                          152     32    79%   18, 31-32, 42, 44, 51, 82, 100, 109-112, 134-135, 157-158, 162-178, 183-184, 190-191, 219-220, 246
+calibration\session.py                           75     35    53%   20-25, 29-32, 66-111, 123, 130-131, 142, 152
+calibration\state_machine.py                     87      5    94%   47, 51-52, 82, 104
+calibration\window.py                           238     93    61%   100-102, 167-208, 223, 256, 260, 269, 291-292, 314-384, 387-395, 401-402, 412-413, 417-420, 427-428, 437-440, 445-446
+diagnostic.py                                     5      5     0%   1-6
+tests\test_back_vowel_calibration.py             27      0   100%
+tests\test_calibration_integration.py            44      0   100%
+tests\test_calibration_plotter.py                50      0   100%
+tests\test_calibration_session.py                63     25    60%   51-52, 69-80, 90-93, 106-138
+tests\test_calibration_state_machine.py          95      0   100%
+tests\test_calibration_window.py                 84      1    99%   98
+tests\test_engine.py                             49     14    71%   42-50, 75-76, 102-104
+tests\test_engine_edge_cases.py                  67     20    70%   40-48, 77-80, 104-107, 135-139
+tests\test_engine_extra.py                       47     16    66%   30-36, 63-65, 92-95, 123-144
+tests\test_engine_singleton_wiring.py            26      3    88%   51-55
+tests\test_live_analyzer.py                      37      0   100%
+tests\test_live_analyzer_smoothing_reset.py      42      6    86%   12-13, 21-22, 32-33
+tests\test_lpc.py                                27      0   100%
+tests\test_mic.py                                14      0   100%
+tests\test_music_utils.py                        62      0   100%
+tests\test_pitch.py                              27      0   100%
+tests\test_plotter.py                            40      0   100%
+tests\test_profile_activation_behavior.py        22      0   100%
+tests\test_profile_controller_extra.py           79      0   100%
+tests\test_profile_manager.py                    47      0   100%
+tests\test_profile_manager_shims.py              11      0   100%
+tests\test_profile_popup_behavior.py             16      2    88%   34-37
+tests\test_safe_spectrogram.py                   43      0   100%
+tests\test_scoring.py                            65      0   100%
+tests\test_scoring_edge_cases.py                 27      0   100%
+tests\test_smoothing.py                          47      0   100%
+tests\test_smoothing_edge_cases.py               27      0   100%
+tests\test_tuner_controller.py                   74      0   100%
+tests\test_tuner_controller_edge_cases.py       106      0   100%
+tests\test_tuner_controller_extra.py             85      0   100%
+tests\test_tuner_plotter_structural.py           55      0   100%
+tests\test_tuner_window_profile_ui.py            19      0   100%
+tests\test_vowel.py                              67      0   100%
+tuner\controller.py                              76      1    99%   127
+tuner\live_analyzer.py                           94     35    63%   167-173, 176-201, 205-213, 216-219
+tuner\profile_controller.py                     109     15    86%   46-48, 114-123, 127, 154-155
+tuner\tuner_plotter.py                          102     20    80%   23-24, 48-53, 112-113, 117-118, 157-158, 167-168, 185-186, 202-203
+tuner\window.py                                 302    137    55%   246, 254-259, 266-269, 272-294, 299, 305-311, 317-323, 335-392, 398-411, 417-424, 431-453, 460-472, 479-539, 545-546
+utils\music_utils.py                             45      9    80%   46-62
+---------------------------------------------------------------------------
+TOTAL                                          3620    659    82%
+=========================== short test summary info ===========================
+FAILED tests/test_calibration_session.py::test_handle_result_requires_valid_vowel
+FAILED tests/test_calibration_session.py::test_normalize_profile_for_save_basic
+FAILED tests/test_calibration_session.py::test_normalize_profile_for_save_swaps_reversed_f1_f2
+FAILED tests/test_calibration_session.py::test_calibration_session_save_profile_creates_new_file
+FAILED tests/test_engine.py::test_engine_basic_processing - AttributeError: '...
+FAILED tests/test_engine.py::test_engine_vowel_guessing - AttributeError: 'fl...
+FAILED tests/test_engine.py::test_engine_scoring_with_user_formants - Attribu...
+FAILED tests/test_engine_edge_cases.py::test_engine_handles_nan_frame - asser...
+FAILED tests/test_engine_edge_cases.py::test_engine_handles_low_sample_rate
+FAILED tests/test_engine_edge_cases.py::test_engine_handles_high_sample_rate
+FAILED tests/test_engine_edge_cases.py::test_engine_handles_extreme_formant_values
+FAILED tests/test_engine_extra.py::test_engine_propagates_formant_confidence
+FAILED tests/test_engine_extra.py::test_engine_handles_extreme_formant_values
+FAILED tests/test_engine_extra.py::test_engine_low_confidence_disables_vowel_guess
+FAILED tests/test_engine_extra.py::test_engine_output_structure_is_stable - A...
+FAILED tests/test_engine_singleton_wiring.py::test_engine_receives_calibrated_profile
+FAILED tests/test_profile_popup_behavior.py::test_calibration_does_not_trigger_popups
+================= 17 failed, 163 passed, 1 warning in 11.75s ==================

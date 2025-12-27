@@ -1,7 +1,6 @@
 # calibration/window.py
 import time
 import traceback
-import threading
 import numpy as np
 from PyQt5.QtWidgets import (
     QMainWindow,
@@ -15,10 +14,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QTimer, pyqtSignal
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-
 from tuner.live_analyzer import LiveAnalyzer
 from analysis.smoothing import LabelSmoother, PitchSmoother, MedianSmoother
-from analysis.vowel import is_plausible_formants
 from calibration.session import CalibrationSession
 from calibration.state_machine import CalibrationStateMachine
 from calibration.plotter import update_artists, safe_spectrogram
@@ -37,9 +34,13 @@ class CalibrationWindow(QMainWindow):
     profile_calibrated = pyqtSignal(str)
 
     def __init__(self, profile_name, voice_type="bass",
-                 engine=None, analyzer=None, parent=None):
+                 engine=None, analyzer=None, profile_manager=None,
+                 existing_profile=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Calibration")
+        # Shared engine
+        self.engine = engine
+        self.profile_manager = profile_manager
 
         # Rolling state
         self._last_result = None
@@ -48,15 +49,16 @@ class CalibrationWindow(QMainWindow):
 
         # Core vowel set
         self.vowels = ["i", "ɛ", "ɑ", "ɔ", "u"]
+
         self.session = CalibrationSession(
             profile_name=profile_name,
             voice_type=voice_type,
             vowels=self.vowels,
+            profile_manager=self.profile_manager,
+            existing_profile=existing_profile,
         )
         self.state = CalibrationStateMachine(self.vowels)
 
-        # Shared engine
-        self.engine = engine
         # Build smoothers (confidence-aware)
         self.pitch_smoother = PitchSmoother(sr=48000, min_confidence=0.25)
         self.formant_smoother = MedianSmoother(min_confidence=0.25)
@@ -67,7 +69,6 @@ class CalibrationWindow(QMainWindow):
                          pitch_smoother=self.pitch_smoother,
                          formant_smoother=self.formant_smoother,
                          label_smoother=self.label_smoother))
-        self.analyzer.reset()
         self.capture_timeout = 3.0
 
         # -----------------------------------------------------
@@ -215,26 +216,25 @@ class CalibrationWindow(QMainWindow):
         if raw is None:
             return
 
-        # Unwrap pitch
+        # Extract pitch (unwrap PitchResult)
         pitch = raw.get("f0")
-        if pitch is not None and hasattr(pitch, "f0"):
-            raw_f0 = pitch.f0
+
+        if hasattr(pitch, "f0"):
+            f0 = pitch.f0
         else:
-            raw_f0 = raw.get("f0")
-        print("RAW IN CALIB:", raw.get("segment") if raw else None)
-        # Unwrap formants
+            f0 = pitch
+        print("DEBUG PITCH:", pitch, "→ f0:", f0)
+        # Sanitize pitch
+        if f0 is None or not np.isfinite(f0):
+            f0 = None
+        # Extract formants
         form = raw.get("formants")
-        if form is not None and hasattr(form, "f1"):
-            f1, f2, f3 = form.f1, form.f2, form.f3
-            lpc_conf = getattr(form, "confidence", raw.get("confidence", 0.0))
+        if isinstance(form, (tuple, list)) and len(form) >= 2:
+            f1, f2 = form[0], form[1]
         else:
-            f1, f2, f3 = raw.get("formants", (None, None, None))
-            lpc_conf = raw.get("confidence", 0.0)
+            f1, f2 = None, None
 
-        stable = raw.get("stable", True)
-
-        # Debug
-        print("DEBUG:", f1, f2, f3, lpc_conf, stable)
+        confidence = raw.get("confidence", 0.0)
 
         # -----------------------------
         # Capture gating (calibration)
@@ -244,10 +244,9 @@ class CalibrationWindow(QMainWindow):
                 target is not None
                 and f1 is not None
                 and f2 is not None
-                and lpc_conf >= 0.25
+                and confidence >= 0.25
         ):
-            self._capture_buffer.append((f1, f2, raw_f0))
-            print("CAPTURED FRAME (CALIB):", target, f1, f2, raw_f0)
+            self._capture_buffer.append((f1, f2, f0))
 
         # -----------------------------
         # Spectrogram
@@ -255,7 +254,7 @@ class CalibrationWindow(QMainWindow):
         segment = raw.get("segment")
         if segment is None:
             return
-        print("SEGMENT RMS:", np.sqrt(np.mean(segment ** 2)))
+
         seg_arr = np.asarray(segment, dtype=float).flatten()
         if seg_arr.size == 0:
             return
@@ -296,7 +295,6 @@ class CalibrationWindow(QMainWindow):
     # Capture processing
     # ---------------------------------------------------------
     def _process_capture(self):
-        print("PROCESS_CAPTURE buffer size:", len(self._capture_buffer))
         self.phase_timer.stop()
 
         vowel = self.state.current_vowel
@@ -316,28 +314,13 @@ class CalibrationWindow(QMainWindow):
         f1_vals, f2_vals, f0_vals = zip(*buffer_snapshot)
         f1_arr = np.asarray(f1_vals, dtype=float)
         f2_arr = np.asarray(f2_vals, dtype=float)
-        f0_arr = np.asarray(f0_vals, dtype=float)
-
-        # Remove NaN/inf
-        f1_arr = f1_arr[np.isfinite(f1_arr)]
-        f2_arr = f2_arr[np.isfinite(f2_arr)]
-        f0_arr = f0_arr[np.isfinite(f0_arr)]
-
-        # Per-frame plausibility
-        mask = []
-        for f1_val, f2_val in zip(f1_arr, f2_arr):
-            ok, _ = is_plausible_formants(
-                f1_val,
-                f2_val,
-                voice_type=self.session.voice_type,
-                vowel=vowel,
-            )
-            mask.append(ok)
-
-        mask = np.asarray(mask, dtype=bool)
-        f1_arr = f1_arr[mask]
-        f2_arr = f2_arr[mask]
-        f0_arr = f0_arr[:mask.sum()] if f0_arr.size >= mask.sum() else f0_arr
+        # Clean f0: keep only finite floats, drop None
+        f0_clean = [v for v in f0_vals if v is not None and np.isfinite(v)]
+        f0_arr = (
+            np.asarray(f0_clean, dtype=float)
+            if f0_clean
+            else np.array([], dtype=float)
+        )
 
         # No plausible frames
         if f1_arr.size == 0 or f2_arr.size == 0:
@@ -349,6 +332,7 @@ class CalibrationWindow(QMainWindow):
             if ev["event"] == "max_retries":
                 f1_best, f2_best, f0_best = self._pick_best_attempt(buffer_snapshot)
                 accepted, skipped, msg = self.session.handle_result(
+                    vowel,
                     f1_best, f2_best, f0_best,
                     confidence=0.0,
                     stability=float("inf"),
@@ -365,6 +349,7 @@ class CalibrationWindow(QMainWindow):
 
         # Submit to session
         accepted, skipped, msg = self.session.handle_result(
+            vowel,
             f1_med, f2_med, f0_med,
             confidence=1.0,
             stability=0.0,
@@ -385,6 +370,7 @@ class CalibrationWindow(QMainWindow):
         if ev["event"] == "max_retries":
             f1_best, f2_best, f0_best = self._pick_best_attempt()
             accepted, skipped, msg = self.session.handle_result(
+                vowel,
                 f1_best, f2_best, f0_best,
                 confidence=1.0,
                 stability=0.0,
@@ -419,26 +405,32 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Finish and save profile
     # ---------------------------------------------------------
-    def _finish(self):  # noqa: C901
+    def _finish(self):
         try:
             self.phase_timer.stop()
             self.poll_timer.stop()
         except Exception:
             pass
 
+        # Stop engine stream if present
         if hasattr(self.engine, "stop_stream"):
             try:
                 self.engine.stop_stream()
             except Exception:
                 pass
+
+        # Reset smoothers
         try:
             self.label_smoother.reset()
             self.pitch_smoother.reset()
             self.formant_smoother.reset()
         except Exception:
             pass
+
         self._capture_buffer.clear()
         self._spec_buffer = np.array([], dtype=float)
+
+        # Save profile
         try:
             base_name = self.session.save_profile()
             self.status_panel.appendPlainText(f"Profile saved for {base_name}")
@@ -447,6 +439,7 @@ class CalibrationWindow(QMainWindow):
             self.status_panel.appendPlainText("Failed to save profile.")
             base_name = f"{self.session.profile_name}_{self.session.voice_type}"
 
+        # Notify tuner
         try:
             self.profile_calibrated.emit(base_name)  # type:ignore
         except Exception:

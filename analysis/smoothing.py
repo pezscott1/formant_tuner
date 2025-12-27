@@ -65,7 +65,9 @@ class PitchSmoother:
     # -------------------------
     def update(self, new, confidence=1.0):
         # --- unwrap PitchResult objects ---
-        if hasattr(new, "frequency"):
+        if hasattr(new, "f0"):
+            new = new.f0
+        elif hasattr(new, "frequency"):
             new = new.frequency
 
         # ignore None

@@ -1,3 +1,4 @@
+# tuner/profile_controller.py
 import os
 import json
 from pathlib import Path
@@ -71,7 +72,7 @@ class ProfileManager:
         if model_bytes is not None:
             with open(model_path, "wb") as f:
                 f.write(model_bytes)
-
+        print("[CALIBRATION] Saving profile to:", base)
         self.set_active_profile(base)
 
     # ---------------------------------------------------------
@@ -121,6 +122,10 @@ class ProfileManager:
         except Exception:
             self.active_profile_name = None
 
+    def load_profile(self, base: str) -> dict:
+        """Public wrapper for loading a profile by base name."""
+        return self.load_profile_json(base)
+
     # ---------------------------------------------------------
     # Internal JSON loader
     # ---------------------------------------------------------
@@ -165,30 +170,23 @@ class ProfileManager:
     # Extract formants from rich profile JSON
     # ---------------------------------------------------------
     def extract_formants(self, raw_dict):
-        """
-        Convert rich profile entries like:
-            { "a": { "f1":..., "f2":...,
-            "f0":..., "confidence":..., "stability":... }, ... }
-        into:
-            { "a": (f1, f2, f0, confidence, stability), ... }
-        """
         out = {}
         if not isinstance(raw_dict, dict):
             return out
 
         for vowel, entry in raw_dict.items():
-            if not isinstance(entry, dict):
-                continue
             if vowel == "voice_type":
                 continue
+            if not isinstance(entry, dict):
+                continue
 
-            f1 = entry.get("f1")
-            f2 = entry.get("f2")
-            f0 = entry.get("f0")
-            conf = entry.get("confidence", 0.0)
-            stab = entry.get("stability", float("inf"))
-
-            out[vowel] = (f1, f2, f0, conf, stab)
+            out[vowel] = (
+                entry.get("f1"),
+                entry.get("f2"),
+                entry.get("f0"),
+                entry.get("confidence", 0.0),
+                entry.get("stability", float("inf")),
+            )
 
         return out
 

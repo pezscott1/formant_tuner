@@ -173,6 +173,7 @@ class LiveAnalyzer:
             pass
 
     def _worker_loop(self):
+        import traceback
         """Background thread: consume audio, run engine, push processed frames."""
         while not self._stop_flag.is_set():
             try:
@@ -185,6 +186,7 @@ class LiveAnalyzer:
                 raw = self.engine.process_frame(segment, self.sample_rate)
             except Exception as e:
                 print("[ENGINE ERROR]", e)
+                traceback.print_exc()
                 continue
 
             processed = self.process_raw(raw)

@@ -92,7 +92,7 @@ class Tuner:
         raw = self.engine.get_latest_raw()
         if raw is None:
             return None
-
+        print("RAW IN TUNER:", raw.get("segment") if raw else None)
         processed = self.live_analyzer.process_raw(raw)
         if processed is None:
             return None
@@ -112,7 +112,7 @@ class Tuner:
 
         processed["profile_vowel"] = vowel
         processed["profile_confidence"] = confidence
-
+        print("DEBUG:", f1, f2)
         return processed
 
     # ---------------------------------------------------------
