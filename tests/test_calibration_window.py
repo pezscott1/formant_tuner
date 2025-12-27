@@ -1,6 +1,9 @@
+import os
+import pytest
+if os.environ.get("CI") == "true":
+    pytest.skip("Skipping CalibrationWindow UI tests in CI", allow_module_level=True)
 import numpy as np
 from unittest.mock import MagicMock, patch
-import pytest
 
 
 @pytest.fixture

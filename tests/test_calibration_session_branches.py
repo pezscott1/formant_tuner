@@ -56,7 +56,8 @@ def test_handle_result_weighted_update():
         "weight": 1.0,
     }
 
-    ok, retry, msg = sess.handle_result("a", 600, 1600, 200, 0.5, 0.5)
+    ok, retry, msg = sess.handle_result(
+        "a", 600, 1600, 200, 0.5, 0.5)
     assert ok is True
     assert retry is False
     assert "Updated /a/" in msg
