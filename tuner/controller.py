@@ -15,6 +15,8 @@ class Tuner:
         sample_rate=48000,
         engine=None,
     ):
+        self.stream = None
+        self.current_tolerance = None
         # Engine: allow injection for tests, otherwise construct
         self.engine = engine or FormantAnalysisEngine(voice_type=voice_type)
 
@@ -162,3 +164,42 @@ class Tuner:
 
         confidence = float(np.exp(-best_dist))
         return best_vowel, confidence
+
+    def update_tolerance(self, text: str) -> int:
+        try:
+            value = int(text)
+            if value <= 0:
+                raise ValueError
+            self.current_tolerance = value
+        except Exception:
+            pass
+        return self.current_tolerance
+
+    def start_mic(self, stream_factory):
+        if getattr(self, "stream", None) is not None:
+            return False
+
+        try:
+            self.stream = stream_factory()
+            self.stream.start()
+            self.live_analyzer.start_worker()
+            return True
+        except Exception:
+            self.stream = None
+            return False
+
+    def stop_mic(self):
+        stream = getattr(self, "stream", None)
+        if stream is None:
+            return False
+
+        try:
+            stream.stop()
+            stream.close()
+        except Exception:
+            pass
+
+        self.stream = None
+        self.live_analyzer.stop_worker()
+        self.live_analyzer.reset()
+        return True

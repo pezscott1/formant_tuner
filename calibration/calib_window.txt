@@ -38,6 +38,9 @@ class CalibrationWindow(QMainWindow):
                  existing_profile=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Calibration")
+        # Shared engine
+        self.engine = engine
+        self.profile_manager = profile_manager
 
         # Rolling state
         self._last_result = None
@@ -46,6 +49,7 @@ class CalibrationWindow(QMainWindow):
 
         # Core vowel set
         self.vowels = ["i", "ɛ", "ɑ", "ɔ", "u"]
+
         self.session = CalibrationSession(
             profile_name=profile_name,
             voice_type=voice_type,
@@ -55,9 +59,6 @@ class CalibrationWindow(QMainWindow):
         )
         self.state = CalibrationStateMachine(self.vowels)
 
-        # Shared engine
-        self.engine = engine
-        self.profile_manager = profile_manager
         # Build smoothers (confidence-aware)
         self.pitch_smoother = PitchSmoother(sr=48000, min_confidence=0.25)
         self.formant_smoother = MedianSmoother(min_confidence=0.25)
@@ -209,15 +210,23 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
-    def _poll_audio(self):
+    def _poll_audio(self):  # noqa: C901
         # Pull latest analyzer frame (NOT engine)
         raw = self.analyzer.get_latest_raw()
         if raw is None:
             return
 
-        # Extract pitch
-        f0 = raw.get("f0")
+        # Extract pitch (unwrap PitchResult)
+        pitch = raw.get("f0")
 
+        if hasattr(pitch, "f0"):
+            f0 = pitch.f0
+        else:
+            f0 = pitch
+        print("DEBUG PITCH:", pitch, "→ f0:", f0)
+        # Sanitize pitch
+        if f0 is None or not np.isfinite(f0):
+            f0 = None
         # Extract formants
         form = raw.get("formants")
         if isinstance(form, (tuple, list)) and len(form) >= 2:
@@ -285,7 +294,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Capture processing
     # ---------------------------------------------------------
-    def _process_capture(self):
+    def _process_capture(self):  # noqa: C901
         self.phase_timer.stop()
 
         vowel = self.state.current_vowel
@@ -305,13 +314,13 @@ class CalibrationWindow(QMainWindow):
         f1_vals, f2_vals, f0_vals = zip(*buffer_snapshot)
         f1_arr = np.asarray(f1_vals, dtype=float)
         f2_arr = np.asarray(f2_vals, dtype=float)
-        f0_arr = np.asarray(f0_vals, dtype=float)
-
-        # Remove NaN/inf
-        mask = np.isfinite(f1_arr) & np.isfinite(f2_arr)
-        f1_arr = f1_arr[mask]
-        f2_arr = f2_arr[mask]
-        f0_arr = f0_arr[mask] if f0_arr.size >= mask.sum() else f0_arr
+        # Clean f0: keep only finite floats, drop None
+        f0_clean = [v for v in f0_vals if v is not None and np.isfinite(v)]
+        f0_arr = (
+            np.asarray(f0_clean, dtype=float)
+            if f0_clean
+            else np.array([], dtype=float)
+        )
 
         # No plausible frames
         if f1_arr.size == 0 or f2_arr.size == 0:
@@ -323,6 +332,7 @@ class CalibrationWindow(QMainWindow):
             if ev["event"] == "max_retries":
                 f1_best, f2_best, f0_best = self._pick_best_attempt(buffer_snapshot)
                 accepted, skipped, msg = self.session.handle_result(
+                    vowel,
                     f1_best, f2_best, f0_best,
                     confidence=0.0,
                     stability=float("inf"),
@@ -339,6 +349,7 @@ class CalibrationWindow(QMainWindow):
 
         # Submit to session
         accepted, skipped, msg = self.session.handle_result(
+            vowel,
             f1_med, f2_med, f0_med,
             confidence=1.0,
             stability=0.0,
@@ -359,6 +370,7 @@ class CalibrationWindow(QMainWindow):
         if ev["event"] == "max_retries":
             f1_best, f2_best, f0_best = self._pick_best_attempt()
             accepted, skipped, msg = self.session.handle_result(
+                vowel,
                 f1_best, f2_best, f0_best,
                 confidence=1.0,
                 stability=0.0,
@@ -393,7 +405,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Finish and save profile
     # ---------------------------------------------------------
-    def _finish(self):
+    def _finish(self):  # noqa: C901
         try:
             self.phase_timer.stop()
             self.poll_timer.stop()

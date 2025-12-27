@@ -41,7 +41,6 @@ class TunerWindow(QMainWindow):
     def __init__(self, tuner, sample_rate=48000, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Formant Tuner")
-
         self.tuner = tuner
         self.analyzer = tuner.engine
         self.profile_manager = tuner.profile_manager
@@ -210,8 +209,8 @@ class TunerWindow(QMainWindow):
         # Signals
         (self.tol_field.editingFinished.connect  # type: ignore
             (self._update_tolerance_from_field))
-        self.start_btn.clicked.connect(self.start_mic)  # type: ignore
-        self.stop_btn.clicked.connect(self.stop_mic)  # type: ignore
+        self.start_btn.clicked.connect(lambda: self._start_mic_ui())  # type: ignore
+        self.stop_btn.clicked.connect(lambda: self._stop_mic_ui())  # type: ignore
         self.refresh_btn.clicked.connect(self._populate_profiles)  # type: ignore
         self.delete_btn.clicked.connect(self._delete_selected_profile)  # type: ignore
         self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type: ignore
@@ -240,7 +239,7 @@ class TunerWindow(QMainWindow):
         new_item.setData(Qt.UserRole, None)
         self.profile_list.addItem(new_item)
 
-        names = self.profile_manager.list_profiles()
+        names = self.tuner.list_profiles()
         for base in names:
             if base == "test_bass":
                 continue
@@ -301,31 +300,12 @@ class TunerWindow(QMainWindow):
 
     def _apply_profile_base(self, base: str):
         try:
-            applied = self.profile_manager.apply_profile(base)
+            applied = self.tuner.load_profile(base)
         except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Profile error",
-                f"Could not apply profile '{base}':\n{e}",
-            )
+            QMessageBox.critical(self, "Profile error", f"Could not apply profile '{base}':\n{e}")
             return
 
         self._set_active_profile(applied)
-
-        try:
-            data = self.profile_manager.load_profile_json(applied)
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Profile error",
-                f"Failed to load profile data for '{applied}':\n{e}",
-            )
-            return
-
-        # Extract calibrated formants (+conf, +stability)
-        formants = self.profile_manager.extract_formants(data)
-        self.analyzer.calibrated_profile = formants
-
         self.voice_type = getattr(self.analyzer, "voice_type", self.voice_type)
 
     def _on_calibrate_clicked(self):
@@ -368,7 +348,7 @@ class TunerWindow(QMainWindow):
                 parent=self,
             )
             self.update_timer.stop()
-            self.start_mic()
+            self._start_mic_ui()
             self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
             self.calib_win.show()
             return
@@ -387,7 +367,7 @@ class TunerWindow(QMainWindow):
             parent=self,
         )
         self.update_timer.stop()
-        self.start_mic()
+        self._start_mic_ui()
         self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
         self.calib_win.show()
 
@@ -406,7 +386,7 @@ class TunerWindow(QMainWindow):
 
         # Stop mic cleanly
         try:
-            self.stop_mic()
+            self.tuner.stop_mic()
         except Exception:
             pass
 
@@ -415,78 +395,49 @@ class TunerWindow(QMainWindow):
     # ---------------------------------------------------------
     def _update_tolerance_from_field(self):
         text = self.tol_field.text()
-        try:
-            value = int(text)
-            if value <= 0:
-                raise ValueError
+        value = self.tuner.update_tolerance(text)
+        if value is None:
+            value = self.current_tolerance
+        else:
             self.current_tolerance = value
-        except ValueError:
-            self.tol_field.setText(str(self.current_tolerance))
+        self.tol_field.setText(str(value))
 
     # ---------------------------------------------------------
     # Mic handling
     # ---------------------------------------------------------
 
-    def start_mic(self):
-        with self.stream_lock:
-            if self.stream is not None:
-                return
+    def _start_mic_ui(self):
+        def callback(indata, _frames, _time, status):
+            if status:
+                print("[AUDIO STATUS]", status)
+            mono = indata[:, 0].astype(np.float64, copy=False)
+            self.live_analyzer.submit_audio_segment(mono)
 
-            def callback(indata, _frames, _time, status):
-                if status:
-                    print("[AUDIO STATUS]", status)
+        ok = self.tuner.start_mic(lambda: sd.InputStream(
+            samplerate=self.sample_rate,
+            channels=1,
+            callback=callback
+        ))
 
-                mono = indata[:, 0].astype(np.float64, copy=False)
-                self.live_analyzer.submit_audio_segment(mono)
+        if ok:
+            self.stream = self.tuner.stream
+        else:
+            QMessageBox.critical(self, "Mic error", "Could not start microphone.")
 
-            try:
-                self.stream = sd.InputStream(
-                    samplerate=self.sample_rate,
-                    channels=1,
-                    callback=callback,
-                )
-                self.stream.start()
-                self.live_analyzer.start_worker()  # NEW
-                print("[AUDIO] Microphone stream started")
-            except Exception as e:
-                self.stream = None
-                QMessageBox.critical(
-                    self,
-                    "Mic error",
-                    f"Could not start microphone:\n{e}",
-                )
-
-    def stop_mic(self):
-        with self.stream_lock:
-            if self.stream is None:
-                return
-            try:
-                self.stream.stop()
-                self.stream.close()
-                print("[AUDIO] Microphone stream stopped")
-            except Exception:
-                pass
-            finally:
-                self.stream = None
-                self.live_analyzer.stop_worker()  # NEW
-                self.live_analyzer.reset()
+    def _stop_mic_ui(self):
+        ok = self.tuner.stop_mic()
+        self.stream = None
 
     # ---------------------------------------------------------
     # Display update
     # ---------------------------------------------------------
     def _update_display(self):  # noqa: C901
         # Only update if mic is running
-        if self.stream is None or not self.stream.active:
+        stream = self.tuner.stream
+        if stream is None or not getattr(stream, "active", True):
             return
 
-        # Pull the most recent processed frame
-        processed = None
-        try:
-            while True:
-                processed = self.live_analyzer.processed_queue.get_nowait()
-        except Exception:
-            pass
-
+        processed = self.tuner.poll_latest_processed()
         if not processed:
             return
 
