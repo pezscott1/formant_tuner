@@ -1,4 +1,8 @@
 # tests/test_tuner_window_profile_ui.py
+import os
+import pytest
+if os.environ.get("CI") == "true":
+    pytest.skip("Skipping Qt/Matplotlib UI tests in CI", allow_module_level=True)
 from tuner.window import TunerWindow
 from tuner.controller import Tuner
 from analysis.engine import FormantAnalysisEngine
