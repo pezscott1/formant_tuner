@@ -56,7 +56,8 @@ class DummyLiveAnalyzer:
         pass
 
     def process_raw(self, raw):
-        return {"f0": 100, "formants": (500, 1500, 2500), "vowel": "a", "vowel_guess": "a",
+        return {"f0": 100, "formants": (500, 1500, 2500),
+                "vowel": "a", "vowel_guess": "a",
                 "vowel_score": 0.5, "resonance_score": 0.4, "overall": 0.45}
 
 
