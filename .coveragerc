@@ -1,3 +1,17 @@
 [coverage:run]
 omit =
     main.py
+[run]
+branch = True
+omit =
+    tuner/window.py
+    calibration/window.py
+    calibration/plotter.py
+    tuner/tuner_plotter.py
+    calibration/dialog.py
+    diagnostic.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
