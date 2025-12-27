@@ -210,7 +210,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
-    def _poll_audio(self):
+    def _poll_audio(self):  # noqa: C901
         # Pull latest analyzer frame (NOT engine)
         raw = self.analyzer.get_latest_raw()
         if raw is None:
@@ -294,7 +294,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Capture processing
     # ---------------------------------------------------------
-    def _process_capture(self):
+    def _process_capture(self):  # noqa: C901
         self.phase_timer.stop()
 
         vowel = self.state.current_vowel
@@ -405,7 +405,7 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Finish and save profile
     # ---------------------------------------------------------
-    def _finish(self):
+    def _finish(self):  # noqa: C901
         try:
             self.phase_timer.stop()
             self.poll_timer.stop()

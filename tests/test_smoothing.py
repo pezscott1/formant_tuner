@@ -211,4 +211,3 @@ def test_hps_pitch_detects_simple_tone():
     assert out is not None
     # Must be within allowed band
     assert 50 <= out <= 500
-

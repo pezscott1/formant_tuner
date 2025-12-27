@@ -54,7 +54,8 @@ def test_pitch_smoother_handles_nan():
     ps.update(120.0)
     out = ps.update(np.nan)
 
-    # Current implementation will set current to nan; we just assert no crash and float-like.
+    # Current implementation will set current to nan
+    # we just assert no crash and float-like.
     assert isinstance(out, float)
 
 

@@ -92,7 +92,8 @@ class CalibrationSession:
             new_f0 = f0
         else:
             new_f0 = old_f0
-        print(f"[HANDLE_RESULT] f0={f0} type={type(f0)} isfinite={np.isfinite(f0) if f0 is not None else 'None'}")
+        print(f"[HANDLE_RESULT] f0={f0} type={type(f0)} "
+              f"isfinite={np.isfinite(f0) if f0 is not None else 'None'}")
         # Confidence and stability smoothing
         new_conf = (old_conf * old_weight + confidence) / new_weight
         new_stab = (old_stab * old_weight + stability) / new_weight
