@@ -47,3 +47,7 @@ jobs:
             --cov=. \
             --cov-report=term-missing \
             --cov-fail-under=85
+      - name: Run tests with branch coverage
+        run: |
+          coverage run --branch -m pytest
+          coverage report --fail-under=85

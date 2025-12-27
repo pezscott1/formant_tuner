@@ -1,6 +1,4 @@
 import pytest
-from datetime import datetime
-from analysis.vowel import is_plausible_formants
 from calibration.session import CalibrationSession, normalize_profile_for_save
 
 
@@ -13,7 +11,8 @@ def test_load_existing_profile():
         "a": {"f1": 500, "f2": 1500, "f0": 120, "confidence": 0.8, "stability": 0.9},
         "voice_type": "baritone",
     }
-    sess = CalibrationSession("test", "baritone", vowels=["a"], existing_profile=existing)
+    sess = CalibrationSession(
+        "test", "baritone", vowels=["a"], existing_profile=existing)
     assert "a" in sess.data
     assert sess.data["a"]["f1"] == 500
 

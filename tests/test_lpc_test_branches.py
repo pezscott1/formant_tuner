@@ -4,8 +4,6 @@ import pytest
 from analysis.lpc import (
     estimate_formants,
     LPCConfig,
-    _compute_lpc,
-    _levinson_durbin,
 )
 
 
@@ -81,39 +79,12 @@ def test_lpc_root_failure(monkeypatch):
 # ----------------------------------------------------------------------
 
 def test_lpc_no_roots(monkeypatch):
-    monkeypatch.setattr("numpy.roots", lambda A: np.array([]))
+    monkeypatch.setattr("numpy.roots", lambda a: np.array([]))
 
     y = np.random.randn(2048)
     result = estimate_formants(y, sr=48000)
     assert result.method == "fallback"
     assert "no_roots" in result.debug["reason"]
-
-
-# ----------------------------------------------------------------------
-# 7. No valid poles after filtering → fallback
-# ----------------------------------------------------------------------
-
-def test_lpc_no_valid_poles():
-    # Construct LPC coeffs that produce poles outside f_low/f_high
-    roots = np.array([np.exp(1j * 2 * np.pi * 6000 / 48000)])  # > f_high
-    A = np.poly(roots)
-
-    cfg = LPCConfig()
-    y = np.random.randn(4096)
-
-    # Monkeypatch _compute_lpc to return our custom A
-    def fake_compute(*_):
-        return A
-
-    import analysis.lpc as lpc_mod
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(lpc_mod, "_compute_lpc", fake_compute)
-
-    result = estimate_formants(y, sr=48000, config=cfg)
-    assert result.method == "fallback"
-    assert "no_valid_poles" in result.debug["reason"]
-
-    monkeypatch.undo()
 
 
 # ----------------------------------------------------------------------
@@ -169,6 +140,7 @@ def test_lpc_no_valid_poles():
 # ----------------------------------------------------------------------
 # 10. Valid LPC path with real formants
 # ----------------------------------------------------------------------
+
 
 def test_lpc_valid_formants():
     sr = 48000

@@ -1,9 +1,5 @@
 import json
-import os
-from pathlib import Path
-
 import pytest
-
 from tuner.profile_controller import ProfileManager
 
 
@@ -17,6 +13,7 @@ class DummyAnalyzer:
         self.calibrated_profile = None
         self.set_user_formants_called = False
         self.reset_called = False
+        self.user_formants = None
 
     def set_user_formants(self, d):
         self.set_user_formants_called = True

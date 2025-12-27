@@ -302,7 +302,8 @@ class TunerWindow(QMainWindow):
         try:
             applied = self.tuner.load_profile(base)
         except Exception as e:
-            QMessageBox.critical(self, "Profile error", f"Could not apply profile '{base}':\n{e}")
+            QMessageBox.critical(self, "Profile error",
+                                 f"Could not apply profile '{base}':\n{e}")
             return
 
         self._set_active_profile(applied)
@@ -425,7 +426,7 @@ class TunerWindow(QMainWindow):
             QMessageBox.critical(self, "Mic error", "Could not start microphone.")
 
     def _stop_mic_ui(self):
-        ok = self.tuner.stop_mic()
+        self.tuner.stop_mic()
         self.stream = None
 
     # ---------------------------------------------------------
