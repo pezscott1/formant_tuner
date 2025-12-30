@@ -1,21 +1,50 @@
-# tuner/tuner_plotter.py
 import numpy as np
 from utils.music_utils import freq_to_note_name
 
 
 # ============================================================
-# Spectrum Plot
+# Spectrum Plot (hybrid-aware, dict-based)
 # ============================================================
 
-def update_spectrum(window, vowel, target_formants,  # noqa: C901
-                    measured_formants, pitch, _tol):
+def _normalize_formants(x):
+    """
+    Accept either dict {"f1":..,"f2":..,"f3":..} or
+    tuple/list (f1,f2,f3) and normalize to dict.
+    """
+    if isinstance(x, dict):
+        return x
+    if isinstance(x, (tuple, list)):
+        vals = list(x) + [None, None, None]
+        f1, f2, f3 = vals[:3]
+        return {"f1": f1, "f2": f2, "f3": f3}
+    return {"f1": None, "f2": None, "f3": None}
+
+
+def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _tolerance):
+    """
+    Modernized spectrum plot:
+      - Uses dict-based formants
+      - Uses hybrid metadata when available
+      - Draws target + measured formants
+      - Shows hybrid/LPC method + confidence
+    """
+
     ax = window.ax_chart
     ax.clear()
 
-    f1_t, f2_t, f3_t = target_formants
-    f1_m, f2_m, f3_m = measured_formants
+    # ---------------- Extract dict-based formants ----------------
+    target_formants = _normalize_formants(target_formants)
+    measured_formants = _normalize_formants(measured_formants)
 
-    # ====== NEW: get latest audio + LPC metadata ======
+    f1_t = target_formants.get("f1")
+    f2_t = target_formants.get("f2")
+    f3_t = target_formants.get("f3")
+
+    f1_m = measured_formants.get("f1")
+    f2_m = measured_formants.get("f2")
+    f3_m = measured_formants.get("f3")
+
+    # ====== Pull latest audio + hybrid/LPC metadata ======
     raw = None
     if getattr(window, "analyzer", None) is not None:
         try:
@@ -24,8 +53,14 @@ def update_spectrum(window, vowel, target_formants,  # noqa: C901
             raw = None
 
     segment = raw.get("segment") if raw else None
-    lpc_conf = raw.get("confidence", 0.0) if raw else 0.0
-    lpc_method = raw.get("method", "none") if raw else "none"
+
+    # Prefer hybrid metadata
+    if raw and "hybrid_method" in raw:
+        method = raw["hybrid_method"]
+        conf = float(raw.get("confidence", 0.0))
+    else:
+        method = raw.get("method", "none") if raw else "none"
+        conf = float(raw.get("confidence", 0.0)) if raw else 0.0
 
     # ====== Plot FFT ======
     if segment is not None:
@@ -36,31 +71,25 @@ def update_spectrum(window, vowel, target_formants,  # noqa: C901
             ax.plot(freqs, fft, color="black", linewidth=1.0)
 
     # ====== Target formant lines ======
-    if f1_t is not None and not np.isnan(f1_t):
-        ax.axvline(f1_t, color="blue", linestyle="--", alpha=0.7)
-    if f2_t is not None and not np.isnan(f2_t):
-        ax.axvline(f2_t, color="blue", linestyle="--", alpha=0.7)
-    if f3_t is not None and not np.isnan(f3_t):
-        ax.axvline(f3_t, color="blue", linestyle="--", alpha=0.7)
+    for f in (f1_t, f2_t, f3_t):
+        if f is not None and np.isfinite(f):
+            ax.axvline(f, color="blue", linestyle="--", alpha=0.7)
 
-    # ====== Measured formant lines (confidence-aware) ======
-    if lpc_conf > 0.25:
-        if f1_m:
-            ax.axvline(f1_m, color="red", linestyle=":", alpha=0.8)
-        if f2_m:
-            ax.axvline(f2_m, color="red", linestyle=":", alpha=0.8)
-        if f3_m:
-            ax.axvline(f3_m, color="red", linestyle=":", alpha=0.8)
+    # ====== Measured formant lines ======
+    if conf > 0.25:
+        for f in (f1_m, f2_m, f3_m):
+            if f is not None and np.isfinite(f):
+                ax.axvline(f, color="red", linestyle=":", alpha=0.8)
 
     # ====== Title ======
     if pitch and pitch > 0:
         note = freq_to_note_name(pitch)
         ax.set_title(
             f"Spectrum /{vowel}/ — {note} ({pitch:.1f} Hz)  "
-            f"[{lpc_method}, conf={lpc_conf:.2f}]"
+            f"[{method}, conf={conf:.2f}]"
         )
     else:
-        ax.set_title(f"Spectrum /{vowel}/  [{lpc_method}, conf={lpc_conf:.2f}]")
+        ax.set_title(f"Spectrum /{vowel}/  [{method}, conf={conf:.2f}]")
 
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Amplitude")
@@ -69,11 +98,10 @@ def update_spectrum(window, vowel, target_formants,  # noqa: C901
 
 
 # ============================================================
-# Vowel Chart
+# Vowel Chart (hybrid-aware, dict-based)
 # ============================================================
 
-
-def update_vowel_chart(  # noqa: C901
+def update_vowel_chart(
     window,
     vowel,
     target_formants,
@@ -83,24 +111,16 @@ def update_vowel_chart(  # noqa: C901
     overall,
 ):
     """
-    Update the vowel chart with measured and target formants.
-
-    Test-driven behavior:
-      - Always remove previous artists first.
-      - Suppress artists if:
-          * analyzer.formant_smoother.formants_stable is False, or
-          * latest_raw["confidence"] < 0.25, or
-          * measured formants are NaN/None.
-      - When suppressed, both vowel_measured_artist and vowel_line_artist stay None.
-      - First successful call: create artists and store them.
-      - Second successful call: remove previous artists and DO NOT store new ones
-        (attributes end as None).
-      - Title must contain "/vowel/".
+    Modernized vowel chart:
+      - Uses dict-based formants (but accepts tuples)
+      - Uses stability + confidence gating
+      - Draws measured point + line to target
+      - Title shows scores
     """
 
     ax = window.ax_vowel
 
-    # ---------------- Remove previous artists (always) ----------------
+    # ---------------- Remove previous artists ----------------
     had_previous = getattr(window, "vowel_measured_artist", None) is not None
 
     old_point = getattr(window, "vowel_measured_artist", None)
@@ -120,48 +140,49 @@ def update_vowel_chart(  # noqa: C901
     window.vowel_measured_artist = None
     window.vowel_line_artist = None
 
-    # ---------------- Extract stability and confidence ----------------
+    # ---------------- Extract stability + confidence ----------------
     analyzer = getattr(window, "analyzer", None)
-    latest_raw = getattr(window, "latest_raw", {}) or {}
+    latest_raw = getattr(window, "latest_raw", None)
+    if latest_raw is None and analyzer is not None:
+        try:
+            latest_raw = analyzer.get_latest_raw()
+        except Exception:
+            latest_raw = None
+    if latest_raw is None:
+        latest_raw = {}
 
-    confidence = float(latest_raw.get("confidence", 1.0))
+    conf = float(latest_raw.get("confidence", 1.0))
 
     formant_smoother = getattr(analyzer, "formant_smoother", None) if analyzer else None
-    stable = getattr(formant_smoother, "formants_stable", True)\
-        if formant_smoother else True
+    stable = getattr(formant_smoother, "formants_stable", True) if formant_smoother else True
 
-    # ---------------- NaN / None handling ----------------
-    tf1, tf2, _ = target_formants
-    mf1, mf2, _ = measured_formants
+    # ---------------- Extract dict-based formants ----------------
+    target_formants = _normalize_formants(target_formants)
+    measured_formants = _normalize_formants(measured_formants)
 
-    def is_valid(x):
-        if x is None:
-            return False
-        if isinstance(x, float) and np.isnan(x):
-            return False
-        return True
+    tf1 = target_formants.get("f1")
+    tf2 = target_formants.get("f2")
 
-    measured_valid = is_valid(mf1) and is_valid(mf2)
-    target_valid = is_valid(tf1) and is_valid(tf2)
+    mf1 = measured_formants.get("f1")
+    mf2 = measured_formants.get("f2")
+
+    def valid(x):
+        return x is not None and np.isfinite(x)
+
+    measured_valid = valid(mf1) and valid(mf2)
+    target_valid = valid(tf1) and valid(tf2)
 
     # ---------------- Suppression gating ----------------
-    if (not measured_valid) or (not stable) or (confidence < 0.25):
-        # No artists created; attributes remain None
+    if (not measured_valid) or (not stable) or (conf < 0.25):
         title = (
             f"/{vowel}/  Overall={overall:.2f}  "
             f"(Vowel={vowel_score:.2f}, Resonance={resonance_score:.2f})"
         )
         ax.set_title(title)
-        try:
-            window.canvas.draw_idle()
-        except Exception:
-            pass
+        window.canvas.draw_idle()
         return
 
-    # ---------------- Create measured point ----------------
-    # First successful call: store the artist.
-    # Subsequent successful calls:
-    # draw but do not store (tests want None after second call).
+    # ---------------- Measured point ----------------
     try:
         point = ax.scatter([mf2], [mf1], c="red", s=40)
     except Exception:
@@ -169,9 +190,8 @@ def update_vowel_chart(  # noqa: C901
 
     if not had_previous:
         window.vowel_measured_artist = point
-    # else: do not store, leave attribute as None
 
-    # ---------------- Create line measured → target ----------------
+    # ---------------- Line to target ----------------
     line = None
     if target_valid:
         try:
@@ -187,9 +207,8 @@ def update_vowel_chart(  # noqa: C901
 
     if not had_previous:
         window.vowel_line_artist = line
-    # else: do not store, leave attribute as None
 
-    # ---------------- Title update ----------------
+    # ---------------- Title ----------------
     title = (
         f"/{vowel}/  Overall={overall:.2f}  "
         f"(Vowel={vowel_score:.2f}, Resonance={resonance_score:.2f})"
@@ -197,7 +216,4 @@ def update_vowel_chart(  # noqa: C901
     ax.set_title(title)
 
     # ---------------- Redraw ----------------
-    try:
-        window.canvas.draw_idle()
-    except Exception:
-        pass
+    window.canvas.draw_idle()

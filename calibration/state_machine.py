@@ -107,17 +107,10 @@ class CalibrationStateMachine:
         return (now - self.capture_start_time) > capture_timeout
 
     def retry_current_vowel(self):
-        """
-        Called when capture fails.
-        Returns:
-            {"event": "retry"} or {"event": "max_retries"}
-        """
         self.retry_count += 1
-
         if self.retry_count >= self.MAX_RETRIES:
             return {"event": "max_retries", "vowel": self.current_vowel}
 
-        # Normal retry
         self.phase = "prep"
         self.prep_secs = self.prep_seconds_default
         self.sing_secs = self.sing_seconds_default

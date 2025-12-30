@@ -8,7 +8,7 @@ if __name__ == "__main__":
     app = QApplication([])
 
     # 1. Create ONE shared engine
-    engine = FormantAnalysisEngine(voice_type="bass")
+    engine = FormantAnalysisEngine(voice_type="bass", debug=False)
 
     # 2. Create ONE shared tuner (owns LiveAnalyzer + ProfileManager)
     tuner = Tuner(engine=engine, voice_type="bass", profiles_dir="profiles")

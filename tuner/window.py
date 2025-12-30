@@ -396,7 +396,10 @@ class TunerWindow(QMainWindow):
     # ---------------------------------------------------------
     def _update_tolerance_from_field(self):
         text = self.tol_field.text()
-        value = self.tuner.update_tolerance(text)
+        try:
+            value = int(text)
+        except Exception:
+            value = self.current_tolerance
         if value is None:
             value = self.current_tolerance
         else:
@@ -413,7 +416,6 @@ class TunerWindow(QMainWindow):
                 print("[AUDIO STATUS]", status)
             mono = indata[:, 0].astype(np.float64, copy=False)
             self.live_analyzer.submit_audio_segment(mono)
-
         ok = self.tuner.start_mic(lambda: sd.InputStream(
             samplerate=self.sample_rate,
             channels=1,
@@ -443,15 +445,26 @@ class TunerWindow(QMainWindow):
             return
 
         f0 = processed["f0"]
-        f1, f2, f3 = processed["formants"]
+        if "hybrid_formants" in processed:
+            f1, f2, f3 = processed["hybrid_formants"]
+        else:
+            f1, f2, f3 = processed["formants"]
         vowel_raw = processed["vowel_guess"]
         vowel_smooth = processed["vowel"]
         vowel_score = processed["vowel_score"]
         resonance_score = processed["resonance_score"]
         overall = processed["overall"]
 
-        target_formants = (np.nan, np.nan, np.nan)
-        measured_formants = (f1, f2, f3)
+        # Pull active profile targets
+        if vowel_smooth in self.analyzer.user_formants:
+            entry = self.analyzer.user_formants[vowel_smooth]
+            target_formants = {
+                "f1": entry.get("f1"),
+                "f2": entry.get("f2"),
+                "f3": entry.get("f3"),
+            }
+        else:
+            target_formants = {"f1": None, "f2": None, "f3": None}
 
         # Spectrum panel
         try:
@@ -459,9 +472,9 @@ class TunerWindow(QMainWindow):
                 window=self,
                 vowel=vowel_raw,
                 target_formants=target_formants,
-                measured_formants=measured_formants,
+                measured_formants={"f1": f1, "f2": f2, "f3": f3},
                 pitch=f0,
-                _tol=self.current_tolerance,
+                _tolerance=self.current_tolerance,
             )
         except Exception as e:
             print("[TUNER] update_spectrum error:", e)
@@ -472,7 +485,7 @@ class TunerWindow(QMainWindow):
                 window=self,
                 vowel=vowel_smooth,
                 target_formants=target_formants,
-                measured_formants=measured_formants,
+                measured_formants={"f1": f1, "f2": f2, "f3": f3},
                 vowel_score=vowel_score,
                 resonance_score=resonance_score,
                 overall=overall,

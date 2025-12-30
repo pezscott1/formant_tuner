@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from analysis.vowel import is_plausible_formants
+from analysis.plausibility import is_plausible_formants
 
 
 class CalibrationSession:
@@ -44,12 +44,38 @@ class CalibrationSession:
             stability: float,
     ):
         import numpy as np
-        """
-        Update the vowel entry using weighted averaging.
-        Backward‑compatible with legacy profiles that lack weight/confidence/stability.
-        """
 
-        # If this vowel has no previous data, create a fresh entry
+        # -----------------------------
+        # 0. Basic sanity
+        # -----------------------------
+        if f1 is None or f2 is None or not np.isfinite(f1) or not np.isfinite(f2):
+            return self._reject_capture(vowel, "invalid formant values")
+
+        if f0 is not None and not np.isfinite(f0):
+            f0 = None
+
+        # -----------------------------
+        # 1. Vowel-model plausibility
+        # -----------------------------
+        ok, reason = is_plausible_formants(
+            f1, f2,
+            voice_type=self.voice_type,
+            vowel=vowel,
+            calibrated=self.data,
+        )
+        if not ok:
+            return self._reject_capture(vowel, reason)
+
+        # -----------------------------
+        # 2. Confidence gating (relaxed)
+        # -----------------------------
+        # Hybrid confidence is often 0.3–0.5 for back vowels.
+        if confidence is not None and confidence < 0.25:
+            return self._reject_capture(vowel, f"low confidence {confidence:.2f}")
+
+        # -----------------------------
+        # 3. First measurement
+        # -----------------------------
         if vowel not in self.data:
             self.data[vowel] = {
                 "f1": f1,
@@ -62,25 +88,21 @@ class CalibrationSession:
             }
             return True, False, f"Accepted first measurement for /{vowel}/"
 
-        # Existing entry (may be legacy)
+        # -----------------------------
+        # 4. Weighted averaging
+        # -----------------------------
         old = self.data[vowel]
 
-        # -----------------------------
-        # Backward‑compatibility fixes
-        # -----------------------------
         old_f1 = old.get("f1", f1)
         old_f2 = old.get("f2", f2)
         old_f0 = old.get("f0", f0)
-        # Sanitize legacy NaN values
         if old_f0 is None or not np.isfinite(old_f0):
             old_f0 = None
+
         old_conf = old.get("confidence", 1.0)
         old_stab = old.get("stability", 0.0)
         old_weight = old.get("weight", 1.0)
 
-        # -----------------------------
-        # Weighted update
-        # -----------------------------
         new_weight = old_weight + 1.0
 
         new_f1 = (old_f1 * old_weight + f1) / new_weight
@@ -92,13 +114,10 @@ class CalibrationSession:
             new_f0 = f0
         else:
             new_f0 = old_f0
-        print(f"[HANDLE_RESULT] f0={f0} type={type(f0)} "
-              f"isfinite={np.isfinite(f0) if f0 is not None else 'None'}")
-        # Confidence and stability smoothing
+
         new_conf = (old_conf * old_weight + confidence) / new_weight
         new_stab = (old_stab * old_weight + stability) / new_weight
 
-        # Store updated entry
         self.data[vowel] = {
             "f1": new_f1,
             "f2": new_f2,
@@ -106,18 +125,47 @@ class CalibrationSession:
             "confidence": new_conf,
             "stability": new_stab,
             "weight": new_weight,
-            "saved_at": datetime.now(timezone.utc).isoformat()
+            "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
         return True, False, f"Updated /{vowel}/ (weight={new_weight:.1f})"
 
+    def _reject_capture(self, vowel: str, reason: str):
+        self.increment_retry(vowel)
+        return False, True, f"Rejected /{vowel}/: {reason}"
+    """
+    def _is_harmonic_lock(self, f1, f2, f0):
+        # If we have no f0 or missing formants, we can't reliably
+        # determine harmonic lock. Let other gates handle it.
+        if f1 is None or f2 is None or f0 is None:
+            return False
+
+        # Only treat as harmonic lock if F1 is *very* close to a
+        # higher-order harmonic, not just any multiple.
+        for k in range(4, 10):  # skip 2nd/3rd where real F1 often lives
+            if abs(f1 - k * f0) < 40:
+                return True
+
+        return False
+    """
     # ---------------------------------------------------------
     # Save profile
     # ---------------------------------------------------------
     def save_profile(self):
-        # Use self.data (not self.results)
-        normalized = normalize_profile_for_save(self.data, self.retries_map)
-        normalized["voice_type"] = self.voice_type
+        """
+        Save the current calibration data as a profile.
+
+        Tests expect:
+          - The per-vowel entries under their vowel keys (e.g. "a")
+          - All fields (f1,f2,f0,confidence,stability,weight,saved_at) preserved
+          - A top-level "voice_type" field
+        """
+        if self.profile_manager is None:
+            raise RuntimeError("profile_manager is not set on CalibrationSession")
+
+        # Shallow copy of self.data so we don't mutate the original
+        profile_data = dict(self.data)
+        profile_data["voice_type"] = self.voice_type
 
         # Prevent double suffixing
         if self.profile_name.endswith(f"_{self.voice_type}"):
@@ -125,16 +173,10 @@ class CalibrationSession:
         else:
             base_name = f"{self.profile_name}_{self.voice_type}"
 
-        if self.profile_manager is None:
-            raise RuntimeError("profile_manager is not set on CalibrationSession")
-
-        self.profile_manager.save_profile(base_name, normalized)
+        self.profile_manager.save_profile(base_name, profile_data)
         return base_name
 
 
-# ---------------------------------------------------------
-# Normalize for saving
-# ---------------------------------------------------------
 def normalize_profile_for_save(user_formants, retries_map):
     out = {}
 
@@ -142,19 +184,21 @@ def normalize_profile_for_save(user_formants, retries_map):
         if vals is None:
             continue
 
-        f1 = vals["f1"]
-        f2 = vals["f2"]
-        f0 = vals["f0"]
-        conf = vals["confidence"]
-        stab = vals["stability"]
+        f1 = vals.get("f1")
+        f2 = vals.get("f2")
+        f0 = vals.get("f0")
+        conf = vals.get("confidence", 0.0)
+        stab = vals.get("stability", float("inf"))
 
         # Swap if reversed
         if f1 is not None and f2 is not None and f1 > f2:
             f1, f2 = f2, f1
 
+        # Plausibility metadata (tests monkeypatch this)
+        plausible, reason = is_plausible_formants(f1, f2, vowel=vowel)
+        reason_text = reason if not plausible else "ok"
+
         retries = retries_map.get(vowel, 0)
-        ok, reason = is_plausible_formants(f1, f2, vowel=vowel)
-        reason_text = "ok" if ok else reason
 
         out[vowel] = {
             "f1": f1,
@@ -162,7 +206,7 @@ def normalize_profile_for_save(user_formants, retries_map):
             "f0": f0,
             "confidence": conf,
             "stability": stab,
-            "weight": vals.get("weight", 1),
+            # tests expect NO weight field
             "retries": retries,
             "reason": reason_text,
             "saved_at": vals.get("saved_at", datetime.now(timezone.utc).isoformat()),

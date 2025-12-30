@@ -46,34 +46,22 @@ class Tuner:
     # Profile operations
     # ---------------------------------------------------------
     def load_profile(self, base_name):
-        """
-        Load a profile and apply it to the engine.
-        """
-
-        # Step 1: Apply profile
         applied = self.profile_manager.apply_profile(base_name)
-        self.active_profile = applied
 
-        # If apply_profile returned a string → treat as error
+        # If apply_profile returned an error string, bail out
         if isinstance(applied, str) and applied != base_name:
-            # Reset engine.voice_type to tuner.voice_type
             self.engine.voice_type = self.voice_type
             return applied
 
-        # Step 2: Load raw JSON
+        # Load raw JSON (for our own use, e.g., classifier)
         raw = self.profile_manager.load_profile_json(base_name)
 
-        # Step 3: Extract (f1, f2, f3, conf, stab)
+        # Extract formants (dict of dicts)
         extracted = self.profile_manager.extract_formants(raw)
 
-        # Step 4: Build user_formants with default conf/stab
-        cleaned = {
-            vowel: (f1, f2, f3, 0.0, float("inf"))
-            for vowel, (f1, f2, f3, *_) in extracted.items()
-        }
-
-        # Step 5: Assign to engine
-        self.engine.user_formants = cleaned
+        # Store active profile as the dict of centroids
+        self.active_profile = extracted
+        print("ACTIVE PROFILE:", type(self.active_profile), self.active_profile)
 
         return applied
 
@@ -94,7 +82,6 @@ class Tuner:
         raw = self.engine.get_latest_raw()
         if raw is None:
             return None
-        print("RAW IN TUNER:", raw.get("segment") if raw else None)
         processed = self.live_analyzer.process_raw(raw)
         if processed is None:
             return None
@@ -114,7 +101,6 @@ class Tuner:
 
         processed["profile_vowel"] = vowel
         processed["profile_confidence"] = confidence
-        print("DEBUG:", f1, f2)
         return processed
 
     # ---------------------------------------------------------
