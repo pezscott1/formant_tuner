@@ -2,7 +2,6 @@
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
-import numpy as np
 
 
 class FakePlotter:

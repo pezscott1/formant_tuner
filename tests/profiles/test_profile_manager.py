@@ -110,7 +110,8 @@ def test_apply_profile_sets_user_formants():
     raw = {"a": {"f1": 500, "f2": 1500, "f3": 2500}}
     pm.load_profile_json = MagicMock(return_value=raw)
 
-    pm.extract_formants = MagicMock(return_value={"a": {"f1": 500, "f2": 1500, "f0": 2500}})
+    pm.extract_formants = MagicMock(return_value={
+        "a": {"f1": 500, "f2": 1500, "f0": 2500}})
 
     pm.apply_profile("alpha")
 

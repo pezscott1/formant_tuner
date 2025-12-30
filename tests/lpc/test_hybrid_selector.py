@@ -1,12 +1,9 @@
 # tests/test_hybrid_selector.py
 
-import math
 from types import SimpleNamespace
 
 from analysis.hybrid_formants import (
     choose_formants_hybrid,
-    BaseFormantLike,
-    HybridFormantResult,
 )
 
 

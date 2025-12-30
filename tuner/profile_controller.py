@@ -24,7 +24,8 @@ class ProfileManager:
 
     def _join(self, filename: str) -> str:
         """Join filename to profiles_dir, handling empty-dir case."""
-        return filename if self.profiles_dir == "" else os.path.join(self.profiles_dir, filename)
+        return filename if self.profiles_dir == "" \
+            else os.path.join(self.profiles_dir, filename)
 
     # ---------------------------------------------------------
     # Listing + name conversion

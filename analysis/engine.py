@@ -144,7 +144,7 @@ class FormantAnalysisEngine:
                 )
             except Exception as e:
                 print("[ENGINE WARNING] vowel classifier failed:", e)
-                vowel_guess, vowel_conf, vowel_second = None, 0.0, None
+                vowel_guess, vowel_conf, _vowel_second = None, 0.0, None
 
         vowel = vowel_guess
         # ---------------------------------------------------------

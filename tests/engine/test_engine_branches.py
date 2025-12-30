@@ -44,7 +44,8 @@ def make_lpc(f1, f2, f3, confidence=1.0, method="lpc"):
 def test_pitch_nonfinite_dropped(engine, monkeypatch):
     """If pitch returns NaN, engine should normalize it to None."""
     # NaN pitch
-    monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(np.nan))
+    monkeypatch.setattr("analysis.engine.estimate_pitch",
+                        lambda sig, sr: make_pitch(np.nan))
     # Valid LPC formants
     monkeypatch.setattr(
         "analysis.engine.estimate_formants",
@@ -81,7 +82,8 @@ def test_pitch_nonfinite_dropped(engine, monkeypatch):
 
 def test_vowel_guess_robust_path(engine, monkeypatch):
     """Normal path: classifier returns a vowel with high confidence."""
-    monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+    monkeypatch.setattr("analysis.engine.estimate_pitch",
+                        lambda sig, sr: make_pitch(120.0))
     monkeypatch.setattr(
         "analysis.engine.estimate_formants",
         lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
@@ -117,7 +119,8 @@ def test_vowel_guess_robust_path(engine, monkeypatch):
 
 def test_vowel_guess_fallback_when_classifier_raises(engine, monkeypatch):
     """If classify_vowel raises, engine should handle it gracefully."""
-    monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+    monkeypatch.setattr("analysis.engine.estimate_pitch",
+                        lambda sig, sr: make_pitch(120.0))
     monkeypatch.setattr(
         "analysis.engine.estimate_formants",
         lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
@@ -147,7 +150,8 @@ def test_vowel_guess_fallback_when_classifier_raises(engine, monkeypatch):
 
 def test_vowel_guess_none_when_invalid_scalars(engine, monkeypatch):
     """If formants are invalid, classifier should not be called and vowel stays None."""
-    monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+    monkeypatch.setattr("analysis.engine.estimate_pitch",
+                        lambda sig, sr: make_pitch(120.0))
     # Invalid f1, valid f2/f3
     monkeypatch.setattr(
         "analysis.engine.estimate_formants",
@@ -188,7 +192,8 @@ def test_vowel_guess_none_when_invalid_scalars(engine, monkeypatch):
 
 def test_scoring_no_user_formants(engine, monkeypatch):
     """When no user targets exist for the vowel, vowel_score should be 0.0."""
-    monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+    monkeypatch.setattr("analysis.engine.estimate_pitch",
+                        lambda sig, sr: make_pitch(120.0))
     monkeypatch.setattr(
         "analysis.engine.estimate_formants",
         lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
@@ -218,7 +223,8 @@ def test_scoring_no_user_formants(engine, monkeypatch):
 
 def test_scoring_with_user_formants(engine, monkeypatch):
     """When user targets exist, they are used for vowel_score."""
-    monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+    monkeypatch.setattr("analysis.engine.estimate_pitch",
+                        lambda sig, sr: make_pitch(120.0))
     monkeypatch.setattr(
         "analysis.engine.estimate_formants",
         lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),

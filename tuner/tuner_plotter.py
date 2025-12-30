@@ -20,7 +20,8 @@ def _normalize_formants(x):
     return {"f1": None, "f2": None, "f3": None}
 
 
-def update_spectrum(window, vowel, target_formants, measured_formants, pitch, _tolerance):
+def update_spectrum(window, vowel, target_formants,
+                    measured_formants, pitch, _tolerance):
     """
     Modernized spectrum plot:
       - Uses dict-based formants
@@ -154,7 +155,8 @@ def update_vowel_chart(
     conf = float(latest_raw.get("confidence", 1.0))
 
     formant_smoother = getattr(analyzer, "formant_smoother", None) if analyzer else None
-    stable = getattr(formant_smoother, "formants_stable", True) if formant_smoother else True
+    stable = getattr(formant_smoother, "formants_stable", True) \
+        if formant_smoother else True
 
     # ---------------- Extract dict-based formants ----------------
     target_formants = _normalize_formants(target_formants)

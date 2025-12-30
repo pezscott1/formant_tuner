@@ -124,6 +124,3 @@ def test_tuner_profile_switch_changes_classification(
     vowel2 = out2["profile_vowel"]
 
     assert vowel1 != vowel2
-
-
-

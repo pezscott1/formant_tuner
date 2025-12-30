@@ -253,7 +253,7 @@ class CalibrationWindow(QMainWindow):
             pitch_raw = pitch_raw.f0
 
         # Live smoothing uses the display raw
-        f0_smooth = self.pitch_smoother.update(pitch_raw, confidence)
+        self.pitch_smoother.update(pitch_raw, confidence)
 
         # ---------------------------------------------------------
         # F0 PLAUSIBILITY + LOCKING
@@ -315,9 +315,11 @@ class CalibrationWindow(QMainWindow):
             )
 
             if not ok:
-                print(f"[REJECT] {target}: f1={raw_f1:.1f}, f2={raw_f2:.1f}, reason={reason}")
+                print(f"[REJECT] {target}: f1={raw_f1:.1f}, "
+                      f"f2={raw_f2:.1f}, reason={reason}")
             else:
-                print(f"[ACCEPT] {target}: f1={raw_f1:.1f}, f2={raw_f2:.1f}, f0={f0_cal}")
+                print(f"[ACCEPT] {target}: f1={raw_f1:.1f}, "
+                      f"f2={raw_f2:.1f}, f0={f0_cal}")
                 # Only append if BOTH formants AND pitch are valid
                 if f0_cal is not None:
                     self._capture_buffer.append((raw_f1, raw_f2, f0_cal))

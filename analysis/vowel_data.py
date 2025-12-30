@@ -104,4 +104,3 @@ VOWEL_CENTERS = {
 VOWEL_CENTERS["bass"]["ʌ"] = (450.0, 1300.0, 2200.0)
 VOWEL_CENTERS["tenor"]["ʌ"] = (500.0, 1400.0, 2300.0)
 # etc. for other voice types you care about
-

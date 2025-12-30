@@ -1,257 +1,271 @@
-C:\Users\pezsc\AppData\Local\Programs\Python\Python312\python.exe "C:/Program Files/JetBrains/PyCharm 2024.1.4/plugins/python/helpers/pycharm/_jb_pytest_runner.py" --path C:\Users\pezsc\PycharmProjects\formant_tuner\tests\test_tuner_window_branches.py
-Testing started at 2:12 PM ...
-Launching pytest with arguments C:\Users\pezsc\PycharmProjects\formant_tuner\tests\test_tuner_window_branches.py --no-header --no-summary -q in C:\Users\pezsc\PycharmProjects\formant_tuner\tests
 
-============================= test session starts =============================
-collecting ... collected 25 items
+================================== FAILURES ===================================
+__________________ test_handle_result_accepts_unknown_vowel ___________________
 
-test_tuner_window_branches.py::test_populate_profiles_basic
-test_tuner_window_branches.py::test_set_active_profile
-test_tuner_window_branches.py::test_get_selected_profile_base
-test_tuner_window_branches.py::test_delete_profile_no_selection
-test_tuner_window_branches.py::test_delete_profile_confirm_yes
-test_tuner_window_branches.py::test_delete_profile_confirm_no
-test_tuner_window_branches.py::test_apply_selected_profile_item_none
-test_tuner_window_branches.py::test_apply_profile_base_success
-test_tuner_window_branches.py::test_apply_profile_base_failure
-test_tuner_window_branches.py::test_calibrate_no_selection
-test_tuner_window_branches.py::test_calibrate_new_profile_cancel
-test_tuner_window_branches.py::test_calibrate_new_profile_accept
-test_tuner_window_branches.py::test_calibrate_existing_profile
-test_tuner_window_branches.py::test_update_tolerance_valid
-test_tuner_window_branches.py::test_update_tolerance_invalid
-test_tuner_window_branches.py::test_update_tolerance_negative
-test_tuner_window_branches.py::test_start_mic_already_running
-test_tuner_window_branches.py::test_start_mic_success
-test_tuner_window_branches.py::test_start_mic_failure
-test_tuner_window_branches.py::test_stop_mic_not_running
-test_tuner_window_branches.py::test_stop_mic_success
-test_tuner_window_branches.py::test_update_display_stream_inactive
-test_tuner_window_branches.py::test_update_display_no_processed
-test_tuner_window_branches.py::test_update_display_with_processed FAILED       [  4%]
-tests\test_tuner_window_branches.py:43 (test_populate_profiles_basic)
-win = <tuner.window.TunerWindow object at 0x0000015902A50950>
+    def test_handle_result_accepts_unknown_vowel():
+        """Current session implementation does NOT validate vowel membership."""
+        sess = CalibrationSession("my_profile", "bass", ["a"])
 
-    def test_populate_profiles_basic(win):
-        win.profile_manager.list_profiles.return_value = ["alpha", "beta"]
->       win._populate_profiles()
+        accepted, skipped, msg = sess.handle_result(
+            "i", 500.0, 1500.0, 120.0, confidence=0.8, stability=1e4
+        )
 
-test_tuner_window_branches.py:46:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+>       assert accepted is True
+E       assert False is True
 
-self = <tuner.window.TunerWindow object at 0x0000015902A50950>
+tests\test_calibration_session.py:37: AssertionError
+________________________ test_pitch_nonfinite_dropped _________________________
 
-    def _populate_profiles(self):
-        """Populate profile list with a 'New Profile' item plus existing profiles."""
-        self.profile_list.clear()
+engine = <analysis.engine.FormantAnalysisEngine object at 0x000002AC5F2F18E0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002AC5F2F17C0>
 
-        # New profile pseudo-item
-        new_item = QListWidgetItem("➕ New Profile")
-        new_item.setForeground(Qt.darkGreen)
-        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
-        new_item.setData(Qt.UserRole, None)
-        self.profile_list.addItem(new_item)
+    def test_pitch_nonfinite_dropped(engine, monkeypatch):
+        """If pitch returns NaN, engine should normalize it to None."""
+        # NaN pitch
+        monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(np.nan))
+        # Valid LPC formants
+        monkeypatch.setattr(
+            "analysis.engine.estimate_formants",
+            lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
+        )
+        # Classifier: deterministic
+        monkeypatch.setattr(
+            "analysis.vowel_classifier.classify_vowel",
+            lambda f1, f2, voice_type=None: ("a", 0.9, None),
+        )
+        # Scoring: return fixed scores so we can assert on them
+        monkeypatch.setattr(
+            "analysis.scoring.live_score_formants",
+            lambda target, measured, tolerance=50: 0.8,
+        )
+        monkeypatch.setattr(
+            "analysis.scoring.resonance_tuning_score",
+            lambda formants, f0, tolerance=50: 0.6,
+        )
 
-        names = self.profile_manager.list_profiles()
-        for base in names:
-            if base == "test_bass":
-                continue
-            display = self.profile_manager.display_name(base)
->           item = QListWidgetItem(display)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^
-E           TypeError: arguments did not match any overloaded call:
-E             QListWidgetItem(parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(icon: QIcon, text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(other: QListWidgetItem): argument 1 has unexpected type 'MagicMock'
+        frame = np.ones(1024)
+        out = engine.process_frame(frame, 44100)
 
-..\tuner\window.py:248: TypeError
----------------------------- Captured Qt messages -----------------------------
-QtWarningMsg: Unable to open default EUDC font: "C:\\Windows\\FONTS\\EUDC.TTE"
-FAILED            [  8%]
-tests\test_tuner_window_branches.py:49 (test_set_active_profile)
-'alpha profile' != "active: <magicmock name='mock.display_name()' id='1481806649520'>"
+        assert out["f0"] is None
+        assert out["formants"] == (500, 1500, 2500)
+        # Overall is average of 0.8 and 0.6
+>       assert np.isclose(out["overall"], 0.7)
+E       assert np.False_
+E        +  where np.False_ = <function isclose at 0x000002AC417906F0>(0.0, 0.7)
+E        +    where <function isclose at 0x000002AC417906F0> = np.isclose
 
-Expected :"active: <magicmock name='mock.display_name()' id='1481806649520'>"
-Actual   :'alpha profile'
-<Click to see difference>
+tests\test_engine_branches.py:74: AssertionError
+---------------------------- Captured stdout call -----------------------------
+DEBUG TARGET ENTRY: \u025b None <class 'NoneType'>\nDEBUG TARGET FORMANTS: (None, None, None)
+________________________ test_vowel_guess_robust_path _________________________
 
-win = <tuner.window.TunerWindow object at 0x00000159071D2210>
+engine = <analysis.engine.FormantAnalysisEngine object at 0x000002AC5F3401A0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002AC5F341640>
 
-    def test_set_active_profile(win):
-        win._set_active_profile("alpha_profile")
->       assert "alpha profile" in win.active_label.text().lower()
-E       assert 'alpha profile' in "active: <magicmock name='mock.display_name()' id='1481806649520'>"
-E        +  where "active: <magicmock name='mock.display_name()' id='1481806649520'>" = <built-in method lower of str object at 0x000001590740CB90>()
-E        +    where <built-in method lower of str object at 0x000001590740CB90> = "Active: <MagicMock name='mock.display_name()' id='1481806649520'>".lower
-E        +      where "Active: <MagicMock name='mock.display_name()' id='1481806649520'>" = <built-in method text of QLabel object at 0x00000159071D2C30>()
-E        +        where <built-in method text of QLabel object at 0x00000159071D2C30> = <PyQt5.QtWidgets.QLabel object at 0x00000159071D2C30>.text
-E        +          where <PyQt5.QtWidgets.QLabel object at 0x00000159071D2C30> = <tuner.window.TunerWindow object at 0x00000159071D2210>.active_label
+    def test_vowel_guess_robust_path(engine, monkeypatch):
+        """Normal path: classifier returns a vowel with high confidence."""
+        monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+        monkeypatch.setattr(
+            "analysis.engine.estimate_formants",
+            lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
+        )
 
-test_tuner_window_branches.py:52: AssertionError
-FAILED     [ 12%]
-tests\test_tuner_window_branches.py:54 (test_get_selected_profile_base)
-win = <tuner.window.TunerWindow object at 0x00000159071D20F0>
+        def fake_classify(f1, f2, voice_type=None):
+            assert f1 == 500
+            assert f2 == 1500
+            return "a", 0.95, "e"
 
-    def test_get_selected_profile_base(win):
-        win.profile_manager.list_profiles.return_value = ["alpha"]
->       win._populate_profiles()
+        monkeypatch.setattr("analysis.vowel_classifier.classify_vowel", fake_classify)
 
-test_tuner_window_branches.py:57:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        monkeypatch.setattr(
+            "analysis.scoring.live_score_formants",
+            lambda target, measured, tolerance=50: 1.0,
+        )
+        monkeypatch.setattr(
+            "analysis.scoring.resonance_tuning_score",
+            lambda formants, f0, tolerance=50: 1.0,
+        )
 
-self = <tuner.window.TunerWindow object at 0x00000159071D20F0>
+        # Provide user targets so scoring has something to use
+        engine.set_user_formants({"a": {"f1": 500, "f2": 1500, "f3": 2500}})
 
-    def _populate_profiles(self):
-        """Populate profile list with a 'New Profile' item plus existing profiles."""
-        self.profile_list.clear()
+        frame = np.ones(1024)
+        out = engine.process_frame(frame, 44100)
 
-        # New profile pseudo-item
-        new_item = QListWidgetItem("➕ New Profile")
-        new_item.setForeground(Qt.darkGreen)
-        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
-        new_item.setData(Qt.UserRole, None)
-        self.profile_list.addItem(new_item)
+>       assert out["vowel"] == "a"
+E       AssertionError: assert '\u025b' == 'a'
+E
+E         - a
+E         + \u025b
 
-        names = self.profile_manager.list_profiles()
-        for base in names:
-            if base == "test_bass":
-                continue
-            display = self.profile_manager.display_name(base)
->           item = QListWidgetItem(display)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^
-E           TypeError: arguments did not match any overloaded call:
-E             QListWidgetItem(parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(icon: QIcon, text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(other: QListWidgetItem): argument 1 has unexpected type 'MagicMock'
+tests\test_engine_branches.py:112: AssertionError
+---------------------------- Captured stdout call -----------------------------
+DEBUG TARGET ENTRY: \u025b None <class 'NoneType'>\nDEBUG TARGET FORMANTS: (None, None, None)
+______________ test_vowel_guess_fallback_when_classifier_raises _______________
 
-..\tuner\window.py:248: TypeError
-PASSED   [ 16%]FAILED    [ 20%]
-tests\test_tuner_window_branches.py:71 (test_delete_profile_confirm_yes)
-win = <tuner.window.TunerWindow object at 0x00000159071D23C0>
+engine = <analysis.engine.FormantAnalysisEngine object at 0x000002AC5F341B80>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002AC5F342C60>
 
-    def test_delete_profile_confirm_yes(win):
-        win.profile_manager.list_profiles.return_value = ["alpha"]
->       win._populate_profiles()
+    def test_vowel_guess_fallback_when_classifier_raises(engine, monkeypatch):
+        """If classify_vowel raises, engine should handle it gracefully."""
+        monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+        monkeypatch.setattr(
+            "analysis.engine.estimate_formants",
+            lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
+        )
 
-test_tuner_window_branches.py:74:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        def bad_classify(f1, f2, voice_type=None):
+            raise RuntimeError("boom")
 
-self = <tuner.window.TunerWindow object at 0x00000159071D23C0>
+        monkeypatch.setattr("analysis.vowel_classifier.classify_vowel", bad_classify)
 
-    def _populate_profiles(self):
-        """Populate profile list with a 'New Profile' item plus existing profiles."""
-        self.profile_list.clear()
+        monkeypatch.setattr(
+            "analysis.scoring.live_score_formants",
+            lambda target, measured, tolerance=50: 0.0,
+        )
+        monkeypatch.setattr(
+            "analysis.scoring.resonance_tuning_score",
+            lambda formants, f0, tolerance=50: 0.0,
+        )
 
-        # New profile pseudo-item
-        new_item = QListWidgetItem("➕ New Profile")
-        new_item.setForeground(Qt.darkGreen)
-        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
-        new_item.setData(Qt.UserRole, None)
-        self.profile_list.addItem(new_item)
+        frame = np.ones(1024)
+        out = engine.process_frame(frame, 44100)
 
-        names = self.profile_manager.list_profiles()
-        for base in names:
-            if base == "test_bass":
-                continue
-            display = self.profile_manager.display_name(base)
->           item = QListWidgetItem(display)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^
-E           TypeError: arguments did not match any overloaded call:
-E             QListWidgetItem(parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(icon: QIcon, text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(other: QListWidgetItem): argument 1 has unexpected type 'MagicMock'
+        # When classifier fails, engine should not crash and should return neutral values
+>       assert out["vowel"] is None or out["vowel_confidence"] == 0.0
+E       AssertionError: assert ('\u025b' is None or 1.6888898562528831 == 0.0)
 
-..\tuner\window.py:248: TypeError
-FAILED     [ 24%]
-tests\test_tuner_window_branches.py:81 (test_delete_profile_confirm_no)
-win = <tuner.window.TunerWindow object at 0x0000015907575FD0>
+tests\test_engine_branches.py:144: AssertionError
+---------------------------- Captured stdout call -----------------------------
+DEBUG TARGET ENTRY: \u025b None <class 'NoneType'>\nDEBUG TARGET FORMANTS: (None, None, None)
+_______________________ test_scoring_with_user_formants _______________________
 
-    def test_delete_profile_confirm_no(win):
-        win.profile_manager.list_profiles.return_value = ["alpha"]
->       win._populate_profiles()
+engine = <analysis.engine.FormantAnalysisEngine object at 0x000002AC5F342780>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002AC5F342660>
 
-test_tuner_window_branches.py:84:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    def test_scoring_with_user_formants(engine, monkeypatch):
+        """When user targets exist, they are used for vowel_score."""
+        monkeypatch.setattr("analysis.engine.estimate_pitch", lambda sig, sr: make_pitch(120.0))
+        monkeypatch.setattr(
+            "analysis.engine.estimate_formants",
+            lambda sig, sr, debug=False: make_lpc(500, 1500, 2500),
+        )
+        monkeypatch.setattr(
+            "analysis.vowel_classifier.classify_vowel",
+            lambda f1, f2, voice_type=None: ("a", 0.9, None),
+        )
 
-self = <tuner.window.TunerWindow object at 0x0000015907575FD0>
+        engine.set_user_formants({"a": {"f1": 500, "f2": 1500, "f3": 2500}})
 
-    def _populate_profiles(self):
-        """Populate profile list with a 'New Profile' item plus existing profiles."""
-        self.profile_list.clear()
+        def fake_live_score(target, measured, tolerance=50):
+            # Target should be normalized tuple from dict
+            assert target == (500.0, 1500.0, 2500.0)
+            return 0.75
 
-        # New profile pseudo-item
-        new_item = QListWidgetItem("➕ New Profile")
-        new_item.setForeground(Qt.darkGreen)
-        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
-        new_item.setData(Qt.UserRole, None)
-        self.profile_list.addItem(new_item)
+        monkeypatch.setattr("analysis.scoring.live_score_formants", fake_live_score)
+        monkeypatch.setattr(
+            "analysis.scoring.resonance_tuning_score",
+            lambda formants, f0, tolerance=50: 0.25,
+        )
 
-        names = self.profile_manager.list_profiles()
-        for base in names:
-            if base == "test_bass":
-                continue
-            display = self.profile_manager.display_name(base)
->           item = QListWidgetItem(display)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^
-E           TypeError: arguments did not match any overloaded call:
-E             QListWidgetItem(parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(icon: QIcon, text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(other: QListWidgetItem): argument 1 has unexpected type 'MagicMock'
+        frame = np.ones(1024)
+        out = engine.process_frame(frame, 44100)
 
-..\tuner\window.py:248: TypeError
-PASSED [ 28%]PASSED    [ 32%]PASSED    [ 36%]PASSED        [ 40%]PASSED  [ 44%]PASSED  [ 48%][AUDIO] Microphone stream started
-FAILED    [ 52%]
-tests\test_tuner_window_branches.py:155 (test_calibrate_existing_profile)
-win = <tuner.window.TunerWindow object at 0x00000159075769F0>
+>       assert np.isclose(out["vowel_score"], 0.75)
+E       assert np.False_
+E        +  where np.False_ = <function isclose at 0x000002AC417906F0>(0, 0.75)
+E        +    where <function isclose at 0x000002AC417906F0> = np.isclose
 
-    def test_calibrate_existing_profile(win):
-        win.profile_manager.list_profiles.return_value = ["alpha"]
-        win.profile_manager.load_profile.return_value = {}
->       win._populate_profiles()
+tests\test_engine_branches.py:247: AssertionError
+---------------------------- Captured stdout call -----------------------------
+DEBUG TARGET ENTRY: \u025b None <class 'NoneType'>\nDEBUG TARGET FORMANTS: (None, None, None)
+______________________________ test_lpc_no_roots ______________________________
 
-test_tuner_window_branches.py:159:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002AC5F3517C0>
 
-self = <tuner.window.TunerWindow object at 0x00000159075769F0>
+    def test_lpc_no_roots(monkeypatch):
+        monkeypatch.setattr("numpy.roots", lambda a: np.array([]))
 
-    def _populate_profiles(self):
-        """Populate profile list with a 'New Profile' item plus existing profiles."""
-        self.profile_list.clear()
+        y = np.random.randn(2048)
+        result = estimate_formants(y, sr=48000)
+        assert result.method == "fallback"
+>       assert "no_roots" in result.debug["reason"]
+E       AssertionError: assert 'no_roots' in 'no_valid_poles'
 
-        # New profile pseudo-item
-        new_item = QListWidgetItem("➕ New Profile")
-        new_item.setForeground(Qt.darkGreen)
-        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
-        new_item.setData(Qt.UserRole, None)
-        self.profile_list.addItem(new_item)
+tests\test_lpc_test_branches.py:75: AssertionError
+____________________________ test_lpc_f1_too_high _____________________________
 
-        names = self.profile_manager.list_profiles()
-        for base in names:
-            if base == "test_bass":
-                continue
-            display = self.profile_manager.display_name(base)
->           item = QListWidgetItem(display)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^
-E           TypeError: arguments did not match any overloaded call:
-E             QListWidgetItem(parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(icon: QIcon, text: Optional[str], parent: Optional[QListWidget] = None, type: int = QListWidgetItem.Type): argument 1 has unexpected type 'MagicMock'
-E             QListWidgetItem(other: QListWidgetItem): argument 1 has unexpected type 'MagicMock'
+    def test_lpc_f1_too_high():
+        # Create a pole at 1500 Hz \u2192 f1 > 1000 triggers fallback
+        sr = 48000
+        root = np.exp(1j * 2 * np.pi * 1500 / sr)
+        A = np.poly([root, np.conj(root)])
 
-..\tuner\window.py:248: TypeError
-PASSED        [ 56%]PASSED      [ 60%]PASSED     [ 64%]PASSED     [ 68%]PASSED             [ 72%][AUDIO] Microphone stream started
-Windows fatal exception: access violation
+        y = np.random.randn(4096)
 
-Thread 0x000054d0 (most recent call first):
-  <no Python frame>
+        def fake_compute(*_):
+            return A
 
-Thread 0x00008274 (most recent call first):
-  File ???Windows fatal exception: access violation
+        import analysis.lpc as lpc_mod
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(lpc_mod, "_compute_lpc", fake_compute)
 
-PASSED             [ 76%]PASSED          [ 80%]PASSED              [ 84%][AUDIO] Microphone stream stopped
-PASSED [ 88%]PASSED   [ 92%]
-Process finished with exit code -1073741819 (0xC0000005)
+        result = estimate_formants(y, sr=sr)
+        assert result.method == "fallback"
+>       assert "f1_too_high_lpc" in result.debug["reason"]
+E       AssertionError: assert 'f1_too_high_lpc' in 'no_valid_poles'
+
+tests\test_lpc_test_branches.py:99: AssertionError
+___________________________ test_lpc_valid_formants ___________________________
+
+    def test_lpc_valid_formants():
+        sr = 48000
+        f1, f2 = 500, 1500
+
+        r1 = np.exp(1j * 2 * np.pi * f1 / sr)
+        r2 = np.exp(1j * 2 * np.pi * f2 / sr)
+        A = np.poly([r1, np.conj(r1), r2, np.conj(r2)])
+
+        y = np.random.randn(4096)
+
+        def fake_compute(*_):
+            return A
+
+        import analysis.lpc as lpc_mod
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(lpc_mod, "_compute_lpc", fake_compute)
+
+        result = estimate_formants(y, sr=sr)
+>       assert result.method == "lpc"
+E       AssertionError: assert 'fallback' == 'lpc'
+E
+E         - lpc
+E         + fallback
+
+tests\test_lpc_test_branches.py:151: AssertionError
+_________________________ test_extract_formants_basic _________________________
+
+pm = <tuner.profile_controller.ProfileManager object at 0x000002AC62901C10>
+
+    def test_extract_formants_basic(pm):
+        raw = {
+            "voice_type": "bass",
+            "a": {"f1": 500, "f2": 1500, "f0": 100, "confidence": 0.9, "stability": 5},
+            "b": {"f1": 400, "f2": 1200, "f0": 90},
+            "junk": 123,
+        }
+        out = pm.extract_formants(raw)
+
+>       assert out["a"] == {
+            "f1": 500,
+            "f2": 1500,
+            "f0": 100,
+            "confidence": 0.9,
+            "stability": 5,
+        }
+E       AssertionError: assert {'confidence'...2': 1500, ...} == {'confidence'...2': 1500, ...}
+E
+E         Omitting 5 identical items, use -vv to show
+E         Left contains 1 more item:
+E         {'f3': None}
+E         Use -v to get more diff
