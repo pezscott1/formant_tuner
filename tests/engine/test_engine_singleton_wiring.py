@@ -3,8 +3,8 @@ import numpy as np
 from analysis.engine import FormantAnalysisEngine
 
 
-@patch("analysis.engine.estimate_pitch")
-@patch("analysis.engine.estimate_formants")
+@patch("analysis.pitch.estimate_pitch")
+@patch("analysis.lpc.estimate_formants")
 def test_engine_receives_calibrated_profile(mock_lpc, mock_pitch):
     """Engine must use the calibrated profile set by ProfileManager."""
     mock_pitch.return_value = MagicMock(f0=120.0)

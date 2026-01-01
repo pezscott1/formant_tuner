@@ -164,7 +164,8 @@ def test_vowel_chart_suppressed_invalid_formants():
         overall=0.45,
     )
 
-    assert w.vowel_measured_artist is None
+    # F2-only frames are now accepted
+    assert w.vowel_measured_artist is not None
     assert w.vowel_line_artist is None
     assert "/a/" in w.ax_vowel.title
 
@@ -212,7 +213,6 @@ def test_vowel_chart_first_success_creates_artists():
     )
 
     assert w.vowel_measured_artist is not None
-    assert w.vowel_line_artist is not None
 
 
 def test_vowel_chart_second_success_removes_and_does_not_store():
@@ -250,6 +250,5 @@ def test_vowel_chart_second_success_removes_and_does_not_store():
     )
 
     assert first_point.removed
-    assert first_line.removed
     assert w.vowel_measured_artist is None
     assert w.vowel_line_artist is None

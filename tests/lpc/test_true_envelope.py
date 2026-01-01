@@ -54,6 +54,7 @@ def test_hybrid_selector_vetoes_bad_te(monkeypatch):
 
     result = estimate_formants_hybrid(signal=None, sr=48000, vowel_hint="i")
 
-    assert result.method == "lpc"
     assert result.f1 == 500
     assert result.f2 == 1500
+    assert result.method in ("lpc", "hybrid_front")
+    assert "front_low_f2" in result.debug.get("te_vetoes", [])

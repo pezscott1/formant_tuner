@@ -321,15 +321,12 @@ class TunerWindow(QMainWindow):
                 "Please select a profile before calibrating.",
             )
             return
-
         base = item.data(Qt.UserRole)
-
         # New Profile
         if base is None:
             dlg = ProfileDialog(self)
             if dlg.exec_() != dlg.Accepted:
                 return
-
             profile_name, voice_type = dlg.get_values()
             if not profile_name:
                 QMessageBox.warning(
@@ -338,7 +335,6 @@ class TunerWindow(QMainWindow):
                     "Please enter a profile name.",
                 )
                 return
-
             self.calib_win = CalibrationWindow(
                 profile_name=profile_name,
                 voice_type=voice_type,
@@ -348,8 +344,10 @@ class TunerWindow(QMainWindow):
                 existing_profile=None,
                 parent=self,
             )
-            self.update_timer.stop()
+            self.calib_win.vowel_capture_started.connect(self._start_mic_ui)
+            self.calib_win.vowel_capture_finished.connect(self._stop_mic_ui)
             self._start_mic_ui()
+            self.update_timer.stop()
             self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
             self.calib_win.show()
             return
@@ -357,7 +355,6 @@ class TunerWindow(QMainWindow):
         # Existing profile
         voice_type = getattr(self.analyzer, "voice_type", "bass")
         existing_data = self.profile_manager.load_profile(base) or {}
-
         self.calib_win = CalibrationWindow(
             profile_name=base,
             voice_type=voice_type,
@@ -368,7 +365,12 @@ class TunerWindow(QMainWindow):
             parent=self,
         )
         self.update_timer.stop()
-        self._start_mic_ui()
+        self.live_analyzer.pause()
+        ok = self._start_mic_ui()
+        if not ok:
+            QMessageBox.critical(self, "Mic error", "Could not start microphone.")
+            return
+
         self.calib_win.profile_calibrated.connect(self._on_profile_calibrated)
         self.calib_win.show()
 
@@ -381,7 +383,7 @@ class TunerWindow(QMainWindow):
 
         # Reset smoothing state
         self.live_analyzer.reset()
-
+        self.live_analyzer.resume()
         # Restart UI updates
         self.update_timer.start()
 
@@ -416,16 +418,29 @@ class TunerWindow(QMainWindow):
                 print("[AUDIO STATUS]", status)
             mono = indata[:, 0].astype(np.float64, copy=False)
             self.live_analyzer.submit_audio_segment(mono)
+
+        def find_device():
+            for idx, dev in enumerate(sd.query_devices()):
+                if "Razer" in dev["name"] or "Seiren" in dev["name"]:
+                    return idx
+            return sd.default.device[0]
+
+        device_index = find_device()
+        print("Using mic device:", device_index)
+
         ok = self.tuner.start_mic(lambda: sd.InputStream(
             samplerate=self.sample_rate,
             channels=1,
+            device=device_index,
             callback=callback
         ))
 
         if ok:
             self.stream = self.tuner.stream
+            return True
         else:
-            QMessageBox.critical(self, "Mic error", "Could not start microphone.")
+            self.stream = None
+            return False
 
     def _stop_mic_ui(self):
         self.tuner.stop_mic()
@@ -439,7 +454,9 @@ class TunerWindow(QMainWindow):
         stream = self.tuner.stream
         if stream is None or not getattr(stream, "active", True):
             return
-
+        # Skip UI updates if analyzer is paused
+        if hasattr(self.live_analyzer, "is_running") and not self.live_analyzer.is_running:
+            return
         processed = self.tuner.poll_latest_processed()
         if not processed:
             return

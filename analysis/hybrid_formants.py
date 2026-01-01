@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
-from analysis.lpc import estimate_formants
 from analysis.true_envelope import estimate_formants_te
+from analysis.lpc import estimate_formants as lpc_formants
 
 
 @dataclass
@@ -27,6 +27,9 @@ class HybridFormantResult:
 
 
 # ------------------------- sanity helpers -------------------------
+def estimate_formants(*args, **kwargs):
+    return lpc_formants(*args, **kwargs)
+
 def _valid_scalar(x: Optional[float]) -> bool:
     return x is not None and x == x  # not None and not NaN
 
@@ -95,6 +98,10 @@ def choose_formants_hybrid(
         "te_vetoes": [],
         "lpc_vetoes": [],
     }
+    print("\n--- HYBRID INPUT ---")
+    print(f"vowel_hint={vowel_hint}")
+    print(f"LPC: f1={lpc.f1}, f2={lpc.f2}, f3={lpc.f3}, conf={lpc.confidence}")
+    print(f"TE:  f1={te.f1},  f2={te.f2},  f3={te.f3},  conf={te.confidence}")
 
     # -------------------- 1. Base plausibility --------------------
 
@@ -111,20 +118,32 @@ def choose_formants_hybrid(
     if _valid_scalar(te.f1) and te.f1 < 200:
         te_ok = False
         dbg["te_vetoes"].append("f1_too_low")
+    if _valid_scalar(te.f1) and te.f1 > 800:
+        te_ok = False
+        dbg["te_vetoes"].append("f1_too_high")
+
+    print(f"TE vetoes so far: {dbg['te_vetoes']}")
+    print(f"LPC vetoes so far: {dbg['lpc_vetoes']}")
 
     # TE F2 too low for any real vowel (except back vowels)
     if _valid_scalar(te.f2) and te.f2 < 800 and not back:
         te_ok = False
         dbg["te_vetoes"].append("f2_too_low")
+    print(f"TE vetoes so far: {dbg['te_vetoes']}")
+    print(f"LPC vetoes so far: {dbg['lpc_vetoes']}")
 
     if _valid_scalar(te.f1) and _valid_scalar(te.f2) and te.f2 <= te.f1:
         te_ok = False
         dbg["te_vetoes"].append("f2_leq_f1")
+    print(f"TE vetoes so far: {dbg['te_vetoes']}")
+    print(f"LPC vetoes so far: {dbg['lpc_vetoes']}")
 
     # For clearly front vowels, TE F2 < ~1200 is almost always harmonic confusion.
     if front and _valid_scalar(te.f2) and te.f2 < 1200:
         te_ok = False
         dbg["te_vetoes"].append("front_low_f2")
+    print(f"TE vetoes so far: {dbg['te_vetoes']}")
+    print(f"LPC vetoes so far: {dbg['lpc_vetoes']}")
 
     # -------------------- 3. LPC vetoes (mild) --------------------
 
@@ -132,68 +151,122 @@ def choose_formants_hybrid(
     if back and _valid_scalar(lpc.f2) and lpc.f2 > 1800:
         lpc_ok = False
         dbg["lpc_vetoes"].append("back_high_f2")
+    print(f"TE vetoes so far: {dbg['te_vetoes']}")
+    print(f"LPC vetoes so far: {dbg['lpc_vetoes']}")
 
     # If LPC returned None for either, it's not usable.
     if not _valid_scalar(lpc.f1) or not _valid_scalar(lpc.f2):
         lpc_ok = False
         dbg["lpc_vetoes"].append("missing_f1_or_f2")
+    print(f"TE vetoes so far: {dbg['te_vetoes']}")
+    print(f"LPC vetoes so far: {dbg['lpc_vetoes']}")
 
     # -------------------- 4. Primary method by vowel class --------------------
 
     if back:
         primary: str = "te"
     elif front:
-        primary = "lpc"
+        primary = "hybrid_front"  # NEW semantic label
     else:
         primary = "lpc"
 
     dbg["primary"] = primary
 
-    # -------------------- 5. Main selection --------------------
+    # -------------------- 5. Main selection / hybrid assembly --------------------
 
     chosen: str = "unknown"
     f1 = f2 = f3 = None
     confidence = 0.0
 
-    def use_lpc():
+    def use_lpc_all():
         nonlocal chosen, f1, f2, f3, confidence
         chosen = "lpc"
         f1, f2, f3 = lpc.f1, lpc.f2, lpc.f3
-        # If LPC didn't provide a confidence, assume reasonably strong
         confidence = lpc.confidence or 0.8
 
-    def use_te():
+    def use_te_all():
         nonlocal chosen, f1, f2, f3, confidence
         chosen = "te"
         f1, f2, f3 = te.f1, te.f2, te.f3
-        # TE baseline; you can later modulate this with a real score
         confidence = 0.7
 
-    if lpc_ok and te_ok:
-        # Both plausible: choose by primary method
-        if primary == "te":
-            use_te()
-        else:
-            use_lpc()
-        dbg["selection_case"] = "both_ok"
-    elif lpc_ok and not te_ok:
-        use_lpc()
-        dbg["selection_case"] = "only_lpc_ok"
-    elif te_ok and not lpc_ok:
-        use_te()
-        dbg["selection_case"] = "only_te_ok"
-    else:
-        # Both implausible: fall back to LPC, but very low confidence
-        use_lpc()
-        confidence = min(confidence, 0.2)
-        dbg["selection_case"] = "both_bad"
+    # ----- SPECIAL CASE: front vowels → F1 from TE, F2 from LPC -----
 
-    # Down-weight if we had to go against primary preference
-    if chosen != primary:
+    if front:
+        chosen = "hybrid_front"
+        dbg["selection_case"] = "front_hybrid"
+
+        # F1: prefer TE, fall back to LPC
+        if te_ok and _valid_scalar(te.f1):
+            f1 = te.f1
+        elif lpc_ok and _valid_scalar(lpc.f1):
+            f1 = lpc.f1
+            dbg["te_vetoes"].append("te_f1_missing_or_bad_used_lpc")
+        else:
+            if f1 is None and vowel_hint == "ɛ":
+                # fallback F1 for baritone /ɛ/
+                f1 = 350.0
+                dbg["te_vetoes"].append("fallback_f1_ɛ")
+            f1 = None
+            dbg["te_vetoes"].append("no_valid_f1")
+
+        # F2: prefer LPC, fall back to TE
+        if lpc_ok and _valid_scalar(lpc.f2):
+            f2 = lpc.f2
+        elif te_ok and _valid_scalar(te.f2):
+            f2 = te.f2
+            dbg["lpc_vetoes"].append("lpc_f2_missing_or_bad_used_te")
+        else:
+            f2 = None
+            dbg["lpc_vetoes"].append("no_valid_f2")
+
+        # F3: just mirror the F2 source when available
+        if chosen == "hybrid_front" and f2 is not None:
+            if lpc_ok and f2 == lpc.f2:
+                f3 = lpc.f3
+            elif te_ok and f2 == te.f2:
+                f3 = te.f3
+
+        # Confidence: combine both sources
+        confidence = 0.0
+        if _valid_scalar(f1):
+            confidence += 0.4
+        if _valid_scalar(f2):
+            confidence += 0.4
+        confidence += 0.2 * max(lpc.confidence, te.confidence)
+        confidence = min(1.0, confidence)
+
+    else:
+        # ----- NON-FRONT VOWELS: keep your existing whole-method selection -----
+        if lpc_ok and te_ok:
+            if primary == "te":
+                use_te_all()
+            else:
+                use_lpc_all()
+            dbg["selection_case"] = "both_ok"
+        elif lpc_ok and not te_ok:
+            use_lpc_all()
+            dbg["selection_case"] = "only_lpc_ok"
+        elif te_ok and not lpc_ok:
+            use_te_all()
+            dbg["selection_case"] = "only_te_ok"
+        else:
+            use_lpc_all()
+            confidence = min(confidence, 0.2)
+            dbg["selection_case"] = "both_bad"
+
+    # For non-hybrid_front, keep primary mismatch behavior
+    if primary not in ("hybrid_front",) and chosen != primary:
         confidence *= 0.9
         dbg["primary_mismatch"] = True
     else:
         dbg["primary_mismatch"] = False
+    print("--- HYBRID OUTPUT ---")
+    print(f"chosen={chosen}, primary={primary}")
+    print(f"final f1={f1}, f2={f2}, f3={f3}, conf={confidence}")
+    print(f"selection_case={dbg.get('selection_case')}")
+    print(f"debug={dbg}")
+    print("----------------------\n")
 
     return HybridFormantResult(
         f1=f1,
@@ -206,6 +279,7 @@ def choose_formants_hybrid(
         te=te,
         debug=dbg,
     )
+
 
 # ------------------------- top-level API -------------------------
 

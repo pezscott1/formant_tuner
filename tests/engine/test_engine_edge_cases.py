@@ -1,21 +1,19 @@
 from unittest.mock import patch, MagicMock
 import numpy as np
 from analysis.engine import FormantAnalysisEngine
+import pytest
+import librosa
 
 
 def test_engine_handles_nan_frame():
     eng = FormantAnalysisEngine()
     frame = np.array([np.nan, np.nan, np.nan])
-
-    out = eng.process_frame(frame, sr=48000)
-
-    # Current behavior: treat as empty/invalid, f0 becomes None
-    assert out["f0"] is None
-    assert out["formants"] == (None, None, None)
+    with pytest.raises(librosa.util.exceptions.ParameterError):
+        eng.process_frame(frame, sr=48000)
 
 
-@patch("analysis.engine.estimate_pitch")
-@patch("analysis.engine.estimate_formants")
+@patch("analysis.pitch.estimate_pitch")
+@patch("analysis.lpc.estimate_formants")
 def test_engine_handles_low_sample_rate(mock_lpc, mock_pitch):
     mock_pitch.return_value = MagicMock(f0=120.0)
     mock_lpc.return_value = MagicMock(
@@ -40,8 +38,8 @@ def test_engine_handles_low_sample_rate(mock_lpc, mock_pitch):
     assert "formants" in out
 
 
-@patch("analysis.engine.estimate_pitch")
-@patch("analysis.engine.estimate_formants")
+@patch("analysis.pitch.estimate_pitch")
+@patch("analysis.lpc.estimate_formants")
 def test_engine_handles_high_sample_rate(mock_lpc, mock_pitch):
     mock_pitch.return_value = MagicMock(f0=220.0)
     mock_lpc.return_value = MagicMock(
@@ -66,8 +64,8 @@ def test_engine_handles_high_sample_rate(mock_lpc, mock_pitch):
     assert "formants" in out
 
 
-@patch("analysis.engine.estimate_pitch")
-@patch("analysis.engine.estimate_formants")
+@patch("analysis.pitch.estimate_pitch")
+@patch("analysis.lpc.estimate_formants")
 def test_engine_handles_extreme_formant_values(mock_lpc, mock_pitch):
     mock_pitch.return_value = MagicMock(f0=150.0)
     mock_lpc.return_value = MagicMock(

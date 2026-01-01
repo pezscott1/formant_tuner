@@ -33,26 +33,12 @@ PITCH_RANGES = {
 
 VOWEL_CENTERS = {
     "baritone": {
-        # From calibration: F1 ≈ 280, F2 ≈ 2229
-        "i":  (280.0, 2250.0, 3000.0),
-
-        # Between /i/ and /ɛ/
-        # From calibration: F1 ≈ 350–450, F2 ≈ 2000
+        "i":  (300.0, 2700.0, 3200.0),
         "e":  (350.0, 2050.0, 2900.0),
-
-        # From calibration: F1 ≈ 553, F2 ≈ 1936
-        "ɛ":  (550.0, 1900.0, 2600.0),
-
-        # Your /ɑ/ is bright and fronted: F1 ≈ 700–800, F2 ≈ 1600–1800
-        "ɑ":  (720.0, 1700.0, 2400.0),
-
-        # Your /ɔ/ is extremely fronted: F2 ≈ 2400–2550
-        # This is *your* vowel space, not IPA.
-        "ɔ":  (600.0, 2450.0, 2600.0),
-
-        # Your /u/ is mid–back but fronted: F1 ≈ 400–500, F2 ≈ 1300–1500
-        "u":  (450.0, 1400.0, 2000.0),
-
+        "ɛ":  (550.0, 2000.0, 2600.0),
+        "ɑ":  (750.0, 1600.0, 2400.0),
+        "ɔ":  (600.0, 1100.0, 2300.0),
+        "u":  (350.0, 900.0, 2100.0),
     },
 
     # Other voice types unchanged for now

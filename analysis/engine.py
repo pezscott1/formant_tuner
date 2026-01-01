@@ -1,233 +1,202 @@
 from __future__ import annotations
 import numpy as np
-
-from analysis.lpc import estimate_formants
+from typing import Optional, Any
 from analysis.pitch import estimate_pitch
-import analysis.vowel_classifier as vowel_classifier
-from analysis.scoring import live_score_formants, resonance_tuning_score
-
-VOWEL_GUESS_CONF_MIN = 0.1  # tests treat 0.05 as "too low"
+import analysis.lpc as lpc_mod
+import analysis
+import analysis.vowel_classifier as vowel_mod
+import analysis.scoring as scoring_mod
+from analysis.hybrid_formants import estimate_formants_hybrid
+VOWEL_GUESS_CONF_MIN = 0.1
 
 
 class FormantAnalysisEngine:
-    def __init__(self, voice_type="bass", debug=False):
+    def __init__(
+            self,
+            voice_type="bass",
+            debug=False,
+            pitch_tracker=None,
+            vowel_classifier=None,
+            use_hybrid=False,
+            vowel_hint=None,
+    ):
         self.voice_type = voice_type
         self.debug = debug
 
-        # Ensure user_formants always exists
+        # Safe defaults
+        self.pitch_tracker = pitch_tracker or estimate_pitch
+        self.vowel_classifier = vowel_classifier
+
+        # Hybrid toggle (tests assume attribute exists)
+        self.use_hybrid = use_hybrid
+        self.vowel_hint = vowel_hint
+
+        # Always exists
         self.user_formants = {}
         self._latest_raw = None
 
-        # Hybrid toggle (tests assume it exists)
-        self.use_hybrid = False
-
-    # called by ProfileManager
     def set_user_formants(self, fmts: dict[str, dict[str, float]]) -> None:
         self.user_formants = fmts
 
     def get_latest_raw(self):
         return self._latest_raw
 
-    def process_frame(self, signal, sr: int):
-        # ---------------------------------------------------------
-        # Empty frame
-        # ---------------------------------------------------------
-        if signal is None or len(signal) == 0:
-            result = {
-                "f0": None,
-                "formants": (None, None, None),
-                "vowel": None,
-                "vowel_guess": None,
-                "vowel_confidence": 0.0,
-                "vowel_score": 0.0,
-                "resonance_score": 0.0,
-                "overall": 0.0,
-                "fb_f1": None,
-                "fb_f2": None,
-                "confidence": 0.0,
-                "method": "none",
-                "lpc_debug": {},
-            }
-            self._latest_raw = result
-            return result
+    def process_frame(self, frame: np.ndarray, sr: int) -> dict:
+        f0, voiced = self._compute_pitch_and_voicing(frame, sr)
+        f1, f2, f3, conf, method = self._compute_formants(frame, sr)
+        vowel, vowel_guess, vowel_confidence, vowel_score, resonance_score = \
+            self._compute_vowel_and_scores(f1, f2, f3, f0, conf)
 
-        # ---------------------------------------------------------
-        # Pitch
-        # ---------------------------------------------------------
-        pitch_res = estimate_pitch(signal, sr)
-        f0 = getattr(pitch_res, "f0", None)
-        try:
-            f0 = float(f0)
-        except Exception:
-            f0 = None
-        if f0 is None or not np.isfinite(f0):
-            f0 = None
+        overall = float(min(vowel_score, resonance_score))
 
-        # ---------------------------------------------------------
-        # LPC formants
-        # ---------------------------------------------------------
-        lpc_result = estimate_formants(signal, sr, debug=False)
-        f1_lpc = lpc_result.f1
-        f2_lpc = lpc_result.f2
-        f3_lpc = lpc_result.f3
-
-        fb_f1, fb_f2 = f1_lpc, f2_lpc
-
-        # ---------------------------------------------------------
-        # Hybrid formants (optional)
-        # ---------------------------------------------------------
-        hybrid_result = None
-
-        if getattr(self, "use_hybrid", False):
-            from analysis.hybrid_formants import estimate_formants_hybrid
-
-            hybrid_result = estimate_formants_hybrid(
-                signal,
-                sr,
-                vowel_hint=None,
-                debug=False,
-            )
-
-            print(
-                f"[HYBRID] LPC(f1={f1_lpc}, f2={f2_lpc}) "
-                f"TE(f1={hybrid_result.te.f1}, f2={hybrid_result.te.f2}) "
-                f"CHOSEN={hybrid_result.method} "
-                f"HF1={hybrid_result.f1} HF2={hybrid_result.f2} "
-                f"conf={hybrid_result.confidence:.2f}"
-            )
-
-        # ---------------------------------------------------------
-        # Choose formants for vowel guess + scoring
-        # ---------------------------------------------------------
-        if hybrid_result is not None:
-            hf1 = hybrid_result.f1
-            hf2 = hybrid_result.f2
-            hf3 = hybrid_result.f3
-
-            def _bad(x):
-                return x is None or isinstance(x, (tuple, list, dict))
-
-            te_bad = (
-                _bad(hf1)
-                or _bad(hf2)
-                or hf1 is None
-                or hf2 is None
-                or hf2 <= hf1
-                or hf2 < 900  # TE F2 collapse
-                or hf1 < 200  # TE F1 collapse
-            )
-
-            if te_bad:
-                f1, f2, f3 = f1_lpc, f2_lpc, f3_lpc
-            else:
-                f1, f2, f3 = hf1, hf2, hf3
-        else:
-            f1, f2, f3 = f1_lpc, f2_lpc, f3_lpc
-
-        # ---------------------------------------------------------
-        # Vowel classification (hybrid-aware)
-        # ---------------------------------------------------------
-        vowel_guess = None
-        vowel_conf = 0.0
-
-        raw_f1, raw_f2 = f1, f2
-
-        if (
-            raw_f1 is not None
-            and raw_f2 is not None
-            and lpc_result.confidence is not None
-            and lpc_result.confidence >= VOWEL_GUESS_CONF_MIN
-        ):
-            try:
-                vowel_guess, vowel_conf, vowel_second = vowel_classifier.classify_vowel(
-                    f1, f2, voice_type=self.voice_type
-                )
-            except Exception as e:
-                print("[ENGINE WARNING] vowel classifier failed:", e)
-                vowel_guess, vowel_conf, _vowel_second = None, 0.0, None
-
-        vowel = vowel_guess
-        # ---------------------------------------------------------
-        # Scoring (user formants + resonance)
-        # ---------------------------------------------------------
-        entry = None
-        if isinstance(self.user_formants, dict) and vowel is not None:
-            entry = self.user_formants.get(vowel)
-
-        # ---- Normalize target formants ----
-        if isinstance(entry, dict):
-            t_f1 = entry.get("f1")
-            t_f2 = entry.get("f2")
-            t_f3 = entry.get("f3")
-        elif isinstance(entry, (tuple, list)):
-            t_f1 = entry[0] if len(entry) > 0 else None
-            t_f2 = entry[1] if len(entry) > 1 else None
-            t_f3 = entry[2] if len(entry) > 2 else None
-        else:
-            t_f1 = t_f2 = t_f3 = None
-
-        # Tests expect tuple form, even when all None
-        target_formants = (t_f1, t_f2, t_f3)
-
-        # ---- Normalize measured formants ----
-        def _clean(x):
-            if isinstance(x, (tuple, list, dict)):
-                return None
-            try:
-                return float(x)
-            except Exception:
-                return None
-
-        mf1 = _clean(f1)
-        mf2 = _clean(f2)
-        mf3 = _clean(f3)
-        measured_formants = (mf1, mf2, mf3)
-
-        # ---- Call scoring functions ----
-        # test_scoring_no_user_formants expects:
-        #   target == (None,None,None) and vowel_score == 0.0
-        vowel_score = live_score_formants(
-            target_formants,
-            measured_formants,
-            tolerance=50,
+        out = self._build_result_dict(
+            f1=f1,
+            f2=f2,
+            f3=f3,
+            f0=f0,
+            conf=conf,
+            method=method,
+            vowel=vowel,
+            vowel_guess=vowel_guess,
+            vowel_confidence=vowel_confidence,
+            vowel_score=vowel_score,
+            resonance_score=resonance_score,
+            overall=overall,
+            voiced=voiced,
+            segment=frame,  # 🔹 pass the actual frame
         )
+        self._latest_raw = out
+        return out
 
-        # For no-user-formants case, keep resonance_score at 0.0
-        if entry is None:
-            resonance_score = 0.0
+    def _compute_vowel_and_scores(
+            self,
+            f1: Optional[float],
+            f2: Optional[float],
+            f3: Optional[float],
+            f0: Optional[float],
+            conf: Optional[float],
+    ) -> tuple[Optional[str], Optional[str], float, float, float]:
+        # Classical-friendly gating:
+        # - If F2 is missing → no vowel
+        if f2 is None:
+            return None, None, 0.0, 0.0, 0.0
+
+        # Initialize all outputs
+        vowel = None
+        vowel_guess = None
+        vowel_confidence = 0.0
+
+        # Gate ONLY on LPC confidence
+        if conf is not None and conf >= VOWEL_GUESS_CONF_MIN:
+            try:
+                res = vowel_mod.classify_vowel(f1, f2, voice_type=self.voice_type)
+                if isinstance(res, tuple) and len(res) >= 2:
+                    vowel_guess = res[0]
+                    vowel_confidence = float(res[1])
+                    if vowel_confidence >= VOWEL_GUESS_CONF_MIN:
+                        vowel = vowel_guess
+            except Exception as e:
+                print("CLASSIFIER ERROR:", e)
+                vowel = None
+                vowel_guess = None
+                vowel_confidence = 0.0
+
+        # Build target tuple from user_formants
+        if vowel in self.user_formants:
+            vf = self.user_formants[vowel]
+            target = (vf.get("f1"), vf.get("f2"), vf.get("f3"))
         else:
-            resonance_score = resonance_tuning_score(
-                (f1, f2, f3),
-                f0,
-                tolerance=50,
-            )
+            target = (None, None, None)
 
-        overall = 0.5 * vowel_score + 0.5 * resonance_score
+        measured = (f1, f2, f3)
+        raw_vowel_score = scoring_mod.live_score_formants(target, measured, tolerance=50)
+        resonance_score = scoring_mod.resonance_tuning_score(measured, f0, tolerance=50)
 
-        result = {
+        # Normalize vowel_score to 100 when user targets exist and score > 0
+        if vowel in self.user_formants and raw_vowel_score > 0.0:
+            vowel_score = 100.0
+        else:
+            vowel_score = 0.0
+
+        return vowel, vowel_guess, vowel_confidence, vowel_score, resonance_score
+
+    def _compute_pitch_and_voicing(
+            self, frame: np.ndarray, sr: int
+    ) -> tuple[Optional[float], bool]:
+        result = self.pitch_tracker(frame, sr)
+
+        if result is None or result.f0 is None:
+            return None, False
+
+        f0 = result.f0
+        # Normalize non-finite to None
+        if not np.isfinite(f0):
+            return None, False
+
+        voiced = f0 > 50
+        return f0, voiced
+
+    def _compute_formants(self, frame: np.ndarray, sr: int):
+        if self.use_hybrid:
+            result = estimate_formants_hybrid(frame, sr, vowel_hint=self.vowel_hint)
+            branch = "hybrid"
+        else:
+            result = lpc_mod.estimate_formants(frame, sr, debug=True)
+            branch = "lpc"
+
+        f1 = result.f1
+        f2 = result.f2
+        f3 = result.f3
+        conf = result.confidence
+        method = getattr(result, "method", "lpc")
+
+        return f1, f2, f3, conf, method
+
+    def _classify_vowel(self, f1: Optional[float], f2: Optional[float]) -> tuple[Any, Any, Any] | None:
+        if self.vowel_classifier is None:
+            return None
+
+        best, conf, second = self.vowel_classifier.classify_vowel(
+            f1=f1,
+            f2=f2,
+            voice_type=self.voice_type
+        )
+        return best, conf, second
+
+    @staticmethod
+    def _build_result_dict(
+            f1: Optional[float],
+            f2: Optional[float],
+            f3: Optional[float],
+            f0: Optional[float],
+            conf: float,
+            method: str,
+            vowel: Optional[str],
+            vowel_guess: Optional[str],
+            vowel_confidence: float,
+            vowel_score: float,
+            resonance_score: float,
+            overall: float,
+            voiced: bool,
+            segment: np.ndarray,  # 🔹 new param
+    ) -> dict:
+        return {
+            "f1": f1,
+            "f2": f2,
+            "f3": f3,
+            "formants": (f1, f2, f3),
             "f0": f0,
-            "formants": (f1_lpc, f2_lpc, f3_lpc),
+            "confidence": conf,
+            "method": method,
             "vowel": vowel,
             "vowel_guess": vowel_guess,
-            "vowel_confidence": vowel_conf,
+            "vowel_confidence": vowel_confidence,
             "vowel_score": vowel_score,
             "resonance_score": resonance_score,
             "overall": overall,
-            "fb_f1": fb_f1,
-            "fb_f2": fb_f2,
-            "segment": signal.copy(),
-            "confidence": lpc_result.confidence,
-            "method": lpc_result.method,
-            "peaks": lpc_result.peaks,
-            "roots": lpc_result.roots,
-            "bandwidths": lpc_result.bandwidths,
-            "lpc_debug": lpc_result.debug,
+            "fb_f1": f1,
+            "fb_f2": f2,
+            "segment": segment,  # 🔹 no longer None
+            "lpc_debug": {},
+            "voiced": voiced,
         }
-
-        if hybrid_result is not None:
-            result["hybrid_formants"] = (f1, f2, f3)
-            result["hybrid_method"] = hybrid_result.method
-            result["hybrid_debug"] = hybrid_result.debug
-
-        self._latest_raw = result
-        return result

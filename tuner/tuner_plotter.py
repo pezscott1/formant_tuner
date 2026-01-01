@@ -171,10 +171,14 @@ def update_vowel_chart(
     def valid(x):
         return x is not None and np.isfinite(x)
 
-    measured_valid = valid(mf1) and valid(mf2)
-    target_valid = valid(tf1) and valid(tf2)
+    # Accept F2-only frames for classical /i/ and similar vowels
+    if valid(mf2) and not valid(mf1):
+        measured_valid = True
+    else:
+        measured_valid = valid(mf1) and valid(mf2)
 
-    # ---------------- Suppression gating ----------------
+    target_valid = valid(tf2)  # allow target F2-only too
+
     if (not measured_valid) or (not stable) or (conf < 0.25):
         title = (
             f"/{vowel}/  Overall={overall:.2f}  "
@@ -186,7 +190,9 @@ def update_vowel_chart(
 
     # ---------------- Measured point ----------------
     try:
-        point = ax.scatter([mf2], [mf1], c="red", s=40)
+        # If F1 is missing, place the point at a neutral F1 height (e.g., 300 Hz)
+        y = mf1 if valid(mf1) else 300.0
+        point = ax.scatter([mf2], [y], c="red", s=40)
     except Exception:
         point = None
 
@@ -197,13 +203,9 @@ def update_vowel_chart(
     line = None
     if target_valid:
         try:
-            line = ax.plot(
-                [tf2, mf2],
-                [tf1, mf1],
-                c="gray",
-                linestyle="--",
-                linewidth=1.0,
-            )[0]
+            y1 = tf1 if valid(tf1) else y
+            y2 = mf1 if valid(mf1) else y
+            line = ax.plot([tf2, mf2], [y1, y2], ...)
         except Exception:
             line = None
 

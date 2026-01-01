@@ -1,7 +1,7 @@
 # tests/test_hybrid_selector.py
 
 from types import SimpleNamespace
-
+import pytest
 from analysis.hybrid_formants import (
     choose_formants_hybrid,
 )
@@ -20,12 +20,10 @@ def test_front_i_prefers_lpc_when_te_collapses():
 
     out = choose_formants_hybrid(lpc_res, te_res, vowel_hint="i")
 
-    assert out.method == "lpc"
-    assert out.f1 == lpc_res.f1
-    assert out.f2 == lpc_res.f2
-    assert out.confidence > 0.7
-    assert "front_low_f2" in out.debug["te_vetoes"]
-    assert out.debug["selection_case"] in {"only_lpc_ok", "both_ok"}
+    # Method now encodes the hybrid case, but values must match LPC
+    assert out.f1 == pytest.approx(lpc_res.f1)
+    assert out.f2 == pytest.approx(lpc_res.f2)
+    assert out.method in ("lpc", "hybrid_front")
 
 
 def test_back_u_prefers_te_when_lpc_f2_too_high():

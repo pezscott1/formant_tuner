@@ -12,6 +12,8 @@ Design:
 """
 from __future__ import annotations
 from typing import Optional
+
+import librosa
 import numpy as np
 from numpy.typing import NDArray
 from dataclasses import dataclass, asdict
@@ -67,15 +69,15 @@ def estimate_formants(
     y = np.append(y[0], y[1:] - pre * y[:-1])
 
     # ---------------------------------------------------------
-    # 2. (Temporarily) no downsampling for LPC
+    # 2. Downsampling for LPC
     # ---------------------------------------------------------
-    y_ds = y
-    sr_eff = sr
+    y_ds = librosa.resample(y, orig_sr=sr, target_sr=16000)
+    sr_eff = 16000
 
     # ---------------------------------------------------------
     # 3. Windowing (40 ms)
     # ---------------------------------------------------------
-    win_len = int(sr_eff * 0.040)
+    win_len = int(sr_eff * 0.050)  # or 0.060
     if win_len < 256:
         return _empty("window_too_short")
 
@@ -107,19 +109,16 @@ def estimate_formants(
     freqs = ang * (sr_eff / (2 * np.pi))
     bw = -0.5 * (sr_eff / np.pi) * np.log(np.abs(roots))
 
-    mask = (freqs > 80) & (freqs < 4000) & (bw < 600)
+    mask = (freqs > 80) & (freqs < 4000) & (bw < 1000)
     freqs_f = freqs[mask].real
     bw_f = bw[mask].real
     roots_f = roots[mask]
 
-    if freqs_f.size < 2:
+    if freqs_f.size < 1:
+        # Only bail out if literally nothing survives
         return _fallback(frame, sr_eff, "no_valid_poles", order)
-    freqs_sorted = np.sort(freqs_f)
 
-    # 2) Lowest surviving pole above 1000 Hz → "f1_too_high_lpc"
-    lowest = float(freqs_sorted[0])
-    if lowest > 1000.0:
-        return _fallback(frame, sr_eff, "f1_too_high_lpc", order)
+    freqs_sorted = np.sort(freqs_f)
 
     # 3) Normal formant extraction
     f1, f2, f3 = _extract_formants(freqs_sorted)
@@ -179,6 +178,11 @@ def _fallback(frame, sr, reason: str, order: Optional[int]) -> FormantResult:
     peak_freqs, peak_heights = _smooth_peaks(
         frame, sr, lifter_cut=20, nfft=4096
     )
+    print(
+        f"DEBUG _fallback: reason={reason} " 
+        f"n_peaks={peak_freqs.size} " 
+        f"first_peaks={peak_freqs[:5] 
+                       if peak_freqs.size > 0 else []}")
 
     # No peaks at all → empty fallback
     if peak_freqs.size == 0:
@@ -273,26 +277,31 @@ def _levinson(r, order):
 
 def _extract_formants(freqs_sorted):
     """
-    Choose F1, F2, F3 from sorted pole frequencies with simple
-    vocal-tract-aware ranges.
-
-    - F1: 200–900 Hz
-    - F2: > F1, up to 3500 Hz
-    - F3: > F2, up to 4000 Hz
+    Choose F1, F2, F3 from sorted pole frequencies with broad ranges
+    suitable for classical/baritone voice.
     """
     if freqs_sorted.size == 0:
         return None, None, None
 
     freqs = np.asarray(freqs_sorted, float)
 
-    # F1: lowest pole in a plausible range
-    f1_candidates = freqs[(freqs >= 200) & (freqs <= 900)]
+    # F1: very broad range
+    f1_candidates = freqs[(freqs >= 150) & (freqs <= 900)]
     f1 = float(f1_candidates[0]) if f1_candidates.size > 0 else None
+    if f1 is None:
+        # last-resort: if there is any peak below 1500, treat the lowest as F1
+        low_candidates = freqs[(freqs >= 150) & (freqs <= 1500)]
+        if low_candidates.size > 0:
+            f1 = float(low_candidates[0])
 
-    # F2: next pole above F1 in plausible range
+    # F2: next pole above F1; if no F1, lowest pole above 800 Hz
     f2 = None
     if f1 is not None:
-        f2_candidates = freqs[(freqs > f1 + 100) & (freqs <= 3500)]
+        f2_candidates = freqs[(freqs > f1 + 50) & (freqs <= 2500)]
+        if f2_candidates.size > 0:
+            f2 = float(f2_candidates[0])
+    else:
+        f2_candidates = freqs[(freqs >= 800) & (freqs <= 3500)]
         if f2_candidates.size > 0:
             f2 = float(f2_candidates[0])
 
@@ -325,8 +334,18 @@ def _smooth_peaks(frame, sr, lifter_cut=20, nfft=4096):
 
     if env_m.size == 0:
         return np.array([]), np.array([])
+
+    base = np.max(env_m)
+
+    # 🔥 LOWER THRESHOLD: catch weak F1
+    thresh = base * 0.005   # was 0.02
     peaks: np.ndarray
-    peaks, _ = find_peaks(env_m, height=np.max(env_m) * 0.02)
+    peaks, _ = find_peaks(env_m, height=thresh)
+
+    # 🔥 If still nothing, relax again
+    if peaks.size == 0:
+        peaks, _ = find_peaks(env_m, height=base * 0.002)
+
     if peaks.size == 0:
         return np.array([]), np.array([])
 

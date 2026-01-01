@@ -3,8 +3,8 @@ import numpy as np
 from analysis.engine import FormantAnalysisEngine
 
 
-@patch("analysis.engine.estimate_pitch")
-@patch("analysis.engine.estimate_formants")
+@patch("analysis.pitch.estimate_pitch")
+@patch("analysis.lpc.estimate_formants")
 def test_engine_scoring_with_user_formants(mock_lpc, mock_pitch):
     mock_pitch.return_value = MagicMock(f0=150.0)
     mock_lpc.return_value = MagicMock(

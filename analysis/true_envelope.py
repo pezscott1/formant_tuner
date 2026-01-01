@@ -127,7 +127,7 @@ def estimate_formants_te(
     # 4. Peak picking
     # ----------------------------------------------------------------------
     peaks_idx: np.ndarray
-    peaks_idx, props = find_peaks(env_m, height=np.max(env_m) * 0.02)
+    peaks_idx, props = find_peaks(env_m, height=np.max(env_m) * 0.05)
     if len(peaks_idx) == 0:
         # No detectable peaks: treat as extremely low-confidence,
         # but still return numeric formants so tests don't hit TypeError.
@@ -166,24 +166,24 @@ def estimate_formants_te(
 
     f1, f2, f3 = _extract_formants(np.sort(peak_freqs))
 
-    # ----------------------------------------------------------------------
-    # 5b. Guaranteed fallback if selector fails
-    # ----------------------------------------------------------------------
-    if (f1 is None or f2 is None) and len(peak_freqs) > 0:
-        sorted_peaks = np.sort(peak_freqs)
-        if len(sorted_peaks) >= 1:
-            f1 = float(sorted_peaks[0])
-        if len(sorted_peaks) >= 2:
-            f2 = float(sorted_peaks[1])
-        if len(sorted_peaks) >= 3:
-            f3 = float(sorted_peaks[2])
+    # 5b. Conservative fallback if selector fails
+    sorted_peaks = np.sort(peak_freqs)
+
+    if f1 is None and sorted_peaks.size >= 1:
+        f1 = float(sorted_peaks[0])
+
+    if f2 is None and sorted_peaks.size >= 2:
+        # Pick the **first peak that is reasonably above F1**
+        for pf in sorted_peaks[1:]:
+            if f1 is not None and pf > f1 * 1.3 and pf - f1 > 200:
+                f2 = float(pf)
+                break
+
     # ----------------------------------------------------------------------
     # 5c. Final guard: ensure numeric f1/f2 if not noise
     # ----------------------------------------------------------------------
     if f1 is None:
         f1 = 0.0
-    if f2 is None:
-        f2 = 0.0
     # ----------------------------------------------------------------------
     # 6. Confidence score
     # ----------------------------------------------------------------------

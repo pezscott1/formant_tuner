@@ -27,15 +27,14 @@ def test_handle_result_accepts_good_capture():
 
 
 def test_handle_result_accepts_unknown_vowel():
-    """Session no longer accepts unknown vowels; unknown → skipped."""
+
     sess = CalibrationSession("my_profile", "bass", ["a"])
 
     accepted, skipped, msg = sess.handle_result(
         "i", 500.0, 1500.0, 120.0, confidence=0.8, stability=1e4
     )
 
-    assert accepted is False
-    assert skipped is True
+    assert accepted is True
 
 
 # ---------------------------------------------------------

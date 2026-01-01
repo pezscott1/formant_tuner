@@ -26,7 +26,7 @@ class LiveAnalyzer:
         self.formant_smoother = formant_smoother
         self.label_smoother = label_smoother
         self.sample_rate = sample_rate
-
+        self.paused = False
         # Audio → engine queue (raw segments)
         self._audio_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=8)
         # Engine → UI queue (processed dicts)
@@ -162,8 +162,16 @@ class LiveAnalyzer:
     # RUNTIME: accepting audio and driving the engine
     # ------------------------------------------------------------------
 
+    def pause(self):
+        self.paused = True
+
+    def resume(self):
+        self.paused = False
+
     def submit_audio_segment(self, segment: np.ndarray):
         """Called from the audio callback. Must be non-blocking."""
+        if self.paused:
+            return
         if segment is None:
             return
         try:

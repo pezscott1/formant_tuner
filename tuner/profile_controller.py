@@ -57,12 +57,82 @@ class ProfileManager:
         path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         return os.path.exists(path)
 
+    def _seed_missing_vowels(self, data):
+        """
+        Seed intermediate vowels (e, ɪ, o) if missing.
+        Uses calibrated anchors: i, ɛ, ɔ, u.
+        """
+        import datetime
+
+        def now():
+            return datetime.datetime.utcnow().isoformat() + "Z"
+
+        # Must have anchors to seed
+        if "i" not in data or "ɛ" not in data or "ɔ" not in data or "u" not in data:
+            return data
+
+        i = data["i"]
+        eps = data["ɛ"]
+        o_bar = data["ɔ"]
+        u = data["u"]
+
+        # -----------------------------
+        # Seed /e/  (between i and ɛ)
+        # -----------------------------
+        if "e" not in data:
+            data["e"] = {
+                "f1": 0.3 * i["f1"] + 0.7 * eps["f1"],
+                "f2": 0.3 * i["f2"] + 0.7 * eps["f2"],
+                "f3": 2900.0,
+                "f0": None,
+                "confidence": 1.0,
+                "stability": 0.0,
+                "weight": 1.0,
+                "saved_at": now(),
+            }
+
+        # -----------------------------
+        # Seed /ɪ/ (between i and e)
+        # -----------------------------
+        if "ɪ" not in data:
+            e = data["e"]
+            data["ɪ"] = {
+                "f1": 0.7 * i["f1"] + 0.3 * e["f1"],
+                "f2": 0.7 * i["f2"] + 0.3 * e["f2"],
+                "f3": 3000.0,
+                "f0": None,
+                "confidence": 1.0,
+                "stability": 0.0,
+                "weight": 1.0,
+                "saved_at": now(),
+            }
+
+        # -----------------------------
+        # Seed /o/ (between ɔ and u)
+        # -----------------------------
+        if "o" not in data:
+            data["o"] = {
+                "f1": 0.5 * o_bar["f1"] + 0.5 * u["f1"],
+                "f2": 0.5 * o_bar["f2"] + 0.5 * u["f2"],
+                "f3": 2200.0,
+                "f0": None,
+                "confidence": 1.0,
+                "stability": 0.0,
+                "weight": 1.0,
+                "saved_at": now(),
+            }
+
+        return data
+
     # ---------------------------------------------------------
     # Saving profiles
     # ---------------------------------------------------------
     def save_profile(self, base, data, model_bytes=None):
         if "voice_type" not in data:
             data["voice_type"] = self.analyzer.voice_type
+
+        # 🔥 Seed missing vowels before writing JSON
+        data = self._seed_missing_vowels(data)
 
         json_path = os.path.join(self.profiles_dir, f"{base}_profile.json")
         model_path = json_path.replace("_profile.json", "_model.pkl")
@@ -73,6 +143,7 @@ class ProfileManager:
         if model_bytes is not None:
             with open(model_path, "wb") as f:
                 f.write(model_bytes)
+
         print("[CALIBRATION] Saving profile to:", base)
         self.set_active_profile(base)
 

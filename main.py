@@ -2,6 +2,11 @@ from analysis.engine import FormantAnalysisEngine
 from tuner.window import TunerWindow
 from tuner.controller import Tuner
 from PyQt5.QtWidgets import QApplication
+import importlib
+import analysis.vowel_data
+import analysis.vowel_classifier
+importlib.reload(analysis.vowel_classifier)
+importlib.reload(analysis.vowel_data)
 
 
 if __name__ == "__main__":
