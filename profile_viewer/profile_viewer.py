@@ -130,9 +130,11 @@ class ProfileViewerWindow(QMainWindow):
 
         self.legend_panel.setHtml("""
         <b>Legend</b><br>
-        <span style='color:red'>/i/</span>, <span style='color:green'>/ɛ/</span>, <span style='color:blue'>/ɑ/</span>, 
+        <span style='color:red'>/i/</span>, <span style='color:green'>/ɛ/</span>,
+        <span style='color:blue'>/ɑ/</span>,
         etc. = calibrated vowels<br>
-        <span style='color:gray'>/e/</span>, <span style='color:gray'>/ɪ/</span>, etc. = interpolated vowels<br>
+        <span style='color:gray'>/e/</span>, <span style='color:gray'>/ɪ/</span>,
+        etc. = interpolated vowels<br>
         X marker = calibrated<br>
         Circle = interpolated
         """)
