@@ -236,7 +236,6 @@ def test_vowel_chart_second_success_removes_and_does_not_store():
     )
 
     first_point = w.vowel_measured_artist
-    first_line = w.vowel_line_artist
 
     # Second call → removes previous, does NOT store new ones
     update_vowel_chart(

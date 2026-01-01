@@ -3,7 +3,6 @@ import numpy as np
 from typing import Optional, Any
 from analysis.pitch import estimate_pitch
 import analysis.lpc as lpc_mod
-import analysis
 import analysis.vowel_classifier as vowel_mod
 import analysis.scoring as scoring_mod
 from analysis.hybrid_formants import estimate_formants_hybrid
@@ -109,8 +108,10 @@ class FormantAnalysisEngine:
             target = (None, None, None)
 
         measured = (f1, f2, f3)
-        raw_vowel_score = scoring_mod.live_score_formants(target, measured, tolerance=50)
-        resonance_score = scoring_mod.resonance_tuning_score(measured, f0, tolerance=50)
+        raw_vowel_score = scoring_mod.live_score_formants(
+            target, measured, tolerance=50)
+        resonance_score = scoring_mod.resonance_tuning_score(
+            measured, f0, tolerance=50)
 
         # Normalize vowel_score to 100 when user targets exist and score > 0
         if vowel in self.user_formants and raw_vowel_score > 0.0:
@@ -139,10 +140,8 @@ class FormantAnalysisEngine:
     def _compute_formants(self, frame: np.ndarray, sr: int):
         if self.use_hybrid:
             result = estimate_formants_hybrid(frame, sr, vowel_hint=self.vowel_hint)
-            branch = "hybrid"
         else:
             result = lpc_mod.estimate_formants(frame, sr, debug=True)
-            branch = "lpc"
 
         f1 = result.f1
         f2 = result.f2
@@ -152,7 +151,8 @@ class FormantAnalysisEngine:
 
         return f1, f2, f3, conf, method
 
-    def _classify_vowel(self, f1: Optional[float], f2: Optional[float]) -> tuple[Any, Any, Any] | None:
+    def _classify_vowel(self, f1: Optional[float],
+                        f2: Optional[float]) -> tuple[Any, Any, Any] | None:
         if self.vowel_classifier is None:
             return None
 

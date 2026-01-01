@@ -179,9 +179,9 @@ def _fallback(frame, sr, reason: str, order: Optional[int]) -> FormantResult:
         frame, sr, lifter_cut=20, nfft=4096
     )
     print(
-        f"DEBUG _fallback: reason={reason} " 
-        f"n_peaks={peak_freqs.size} " 
-        f"first_peaks={peak_freqs[:5] 
+        f"DEBUG _fallback: reason={reason} "
+        f"n_peaks={peak_freqs.size} "
+        f"first_peaks={peak_freqs[:5]
                        if peak_freqs.size > 0 else []}")
 
     # No peaks at all → empty fallback

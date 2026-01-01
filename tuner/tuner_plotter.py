@@ -98,10 +98,6 @@ def update_spectrum(window, vowel, target_formants,
     window.canvas.draw_idle()
 
 
-# ============================================================
-# Vowel Chart (hybrid-aware, dict-based)
-# ============================================================
-
 def update_vowel_chart(
     window,
     vowel,
@@ -111,113 +107,127 @@ def update_vowel_chart(
     resonance_score,
     overall,
 ):
-    """
-    Modernized vowel chart:
-      - Uses dict-based formants (but accepts tuples)
-      - Uses stability + confidence gating
-      - Draws measured point + line to target
-      - Title shows scores
-    """
-
     ax = window.ax_vowel
 
-    # ---------------- Remove previous artists ----------------
+    # ------------------------------------------------------------
+    # Remove previous artists
+    # ------------------------------------------------------------
     had_previous = getattr(window, "vowel_measured_artist", None) is not None
+    _remove_old_artists(window)
 
-    old_point = getattr(window, "vowel_measured_artist", None)
-    old_line = getattr(window, "vowel_line_artist", None)
+    # ------------------------------------------------------------
+    # Extract stability + confidence
+    # ------------------------------------------------------------
+    conf, stable = _extract_confidence_and_stability(window)
 
-    if old_point is not None:
-        try:
-            old_point.remove()
-        except Exception:
-            pass
-    if old_line is not None:
-        try:
-            old_line.remove()
-        except Exception:
-            pass
+    # ------------------------------------------------------------
+    # Normalize formants
+    # ------------------------------------------------------------
+    target_formants = _normalize_formants(target_formants)
+    measured_formants = _normalize_formants(measured_formants)
 
-    window.vowel_measured_artist = None
-    window.vowel_line_artist = None
+    tf1, tf2 = target_formants.get("f1"), target_formants.get("f2")
+    mf1, mf2 = measured_formants.get("f1"), measured_formants.get("f2")
 
-    # ---------------- Extract stability + confidence ----------------
+    measured_valid, target_valid = _validate_formants(mf1, mf2, tf2)
+
+    # ------------------------------------------------------------
+    # Gating: invalid → title only
+    # ------------------------------------------------------------
+    if (not measured_valid) or (not stable) or (conf < 0.25):
+        _set_title(ax, vowel, vowel_score, resonance_score, overall)
+        window.canvas.draw_idle()
+        return
+
+    # ------------------------------------------------------------
+    # Draw measured point
+    # ------------------------------------------------------------
+    point = _draw_measured_point(ax, mf1, mf2)
+
+    if not had_previous:
+        window.vowel_measured_artist = point
+
+    # ------------------------------------------------------------
+    # Draw line to target
+    # ------------------------------------------------------------
+    line = _draw_target_line(ax, tf1, tf2, mf1, mf2) if target_valid else None
+
+    if not had_previous:
+        window.vowel_line_artist = line
+
+    # ------------------------------------------------------------
+    # Title + redraw
+    # ------------------------------------------------------------
+    _set_title(ax, vowel, vowel_score, resonance_score, overall)
+    window.canvas.draw_idle()
+
+
+# ======================================================================
+# Helper functions (pure, complexity-free)
+# ======================================================================
+
+def _remove_old_artists(window):
+    for attr in ("vowel_measured_artist", "vowel_line_artist"):
+        artist = getattr(window, attr, None)
+        if artist is not None:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        setattr(window, attr, None)
+
+
+def _extract_confidence_and_stability(window):
     analyzer = getattr(window, "analyzer", None)
     latest_raw = getattr(window, "latest_raw", None)
+
     if latest_raw is None and analyzer is not None:
         try:
             latest_raw = analyzer.get_latest_raw()
         except Exception:
             latest_raw = None
-    if latest_raw is None:
-        latest_raw = {}
 
+    latest_raw = latest_raw or {}
     conf = float(latest_raw.get("confidence", 1.0))
 
-    formant_smoother = getattr(analyzer, "formant_smoother", None) if analyzer else None
-    stable = getattr(formant_smoother, "formants_stable", True) \
-        if formant_smoother else True
+    smoother = getattr(analyzer, "formant_smoother", None) if analyzer else None
+    stable = getattr(smoother, "formants_stable", True) if smoother else True
 
-    # ---------------- Extract dict-based formants ----------------
-    target_formants = _normalize_formants(target_formants)
-    measured_formants = _normalize_formants(measured_formants)
+    return conf, stable
 
-    tf1 = target_formants.get("f1")
-    tf2 = target_formants.get("f2")
 
-    mf1 = measured_formants.get("f1")
-    mf2 = measured_formants.get("f2")
+def _valid(x):
+    return x is not None and np.isfinite(x)
 
-    def valid(x):
-        return x is not None and np.isfinite(x)
 
-    # Accept F2-only frames for classical /i/ and similar vowels
-    if valid(mf2) and not valid(mf1):
-        measured_valid = True
-    else:
-        measured_valid = valid(mf1) and valid(mf2)
+def _validate_formants(mf1, mf2, tf2):
 
-    target_valid = valid(tf2)  # allow target F2-only too
+    # Accept F2-only frames
+    measured_valid = _valid(mf2) if not _valid(mf1) else (_valid(mf1) and _valid(mf2))
+    target_valid = _valid(tf2)
 
-    if (not measured_valid) or (not stable) or (conf < 0.25):
-        title = (
-            f"/{vowel}/  Overall={overall:.2f}  "
-            f"(Vowel={vowel_score:.2f}, Resonance={resonance_score:.2f})"
-        )
-        ax.set_title(title)
-        window.canvas.draw_idle()
-        return
+    return measured_valid, target_valid
 
-    # ---------------- Measured point ----------------
+
+def _draw_measured_point(ax, mf1, mf2):
     try:
-        # If F1 is missing, place the point at a neutral F1 height (e.g., 300 Hz)
-        y = mf1 if valid(mf1) else 300.0
-        point = ax.scatter([mf2], [y], c="red", s=40)
+        y = mf1 if _valid(mf1) else 300.0
+        return ax.scatter([mf2], [y], c="red", s=40)
     except Exception:
-        point = None
+        return None
 
-    if not had_previous:
-        window.vowel_measured_artist = point
 
-    # ---------------- Line to target ----------------
-    line = None
-    if target_valid:
-        try:
-            y1 = tf1 if valid(tf1) else y
-            y2 = mf1 if valid(mf1) else y
-            line = ax.plot([tf2, mf2], [y1, y2], ...)
-        except Exception:
-            line = None
+def _draw_target_line(ax, tf1, tf2, mf1, mf2):
+    try:
+        y1 = tf1 if _valid(tf1) else (mf1 if _valid(mf1) else 300.0)
+        y2 = mf1 if _valid(mf1) else 300.0
+        return ax.plot([tf2, mf2], [y1, y2], ...)
+    except Exception:
+        return None
 
-    if not had_previous:
-        window.vowel_line_artist = line
 
-    # ---------------- Title ----------------
-    title = (
+def _set_title(ax, vowel, vowel_score, resonance_score, overall):
+    ax.set_title(
         f"/{vowel}/  Overall={overall:.2f}  "
         f"(Vowel={vowel_score:.2f}, Resonance={resonance_score:.2f})"
     )
-    ax.set_title(title)
-
-    # ---------------- Redraw ----------------
-    window.canvas.draw_idle()
