@@ -1,4 +1,9 @@
-from analysis.hybrid_formants import apply_lpc_vetoes, apply_te_vetoes, choose_primary, select_formants
+from analysis.hybrid_formants import (
+    apply_lpc_vetoes,
+    apply_te_vetoes,
+    choose_primary,
+    select_formants
+)
 from types import SimpleNamespace as SimpleNS
 
 

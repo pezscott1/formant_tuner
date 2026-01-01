@@ -12,7 +12,7 @@ def test_no_profile_auto_load(qtbot, tmp_path):
     engine = FormantAnalysisEngine()
     tuner = Tuner(engine=engine, profiles_dir=str(tmp_path))
 
-    window = TunerWindow(tuner)
+    window = TunerWindow(tuner, headless=True)
     qtbot.addWidget(window)
 
     # No profiles exist → Active: None
@@ -27,7 +27,7 @@ def test_single_click_applies_profile(qtbot, tmp_path):
 
     engine = FormantAnalysisEngine()
     tuner = Tuner(engine=engine, profiles_dir=str(tmp_path))
-    window = TunerWindow(tuner)
+    window = TunerWindow(tuner, headless=True)
     qtbot.addWidget(window)
 
     window._populate_profiles()

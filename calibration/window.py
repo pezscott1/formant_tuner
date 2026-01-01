@@ -44,6 +44,7 @@ class CalibrationWindow(QMainWindow):
         # Shared engine
         self.engine = engine
         self.engine.use_hybrid = True
+        self.engine.calibrating = True
         self.profile_manager = profile_manager
 
         # Rolling state
@@ -55,7 +56,6 @@ class CalibrationWindow(QMainWindow):
 
         # Core vowel set
         self.vowels = ["i", "ɛ", "ɑ", "ɔ", "u"]
-
         # f0 locking state
         self._f0_locked = None
         self._f0_candidates = []
@@ -461,6 +461,8 @@ class CalibrationWindow(QMainWindow):
 
         try:
             self.engine.use_hybrid = True
+            self.engine.calibrating = False
+            self.engine.vowel_hint = None
         except Exception:
             pass
 
@@ -513,6 +515,8 @@ class CalibrationWindow(QMainWindow):
         # Reset analyzer state
         try:
             self.analyzer.pause()
+            self.engine.calibrating = False
+            self.engine.vowel_hint = None
             self.label_smoother.reset()
             self.pitch_smoother.reset()
             self.formant_smoother.reset()

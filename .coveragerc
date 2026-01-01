@@ -1,5 +1,6 @@
 [run]
 branch = True
+disable_warnings = c-extension-not-loaded
 omit =
     # UI shells (not testable)
     tuner/window.py
@@ -9,10 +10,15 @@ omit =
     calibration/dialog.py
     diagnostic.py
     main.py
+    profile_viewer/profile_viewer.py
+
     # Skip tests from coverage
     tests/*
+    conftest.py
 
 [report]
 exclude_lines =
     pragma: no cover
     if __name__ == .__main__.:
+
+

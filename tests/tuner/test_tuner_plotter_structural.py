@@ -2,11 +2,9 @@ import os
 import pytest
 if os.environ.get("CI") == "true":
     pytest.skip("Skipping Qt/Matplotlib UI tests in CI", allow_module_level=True)
-
 import numpy as np
 import matplotlib.pyplot as plt
 import types
-
 from tuner.tuner_plotter import update_spectrum, update_vowel_chart
 
 

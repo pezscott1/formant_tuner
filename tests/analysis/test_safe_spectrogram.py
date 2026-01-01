@@ -24,6 +24,9 @@ def test_safe_spectrogram_empty():
 # ---------------------------------------------------------
 
 def test_safe_spectrogram_too_short():
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
     y = np.random.randn(100)  # shorter than n_fft=1024
     f, t, S = safe_spectrogram(y, sr=16000)
 

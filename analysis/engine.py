@@ -21,7 +21,7 @@ class FormantAnalysisEngine:
     ):
         self.voice_type = voice_type
         self.debug = debug
-
+        self.calibrating = False
         # Safe defaults
         self.pitch_tracker = pitch_tracker or estimate_pitch
         self.vowel_classifier = vowel_classifier
@@ -75,8 +75,9 @@ class FormantAnalysisEngine:
             f0: Optional[float],
             conf: Optional[float],
     ) -> tuple[Optional[str], Optional[str], float, float, float]:
-        # Classical-friendly gating:
-        # - If F2 is missing → no vowel
+
+        if self.calibrating:
+            return None, None, 0.0, 0.0, 0.0
         if f2 is None:
             return None, None, 0.0, 0.0, 0.0
 
@@ -138,7 +139,7 @@ class FormantAnalysisEngine:
         return f0, voiced
 
     def _compute_formants(self, frame: np.ndarray, sr: int):
-        if self.use_hybrid:
+        if self.use_hybrid or self.calibrating:
             result = estimate_formants_hybrid(frame, sr, vowel_hint=self.vowel_hint)
         else:
             result = lpc_mod.estimate_formants(frame, sr, debug=True)

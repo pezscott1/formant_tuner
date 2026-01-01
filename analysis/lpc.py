@@ -181,8 +181,8 @@ def _fallback(frame, sr, reason: str, order: Optional[int]) -> FormantResult:
     print(
         f"DEBUG _fallback: reason={reason} "
         f"n_peaks={peak_freqs.size} "
-        f"first_peaks={peak_freqs[:5]
-                       if peak_freqs.size > 0 else []}")
+        f"first_peaks={peak_freqs[:5] if peak_freqs.size > 0 else []}"
+    )
 
     # No peaks at all → empty fallback
     if peak_freqs.size == 0:
