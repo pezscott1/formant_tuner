@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-
+from analysis.vowel_classifier import classify_vowel
 from analysis.vowel_data import VOWEL_CENTERS
 from analysis.plausibility import (
     vowel_window,
@@ -124,3 +124,9 @@ def test_plausible_pitch_ok():
     ok, reason = is_plausible_pitch(200)
     assert ok
     assert reason == "ok"
+
+
+def test_classifier_missing_f1():
+    vowel, conf, dbg = classify_vowel(None, 1500)
+    assert vowel is None
+    assert conf == 0.0

@@ -58,3 +58,11 @@ def test_hybrid_selector_vetoes_bad_te(monkeypatch):
     assert result.f2 == 1500
     assert result.method in ("lpc", "hybrid_front")
     assert "front_low_f2" in result.debug.get("te_vetoes", [])
+
+
+def test_te_no_valid_peaks():
+    y = np.zeros(4096)
+    out = estimate_formants_te(y, sr=48000)
+    assert out.method in ("te", "fallback")
+    assert out.f1 is None
+    assert out.f2 is None

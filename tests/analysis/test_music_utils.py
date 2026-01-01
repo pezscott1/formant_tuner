@@ -110,3 +110,8 @@ def test_render_piano_handles_negative_midi():
     ax = MagicMock()
     render_piano(ax, midi_note=-10)
     assert ax.add_patch.called or ax.plot.called
+
+
+def test_freq_to_note_low_boundary():
+    note = freq_to_note_name(27.5)  # A0
+    assert note == "A0"

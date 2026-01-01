@@ -99,17 +99,17 @@ def choose_formants_hybrid(
     dbg["te_base_ok"] = te_ok
 
     # 2. TE vetoes
-    te_ok = _apply_te_vetoes(te, te_ok, dbg, back, front)
+    te_ok = apply_te_vetoes(te, te_ok, dbg, back, front)
 
     # 3. LPC vetoes
-    lpc_ok = _apply_lpc_vetoes(lpc, lpc_ok, dbg, back)
+    lpc_ok = apply_lpc_vetoes(lpc, lpc_ok, dbg, back)
 
     # 4. Primary method
-    primary = _choose_primary(front, back)
+    primary = choose_primary(front, back)
     dbg["primary"] = primary
 
     # 5. Main selection
-    chosen, f1, f2, f3, confidence = _select_formants(
+    chosen, f1, f2, f3, confidence = select_formants(
         lpc, te, lpc_ok, te_ok, primary, front, vowel_hint, dbg
     )
 
@@ -161,7 +161,7 @@ def _print_output_debug(chosen, primary, f1, f2, f3, confidence, dbg):
     print("----------------------\n")
 
 
-def _apply_te_vetoes(te, te_ok, dbg, back, front):
+def apply_te_vetoes(te, te_ok, dbg, back, front):
     if _valid_scalar(te.f1) and te.f1 < 200:
         te_ok = False
         dbg["te_vetoes"].append("f1_too_low")
@@ -184,7 +184,7 @@ def _apply_te_vetoes(te, te_ok, dbg, back, front):
     return te_ok
 
 
-def _apply_lpc_vetoes(lpc, lpc_ok, dbg, back):
+def apply_lpc_vetoes(lpc, lpc_ok, dbg, back):
     if back and _valid_scalar(lpc.f2) and lpc.f2 > 1800:
         lpc_ok = False
         dbg["lpc_vetoes"].append("back_high_f2")
@@ -196,7 +196,7 @@ def _apply_lpc_vetoes(lpc, lpc_ok, dbg, back):
     return lpc_ok
 
 
-def _choose_primary(front, back):
+def choose_primary(front, back):
     if back:
         return "te"
     if front:
@@ -204,7 +204,7 @@ def _choose_primary(front, back):
     return "lpc"
 
 
-def _select_formants(lpc, te, lpc_ok, te_ok, primary, front, vowel_hint, dbg):
+def select_formants(lpc, te, lpc_ok, te_ok, primary, front, vowel_hint, dbg):
     """
     Return (chosen, f1, f2, f3, confidence)
     Always sets dbg["selection_case"].
@@ -213,7 +213,7 @@ def _select_formants(lpc, te, lpc_ok, te_ok, primary, front, vowel_hint, dbg):
     # ----- FRONT HYBRID -----
     if front:
         dbg["selection_case"] = "front_hybrid"
-        return _select_front_hybrid(lpc, te, lpc_ok, te_ok, vowel_hint, dbg)
+        return select_front_hybrid(lpc, te, lpc_ok, te_ok, vowel_hint, dbg)
 
     # ----- BOTH OK -----
     if lpc_ok and te_ok:
@@ -239,7 +239,7 @@ def _select_formants(lpc, te, lpc_ok, te_ok, primary, front, vowel_hint, dbg):
     return "lpc", lpc.f1, lpc.f2, lpc.f3, 0.2
 
 
-def _select_front_hybrid(lpc, te, lpc_ok, te_ok, vowel_hint, dbg):
+def select_front_hybrid(lpc, te, lpc_ok, te_ok, vowel_hint, dbg):
     dbg["selection_case"] = "front_hybrid"
     chosen = "hybrid_front"
 

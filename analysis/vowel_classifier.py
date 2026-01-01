@@ -17,6 +17,8 @@ from analysis.vowel_data import VOWEL_CENTERS
 
 
 def classify_vowel(f1, f2, voice_type=None):
+    if f1 is None or not np.isfinite(f1):
+        return None, 0.0, {"reason": "missing_f1"}
     vt = (voice_type or "baritone").lower()
     centers = VOWEL_CENTERS.get(vt)
     if centers is None:
