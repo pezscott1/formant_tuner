@@ -205,30 +205,38 @@ def _choose_primary(front, back):
 
 
 def _select_formants(lpc, te, lpc_ok, te_ok, primary, front, vowel_hint, dbg):
-    chosen = "unknown"
-    f1 = f2 = f3 = None
-    confidence = 0.0
+    """
+    Return (chosen, f1, f2, f3, confidence)
+    Always sets dbg["selection_case"].
+    """
 
-    def use_lpc():
-        return "lpc", lpc.f1, lpc.f2, lpc.f3, (lpc.confidence or 0.8)
-
-    def use_te():
-        return "te", te.f1, te.f2, te.f3, 0.7
-
+    # ----- FRONT HYBRID -----
     if front:
+        dbg["selection_case"] = "front_hybrid"
         return _select_front_hybrid(lpc, te, lpc_ok, te_ok, vowel_hint, dbg)
 
+    # ----- BOTH OK -----
     if lpc_ok and te_ok:
-        return use_te() if primary == "te" else use_lpc(), None
-    if lpc_ok:
-        return use_lpc()
-    if te_ok:
-        return use_te()
+        dbg["selection_case"] = "both_ok"
+        if primary == "te":
+            return "te", te.f1, te.f2, te.f3, 0.7
+        else:
+            return "lpc", lpc.f1, lpc.f2, lpc.f3, (lpc.confidence or 0.8)
 
-    chosen, f1, f2, f3, confidence = use_lpc()
-    confidence = min(confidence, 0.2)
+    # ----- ONLY LPC OK -----
+    if lpc_ok and not te_ok:
+        dbg["selection_case"] = "only_lpc_ok"
+        return "lpc", lpc.f1, lpc.f2, lpc.f3, (lpc.confidence or 0.8)
+
+    # ----- ONLY TE OK -----
+    if te_ok and not lpc_ok:
+        dbg["selection_case"] = "only_te_ok"
+        return "te", te.f1, te.f2, te.f3, 0.7
+
+    # ----- BOTH BAD -----
     dbg["selection_case"] = "both_bad"
-    return chosen, f1, f2, f3, confidence
+    # fallback to LPC but with low confidence
+    return "lpc", lpc.f1, lpc.f2, lpc.f3, 0.2
 
 
 def _select_front_hybrid(lpc, te, lpc_ok, te_ok, vowel_hint, dbg):

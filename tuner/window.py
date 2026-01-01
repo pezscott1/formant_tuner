@@ -455,7 +455,8 @@ class TunerWindow(QMainWindow):
         if stream is None or not getattr(stream, "active", True):
             return
         # Skip UI updates if analyzer is paused
-        if hasattr(self.live_analyzer, "is_running") and not self.live_analyzer.is_running:
+        if (hasattr(self.live_analyzer, "is_running")
+                and not self.live_analyzer.is_running):
             return
         processed = self.tuner.poll_latest_processed()
         if not processed:
