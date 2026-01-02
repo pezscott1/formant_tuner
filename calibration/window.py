@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
-    QFrame,
+    QFrame, QPushButton,
 )
 from PyQt5.QtCore import QTimer, pyqtSignal
 import matplotlib.pyplot as plt
@@ -86,6 +86,7 @@ class CalibrationWindow(QMainWindow):
         self.capture_timeout = 3.0
 
         # Store durable vowel anchors
+        self._interpolated_vowels = {}
         self._vowel_anchors = {}
         self._vowel_colors = {
             "i": "red",
@@ -148,6 +149,10 @@ class CalibrationWindow(QMainWindow):
         self.capture_panel.setReadOnly(True)
         layout.addWidget(QLabel("Captures"))
         layout.addWidget(self.capture_panel)
+
+        btn = QPushButton("Close")
+        btn.clicked.connect(self.close)  # type: ignore
+        layout.addWidget(btn)
 
         return frame
 
@@ -262,6 +267,42 @@ class CalibrationWindow(QMainWindow):
                 self._finish()
                 return
 
+    @staticmethod
+    def fmt_pitch(x):
+        if x is None:
+            return "None"
+        try:
+            return f"{float(x):.1f}"
+        except Exception:
+            return str(x)
+
+    @staticmethod
+    def lock_f0(values):
+        arr = np.asarray(values, dtype=float)
+        if arr.size < 5:
+            return None
+
+        # Normalize into the same octave band
+        norm = []
+        for v in arr:
+            base = v
+            while base > 200:
+                base /= 2
+            while base < 80:
+                base *= 2
+            norm.append(base)
+
+        norm = np.asarray(norm)
+
+        # Median of normalized values
+        f0_norm = float(np.median(norm))
+
+        # Restore original octave: choose the octave closest to raw values
+        candidates = [f0_norm, f0_norm * 2, f0_norm / 2]
+        best = min(candidates, key=lambda x: np.mean(np.abs(arr - x)))
+
+        return best
+
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
@@ -274,22 +315,29 @@ class CalibrationWindow(QMainWindow):
         target = self.state.current_vowel
         self.engine.vowel_hint = target
 
-        # Pitch
+        # Extract raw pitch
         pitch_raw = raw.get("f0")
+
+        # Unwrap PitchResult
+        if hasattr(pitch_raw, "f0"):
+            pitch_raw = pitch_raw.f0
+
+        # Convert to float or None
         try:
             pitch_val = float(pitch_raw)
         except Exception:
             pitch_val = None
+
         if pitch_val is not None and pitch_val <= 0:
             pitch_val = None
 
-        if hasattr(pitch_raw, "f0"):
-            pitch_raw = pitch_raw.f0
+        # Update smoother (for UI only)
+        self.pitch_smoother.update(pitch_val, confidence)
 
-        self.pitch_smoother.update(pitch_raw, confidence)
-
-        # F0 locking
+        # --- Calibration uses RAW pitch, not smoothed ---
         f0_cal = pitch_val
+
+        # Voice-type plausibility
         if f0_cal is not None:
             if self.session.voice_type in ("bass", "baritone"):
                 low, high = 60, 260
@@ -298,13 +346,12 @@ class CalibrationWindow(QMainWindow):
             if not (low <= f0_cal <= high):
                 f0_cal = None
 
-        if self._f0_locked is None:
-            if f0_cal is not None:
-                self._f0_candidates.append(f0_cal)
-                if len(self._f0_candidates) >= 3:
-                    self._f0_locked = float(np.median(self._f0_candidates))
-        else:
-            f0_cal = self._f0_locked
+        print(
+            f"raw={self.fmt_pitch(pitch_raw)}  "
+            f"smoothed={self.fmt_pitch(self.pitch_smoother.current)}  "
+            f"f0_cal={self.fmt_pitch(f0_cal)}  "
+            f"conf={confidence:.2f}"
+        )
 
         # Raw formants
         raw_f1 = raw.get("f1") or raw.get("fb_f1")
@@ -323,7 +370,7 @@ class CalibrationWindow(QMainWindow):
                 vowel=target,
                 calibrated=self.session.data,
             )
-            if ok and f0_cal is not None:
+            if ok and f0_cal is not None and confidence > 0.5:
                 self._capture_buffer.append((raw_f1, raw_f2, f0_cal))
 
         # Spectrogram
@@ -352,7 +399,7 @@ class CalibrationWindow(QMainWindow):
 
         # Draw vowel anchors
         self._redraw_vowel_anchors()
-
+        self._interpolated_vowels = self.session.compute_interpolated_vowels()
         # Throttled draw
         now = time.time()
         if now - self._last_draw >= self._min_draw_interval:
@@ -365,15 +412,69 @@ class CalibrationWindow(QMainWindow):
     def _redraw_vowel_anchors(self):
         ax = self.ax_vowel
         ax.cla()
+
         ax.set_xlabel("F2 (Hz)")
         ax.set_ylabel("F1 (Hz)")
         ax.invert_xaxis()
         ax.invert_yaxis()
 
+        # Softer, thicker grid like Profile Viewer
+        ax.grid(
+            True,
+            linewidth=1.5,
+            color="#cccccc",
+            alpha=0.8,
+        )
+
+        # Anti-aliasing
+        for spine in ax.spines.values():
+            spine.set_antialiased(True)
+
+        # Draw calibrated vowels
         for vowel, (f1, f2) in self._vowel_anchors.items():
             color = self._vowel_colors.get(vowel, "black")
-            ax.scatter(f2, f1, s=180, c=color, marker="x", linewidths=3)
-            ax.text(f2, f1, f" /{vowel}/", fontsize=9, color=color)
+            ax.scatter(
+                f2, f1,
+                s=200,
+                c=color,
+                marker="x",
+                linewidths=3,
+                antialiased=True,
+            )
+            ax.text(
+                f2 + 20,
+                f1 - 20,
+                f"/{vowel}/",
+                fontsize=12,
+                fontweight="bold",
+                color=color,
+                bbox=dict(facecolor="white", alpha=0.6, edgecolor="none", pad=1.5),
+                ha="left",
+                va="center",
+            )
+
+        # Draw interpolated vowels (once barycentric interpolation is added)
+        for vowel, data in self._interpolated_vowels.items():
+            f1, f2 = data["f1"], data["f2"]
+            ax.scatter(
+                f2, f1,
+                s=160,
+                edgecolors="gray",
+                facecolors="none",
+                marker="o",
+                linewidths=2,
+                antialiased=True,
+            )
+            ax.text(
+                f2 + 20,
+                f1 - 20,
+                f"/{vowel}/",
+                fontsize=11,
+                color="gray",
+                bbox=dict(facecolor="white", alpha=0.4, edgecolor="none", pad=1.0),
+                ha="left",
+                va="center",
+            )
 
     # ---------------------------------------------------------
     # Capture processing
@@ -494,8 +595,6 @@ class CalibrationWindow(QMainWindow):
             self.profile_calibrated.emit(base_name)  # type:ignore
         except Exception:
             traceback.print_exc()
-
-        self.close()
 
     def closeEvent(self, event):
         # Stop timers

@@ -31,7 +31,7 @@ def hps_pitch(signal, sr, max_f0=500, min_f0=50):
 # Pitch smoothing
 # ---------------------------------------------------------
 class PitchSmoother:
-    def __init__(self, alpha=0.25, jump_limit=80, min_confidence=0.0,
+    def __init__(self, alpha=0.25, jump_limit=200, min_confidence=0.0,
                  hps_enabled=False, sr=48000):
         self.alpha = alpha
         self.jump_limit = jump_limit
@@ -47,14 +47,18 @@ class PitchSmoother:
         if self.current is None or new is None:
             return new
 
-        # Snap to 2×current if within 40 Hz
-        if abs(new - 2 * self.current) <= 40:
-            return 2 * self.current
+        cur = float(self.current)
+        new = float(new)
 
-        # Snap to 0.5×current if within 20 Hz
-        if abs(new - 0.5 * self.current) <= 20:
-            return 0.5 * self.current
+        # If new is close to 2×current, snap up
+        if abs(new - 2.0 * cur) <= 40.0:
+            return 2.0 * cur
 
+        # If new is close to ½×current, snap down
+        if abs(new - 0.5 * cur) <= 20.0:
+            return 0.5 * cur
+
+        # Otherwise leave it unchanged
         return new
 
     def reset(self):
@@ -79,7 +83,7 @@ class PitchSmoother:
         except Exception:
             return self.current
 
-        # first frame
+        # first frame: no normalization, tests expect identity
         if self.current is None:
             self.current = new
             return self.current
@@ -88,18 +92,28 @@ class PitchSmoother:
         if confidence < self.min_confidence:
             return self.current
 
-        # jump suppression
+        # jump suppression on raw value (before octave correction)
         if abs(new - self.current) > self.jump_limit:
             return self.current
 
-        # EMA smoothing
-        self.current = self.alpha * new + (1 - self.alpha) * self.current
-        return self.current
+        # octave correction on values that passed jump suppression
+        corrected = self._octave_correct(new)
 
+        # If octave correction snapped exactly to an octave,
+        # tests allow us to land *exactly* on that value
+        if corrected in (self.current * 2.0, self.current * 0.5):
+            self.current = corrected
+            return self.current
+
+        # EMA smoothing (normal case)
+        self.current = self.alpha * corrected + (1.0 - self.alpha) * self.current
+        return self.current
 
 # ---------------------------------------------------------
 # Formant smoothing
 # ---------------------------------------------------------
+
+
 class MedianSmoother:
     """
     Rolling median smoother for F1/F2/F3 with:

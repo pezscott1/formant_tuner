@@ -115,10 +115,10 @@ class ProfileViewerWindow(QMainWindow):
             f2 = data.get("f2")
             f0 = data.get("f0")
             color = self.colors.get(vowel, self.interp_color)
-
+            f0_display = f"{f0:.1f}" if isinstance(f0, (int, float)) else "—"
             lines.append(
                 f"<span style='color:{color}; font-weight:bold'>/{vowel}/</span> "
-                f"F1={f1:.1f}  F2={f2:.1f}  F0={f0:.1f}"
+                f"F1={f1:.1f}  F2={f2:.1f}  F0={f0_display}"
             )
 
         self.values_panel.setHtml("<br>".join(lines))

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from analysis.plausibility import is_plausible_formants
+import numpy as np
 
 
 class CalibrationSession:
@@ -24,6 +25,87 @@ class CalibrationSession:
                     # Make a shallow copy so we can enrich it
                     self.data[vowel] = entry.copy()
 
+    # ---------------------------------------------------------
+    # Barycentric vowel triangles
+    # --------------------------------------------------------
+    TRIANGLES = {
+        "æ": ("ɛ", "ɑ", "i"),
+        "e": ("i", "ɛ", "ɑ"),
+        "ɪ": ("i", "ɛ", "u"),
+        "o": ("u", "ɔ", "ɑ"),
+    }
+
+    @staticmethod
+    def _weights_for(vowel):
+        if vowel == "æ":
+            return 0.45, 0.35, 0.20
+        if vowel == "e":
+            return 0.5, 0.3, 0.2
+        if vowel == "ɪ":
+            return 0.6, 0.3, 0.1
+        if vowel == "o":
+            return 0.5, 0.3, 0.2
+        return 1/3, 1/3, 1/3
+
+    def get_calibrated_anchors(self):
+        """Return a dict of vowel → (f1, f2) for calibrated vowels only."""
+        anchors = {}
+        for vowel, entry in self.data.items():
+            f1 = entry.get("f1")
+            f2 = entry.get("f2")
+            if f1 is not None and f2 is not None:
+                anchors[vowel] = (float(f1), float(f2))
+        return anchors
+
+    @staticmethod
+    def barycentric_interpolate(target, triangle):
+        """
+        target: (wA, wB, wC) barycentric weights that sum to 1
+        triangle: dict with keys 'A','B','C' mapping to (f1,f2) coordinates
+        """
+        A = np.array(triangle["A"])
+        B = np.array(triangle["B"])
+        C = np.array(triangle["C"])
+
+        wA, wB, wC = target  # barycentric weights
+        return wA * A + wB * B + wC * C
+
+    def compute_interpolated_vowels(self):
+        anchors = self.get_calibrated_anchors()
+        out = {}
+
+        for vowel, (A, B, C) in self.TRIANGLES.items():
+            # Only interpolate if all three anchors exist
+            if {A, B, C} <= anchors.keys():
+                w = self._weights_for(vowel)
+                # Get F0 values for the triangle vertices
+                f0A = self.data[A].get("f0")
+                f0B = self.data[B].get("f0")
+                f0C = self.data[C].get("f0")
+
+                # Interpolate F0 using the same barycentric weights
+                f0 = None
+                if all(isinstance(x, (int, float)) for x in (f0A, f0B, f0C)):
+                    f0 = w[0] * f0A + w[1] * f0B + w[2] * f0C
+
+                result = self.barycentric_interpolate(
+                    w,
+                    {"A": anchors[A], "B": anchors[B], "C": anchors[C]},
+                )
+                f1, f2 = map(float, result)
+
+                out[vowel] = {
+                    "f1": float(f1),
+                    "f2": float(f2),
+                    "f0": float(f0) if f0 is not None else None,
+                    "confidence": 1.0,
+                    "stability": 0.0,
+                    "weight": 0.0,
+                    "saved_at": datetime.now(timezone.utc).isoformat(),
+                }
+
+        return out
+
     def increment_retry(self, vowel: str) -> None:
         """Increment retry count for a vowel."""
         if vowel in self.retries_map:
@@ -43,7 +125,6 @@ class CalibrationSession:
             confidence: float,
             stability: float,
     ):
-        import numpy as np
 
         # -----------------------------
         # 0. Basic sanity
@@ -133,21 +214,7 @@ class CalibrationSession:
     def _reject_capture(self, vowel: str, reason: str):
         self.increment_retry(vowel)
         return False, True, f"Rejected /{vowel}/: {reason}"
-    """
-    def _is_harmonic_lock(self, f1, f2, f0):
-        # If we have no f0 or missing formants, we can't reliably
-        # determine harmonic lock. Let other gates handle it.
-        if f1 is None or f2 is None or f0 is None:
-            return False
 
-        # Only treat as harmonic lock if F1 is *very* close to a
-        # higher-order harmonic, not just any multiple.
-        for k in range(4, 10):  # skip 2nd/3rd where real F1 often lives
-            if abs(f1 - k * f0) < 40:
-                return True
-
-        return False
-    """
     # ---------------------------------------------------------
     # Save profile
     # ---------------------------------------------------------
@@ -165,6 +232,11 @@ class CalibrationSession:
 
         # Shallow copy of self.data so we don't mutate the original
         profile_data = dict(self.data)
+        # Add interpolated vowels
+        interpolated = self.compute_interpolated_vowels()
+        for v, vals in interpolated.items():
+            if v not in profile_data:
+                profile_data[v] = vals
         profile_data["voice_type"] = self.voice_type
 
         # Prevent double suffixing
