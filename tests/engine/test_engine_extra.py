@@ -177,7 +177,8 @@ def test_compute_formants_hybrid_path(monkeypatch):
         confidence = 0.9
         method = "hybrid_front"
 
-    monkeypatch.setattr("analysis.engine.estimate_formants_hybrid", lambda f, sr, vowel_hint=None: Dummy())
+    monkeypatch.setattr("analysis.engine.estimate_formants_hybrid",
+                        lambda f, sr, vowel_hint=None: Dummy())
 
     f1, f2, f3, conf, method, hybrid = eng._compute_formants(np.zeros(100), 44100)
     assert hybrid == (500, 1500, 2500)
