@@ -306,82 +306,53 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Poll shared engine
     # ---------------------------------------------------------
-    def _poll_audio(self):
-        raw = self.analyzer.get_latest_raw()
-        if raw is None:
-            return
 
-        confidence = raw.get("confidence", 0.0)
-        target = self.state.current_vowel
-        self.engine.vowel_hint = target
-
-        # Extract raw pitch
+    def _extract_pitch(self, raw):
         pitch_raw = raw.get("f0")
 
-        # Unwrap PitchResult
         if hasattr(pitch_raw, "f0"):
             pitch_raw = pitch_raw.f0
 
-        # Convert to float or None
         try:
-            pitch_val = float(pitch_raw)
+            val = float(pitch_raw)
         except Exception:
-            pitch_val = None
+            return pitch_raw, None
 
-        if pitch_val is not None and pitch_val <= 0:
-            pitch_val = None
+        if val <= 0:
+            return pitch_raw, None
 
-        # Update smoother (for UI only)
-        self.pitch_smoother.update(pitch_val, confidence)
+        return pitch_raw, val
 
-        # --- Calibration uses RAW pitch, not smoothed ---
-        f0_cal = pitch_val
-        if isinstance(f0_cal, (int, float)):
-            float(f0_cal)
-        # Voice-type plausibility
-        if f0_cal is not None:
-            if self.session.voice_type in ("bass", "baritone"):
-                low, high = 60, 350
-            else:
-                low, high = 180, 500
-            if f0_cal < low or f0_cal > high:
-                f0_cal = None
-        print(
-            f"raw={self.fmt_pitch(pitch_raw)}  "
-            f"smoothed={self.fmt_pitch(self.pitch_smoother.current)}  "
-            f"f0_cal={self.fmt_pitch(f0_cal)}  "
-            f"conf={confidence:.2f}"
-        )
-
-        # Raw formants
+    def _extract_formants(self, raw, target, confidence):
         raw_f1 = raw.get("f1") or raw.get("fb_f1")
         raw_f2 = raw.get("f2") or raw.get("fb_f2")
 
         if target is not None:
-            f1, f2 = raw_f1, raw_f2
-        else:
-            f1, f2, _ = self.formant_smoother.update(raw_f1, raw_f2, None, confidence)
+            return raw_f1, raw_f2
 
-        # Capture gating
-        if target is not None and raw_f1 is not None and raw_f2 is not None:
-            ok, reason = is_plausible_formants(
-                f1, f2,
-                voice_type=self.session.voice_type,
-                vowel=target,
-                calibrated=self.session.data,
-            )
-            if ok and f0_cal is not None and confidence > 0.5:
-                # Reject harmonic frames: raw F0 far above smoothed F0
-                smoothed = self.pitch_smoother.current
-                if smoothed is not None:
-                    # If raw F0 is > 1.6× smoothed, it's almost certainly H2/H3
-                    if f0_cal > 1.6 * smoothed:
-                        f0_cal = None
+        f1, f2, _ = self.formant_smoother.update(raw_f1, raw_f2, None, confidence)
+        return f1, f2
 
-            if f0_cal is not None:
-                self._capture_buffer.append((raw_f1, raw_f2, f0_cal))
+    def _maybe_capture(self, f1, f2, f0_cal, confidence, target, raw_f1, raw_f2):
+        if target is None or raw_f1 is None or raw_f2 is None:
+            return
 
-        # Spectrogram
+        ok, reason = is_plausible_formants(
+            f1, f2,
+            voice_type=self.session.voice_type,
+            vowel=target,
+            calibrated=self.session.data,
+        )
+
+        if ok and f0_cal is not None and confidence > 0.5:
+            smoothed = self.pitch_smoother.current
+            if smoothed is not None and f0_cal > 1.6 * smoothed:
+                f0_cal = None
+
+        if f0_cal is not None:
+            self._capture_buffer.append((raw_f1, raw_f2, f0_cal))
+
+    def _update_spectrogram(self, raw):
         if not self._mic_active:
             return
 
@@ -395,24 +366,73 @@ class CalibrationWindow(QMainWindow):
 
         self._spec_buffer = np.concatenate((self._spec_buffer, seg_arr))
 
-        # Rolling 1s buffer
         sr = 48000
         max_samples = int(sr * 1.0)
         if self._spec_buffer.size > max_samples:
             self._spec_buffer = self._spec_buffer[-max_samples:]
 
-        # Draw spectrogram
         freqs, times, S = safe_spectrogram(self._spec_buffer, sr)
         update_spectrogram(self, freqs, times, S)
 
-        # Draw vowel anchors
         self._redraw_vowel_anchors()
         self._interpolated_vowels = self.session.compute_interpolated_vowels()
-        # Throttled draw
+
         now = time.time()
         if now - self._last_draw >= self._min_draw_interval:
             self.canvas.draw_idle()
             self._last_draw = now
+
+    def _apply_pitch_plausibility(self, pitch_val):
+        """
+        Normalize and plausibility‑check raw F0 for calibration.
+        Returns a float or None.
+        """
+
+        # Must be numeric
+        if not isinstance(pitch_val, (int, float)):
+            return None
+
+        # Reject non‑positive
+        if pitch_val <= 0:
+            return None
+
+        # Voice‑type plausibility ranges
+        if self.session.voice_type in ("bass", "baritone"):
+            low, high = 60, 350
+        else:
+            low, high = 180, 500
+
+        if not (low <= pitch_val <= high):
+            return None
+
+        return float(pitch_val)
+
+    def _poll_audio(self):
+        raw = self.analyzer.get_latest_raw()
+        if raw is None:
+            return
+
+        confidence = raw.get("confidence", 0.0)
+        target = self.state.current_vowel
+        self.engine.vowel_hint = target
+
+        pitch_raw, pitch_val = self._extract_pitch(raw)
+        self.pitch_smoother.update(pitch_val, confidence)
+
+        f0_cal = self._apply_pitch_plausibility(pitch_val)
+
+        if f0_cal is not None:
+            float(f0_cal)  # explicit narrowing
+        else:
+            f0_cal = None
+
+        raw_f1 = raw.get("f1") or raw.get("fb_f1")
+        raw_f2 = raw.get("f2") or raw.get("fb_f2")
+        f1, f2 = self._extract_formants(raw, target, confidence)
+
+        self._maybe_capture(f1, f2, f0_cal, confidence, target, raw_f1, raw_f2)
+
+        self._update_spectrogram(raw)
 
     # ---------------------------------------------------------
     # Vowel anchor redraw
