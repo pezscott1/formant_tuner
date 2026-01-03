@@ -119,3 +119,70 @@ def test_engine_output_structure_is_stable(mock_lpc, mock_pitch):
         "lpc_debug",
     }
     assert expected_keys.issubset(out.keys())
+
+
+def test_profile_classifier_error():
+    eng = FormantAnalysisEngine()
+    eng.profile_classifier = lambda f1, f2: 1 / 0  # force exception
+    vowel, guess, conf, score, res = eng._compute_vowel_and_scores(
+        f1=500, f2=1500, f3=None, f0=120, conf=1.0
+    )
+    assert vowel is None
+    assert guess is None
+    assert conf == 0.0
+
+
+def test_fallback_classifier_runs():
+    eng = FormantAnalysisEngine(voice_type="bass")
+    # No profile classifier → fallback path
+    vowel, guess, conf, score, res = eng._compute_vowel_and_scores(
+        f1=500, f2=1500, f3=None, f0=120, conf=1.0
+    )
+    assert guess is not None
+    assert isinstance(conf, float)
+
+
+def test_compute_vowel_scores_calibrating():
+    eng = FormantAnalysisEngine()
+    eng.calibrating = True
+    res = eng._compute_vowel_and_scores(500, 1500, None, 120, 1.0)
+    assert res == (None, None, 0.0, 0.0, 0.0)
+
+
+def test_compute_vowel_scores_missing_f2():
+    eng = FormantAnalysisEngine()
+    res = eng._compute_vowel_and_scores(500, None, None, 120, 1.0)
+    assert res == (None, None, 0.0, 0.0, 0.0)
+
+
+class DummyPitch:
+    def __init__(self, f0):
+        self.f0 = f0
+
+
+def test_compute_pitch_nonfinite():
+    eng = FormantAnalysisEngine(pitch_tracker=lambda f, sr: DummyPitch(np.nan))
+    f0, voiced = eng._compute_pitch_and_voicing(np.zeros(100), 44100)
+    assert f0 is None
+    assert voiced is False
+
+
+def test_compute_formants_hybrid_path(monkeypatch):
+    eng = FormantAnalysisEngine(use_hybrid=True)
+
+    class Dummy:
+        f1 = 500
+        f2 = 1500
+        f3 = 2500
+        confidence = 0.9
+        method = "hybrid_front"
+
+    monkeypatch.setattr("analysis.engine.estimate_formants_hybrid", lambda f, sr, vowel_hint=None: Dummy())
+
+    f1, f2, f3, conf, method, hybrid = eng._compute_formants(np.zeros(100), 44100)
+    assert hybrid == (500, 1500, 2500)
+
+
+def test_classify_vowel_none_when_no_classifier():
+    eng = FormantAnalysisEngine()
+    assert eng._classify_vowel(500, 1500) is None
