@@ -46,7 +46,7 @@ class FakeListWidget:
     def clear(self):
         self._items.clear()
 
-    def addItem(self, item):
+    def addItem(self, item):  # noqa
         self._items.append(item)
 
     def count(self):
@@ -55,10 +55,10 @@ class FakeListWidget:
     def item(self, index):
         return self._items[index]
 
-    def setCurrentItem(self, item):
+    def setCurrentItem(self, item):  # noqa
         self._current = item
 
-    def currentItem(self):
+    def currentItem(self):  # noqa
         return self._current
 
 

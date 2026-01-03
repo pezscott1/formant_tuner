@@ -95,7 +95,8 @@ class FormantAnalysisEngine:
         if self.profile_classifier is not None:
             try:
                 vowel_guess, vowel_confidence = self.profile_classifier(f1, f2)
-                vowel = vowel_guess if vowel_confidence >= VOWEL_GUESS_CONF_MIN else None
+                vowel = vowel_guess if (vowel_confidence >=
+                                        VOWEL_GUESS_CONF_MIN) else None
             except Exception as e:
                 print("PROFILE CLASSIFIER ERROR:", e)
                 vowel = None
@@ -109,7 +110,8 @@ class FormantAnalysisEngine:
                 if isinstance(res, tuple) and len(res) >= 2:
                     vowel_guess = res[0]
                     vowel_confidence = float(res[1])
-                    vowel = vowel_guess if vowel_confidence >= VOWEL_GUESS_CONF_MIN else None
+                    vowel = vowel_guess if (vowel_confidence >=
+                                            VOWEL_GUESS_CONF_MIN) else None
             except Exception as e:
                 print("CLASSIFIER ERROR:", e)
                 vowel = None

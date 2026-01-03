@@ -1,6 +1,11 @@
 import os
 import json
 from pathlib import Path
+from datetime import datetime, UTC
+
+
+def utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 class ProfileManager:
@@ -62,10 +67,6 @@ class ProfileManager:
         Seed intermediate vowels (e, ɪ, o) if missing.
         Uses calibrated anchors: i, ɛ, ɔ, u.
         """
-        import datetime
-
-        def now():
-            return datetime.datetime.utcnow().isoformat() + "Z"
 
         # Must have anchors to seed
         if "i" not in data or "ɛ" not in data or "ɔ" not in data or "u" not in data:
@@ -88,7 +89,7 @@ class ProfileManager:
                 "confidence": 1.0,
                 "stability": 0.0,
                 "weight": 1.0,
-                "saved_at": now(),
+                "saved_at": utc_now_iso(),
             }
 
         # -----------------------------
@@ -104,7 +105,7 @@ class ProfileManager:
                 "confidence": 1.0,
                 "stability": 0.0,
                 "weight": 1.0,
-                "saved_at": now(),
+                "saved_at": utc_now_iso(),
             }
 
         # -----------------------------
@@ -119,7 +120,7 @@ class ProfileManager:
                 "confidence": 1.0,
                 "stability": 0.0,
                 "weight": 1.0,
-                "saved_at": now(),
+                "saved_at": utc_now_iso(),
             }
 
         return data
@@ -152,6 +153,11 @@ class ProfileManager:
     # ---------------------------------------------------------
     def set_active_profile(self, name):
         self.active_profile_name = name
+
+        # Only write active_profile.json when profiles_dir is not empty
+        if self.profiles_dir == "":
+            return
+
         path = self._join(self.ACTIVE_FILE)
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"active": name}, f)
@@ -237,7 +243,9 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Extract formants from rich profile JSON
     # ---------------------------------------------------------
-    def extract_formants(self, raw_dict):
+
+    @staticmethod
+    def extract_formants(raw_dict):
         out = {}
         if not isinstance(raw_dict, dict):
             return out
@@ -246,7 +254,6 @@ class ProfileManager:
             if vowel == "voice_type":
                 continue
 
-            # skip obviously invalid non-dict/non-tuple entries
             if not isinstance(entry, (dict, list, tuple)):
                 continue
 
@@ -256,12 +263,13 @@ class ProfileManager:
 
             f1 = norm.get("f1")
             f2 = norm.get("f2")
+
             f0 = norm.get("f0")
             if f0 is None:
                 f0 = norm.get("f3")
 
-            confidence = norm.get("confidence", 0.0)
-            stability = norm.get("stability", float("inf"))
+            confidence = float(norm.get("confidence", 0.0))
+            stability = float(norm.get("stability", float("inf")))
 
             out[vowel] = {
                 "f1": f1,

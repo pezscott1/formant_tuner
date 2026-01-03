@@ -188,16 +188,22 @@ class CalibrationSession:
 
         new_f1 = (old_f1 * old_weight + f1) / new_weight
         new_f2 = (old_f2 * old_weight + f2) / new_weight
-
+        old_f0: float
+        confidence: float
+        # --- F0 update ---
         if f0 is not None and old_f0 is not None:
-            new_f0 = (old_f0 * old_weight + f0) / new_weight
+            f0_val = float(f0)
+            old_f0_val = float(old_f0)
+            new_f0 = (old_f0_val * old_weight + f0_val) / new_weight
+
         elif f0 is not None:
-            new_f0 = f0
+            new_f0 = float(f0)
+
         else:
             new_f0 = old_f0
 
-        new_conf = (old_conf * old_weight + confidence) / new_weight
-        new_stab = (old_stab * old_weight + stability) / new_weight
+        new_conf = (float(old_conf) * old_weight + float(confidence)) / new_weight
+        new_stab = (float(old_stab) * old_weight + float(stability)) / new_weight
 
         self.data[vowel] = {
             "f1": new_f1,

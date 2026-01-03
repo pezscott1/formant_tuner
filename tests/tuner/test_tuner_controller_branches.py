@@ -22,7 +22,7 @@ class DummyProfileManager:
         self.applied = []
         self.loaded = []
 
-    def list_profiles(self):
+    def list_profiles(self):  # noqa
         return ["alpha", "beta"]
 
     def apply_profile(self, base):
@@ -36,7 +36,7 @@ class DummyProfileManager:
             "a": {"f1": 500, "f2": 1500, "f0": 100}
         }
 
-    def extract_formants(self, raw):
+    def extract_formants(self, raw): # noqa
         # MUST return dict of dicts for new classifier
         return {"a": {"f1": 500, "f2": 1500, "f0": 100}}
 

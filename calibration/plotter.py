@@ -81,12 +81,12 @@ def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=1.0):
     return freqs, times, S
 
 
-def update_spectrogram(self, freqs, times, S):
+def update_spectrogram(self, freqs, times, s):
     """
     Draw ONLY the spectrogram.
     Vowel anchors are handled by CalibrationWindow.
     """
-    if freqs is None or times is None or S is None:
+    if freqs is None or times is None or s is None:
         return
     freqs = np.asarray(freqs)
     # Limit to 4 kHz
@@ -94,7 +94,7 @@ def update_spectrogram(self, freqs, times, S):
     if mask.sum() < 2:
         mask = np.arange(len(freqs))
 
-    S_small = S[mask, :]
+    S_small = s[mask, :]
     freqs_small = freqs[mask]
 
     # dB scaling

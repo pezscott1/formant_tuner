@@ -336,16 +336,16 @@ class CalibrationWindow(QMainWindow):
 
         # --- Calibration uses RAW pitch, not smoothed ---
         f0_cal = pitch_val
-
+        if isinstance(f0_cal, (int, float)):
+            float(f0_cal)
         # Voice-type plausibility
         if f0_cal is not None:
             if self.session.voice_type in ("bass", "baritone"):
-                low, high = 60, 260
+                low, high = 60, 350
             else:
-                low, high = 70, 320
-            if not (low <= f0_cal <= high):
+                low, high = 180, 500
+            if f0_cal < low or f0_cal > high:
                 f0_cal = None
-
         print(
             f"raw={self.fmt_pitch(pitch_raw)}  "
             f"smoothed={self.fmt_pitch(self.pitch_smoother.current)}  "
@@ -376,8 +376,6 @@ class CalibrationWindow(QMainWindow):
                 if smoothed is not None:
                     # If raw F0 is > 1.6× smoothed, it's almost certainly H2/H3
                     if f0_cal > 1.6 * smoothed:
-                        # Debug print if you want:
-                        # print(f"Rejecting harmonic F0: raw={f0_cal:.1f}, smoothed={smoothed:.1f}")
                         f0_cal = None
 
             if f0_cal is not None:
