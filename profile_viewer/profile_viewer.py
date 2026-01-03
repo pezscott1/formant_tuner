@@ -83,7 +83,7 @@ class ProfileViewerWindow(QMainWindow):
     def _build_ui(self):
         if self.headless:
             return  # skip all Qt widgets
-
+        self._resize_and_center()
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)

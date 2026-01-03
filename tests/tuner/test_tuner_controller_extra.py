@@ -1,4 +1,3 @@
-# tests/test_tuner_controller_extra.py
 from unittest.mock import MagicMock, patch
 from tuner.controller import Tuner
 
@@ -53,7 +52,7 @@ def test_tuner_switches_profiles(mock_engine_cls, mock_analyzer_cls, mock_profil
 
 
 # ---------------------------------------------------------------------
-# Test: loading a profile updates engine.user_formants
+# Test: loading a profile sets active_profile to extracted centroids
 # ---------------------------------------------------------------------
 def test_load_profile_sets_user_formants():
     t, engine, analyzer, profiles = make_tuner()
@@ -102,11 +101,16 @@ def test_tuner_profile_switch_changes_classification(
         "confidence": 0.9,
         "stable": True,
     }
-    analyzer.process_raw.return_value = processed
+    analyzer.get_latest_processed.return_value = processed
 
     profiles.apply_profile.side_effect = ["profile_a", "profile_i"]
 
     profiles.extract_formants.side_effect = [
+        {"a": {"f1": 700, "f2": 1100}},
+        {"i": {"f1": 300, "f2": 2500}},
+    ]
+
+    profiles.load_profile_json.side_effect = [
         {"a": {"f1": 700, "f2": 1100}},
         {"i": {"f1": 300, "f2": 2500}},
     ]

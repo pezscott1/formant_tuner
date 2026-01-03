@@ -371,6 +371,16 @@ class CalibrationWindow(QMainWindow):
                 calibrated=self.session.data,
             )
             if ok and f0_cal is not None and confidence > 0.5:
+                # Reject harmonic frames: raw F0 far above smoothed F0
+                smoothed = self.pitch_smoother.current
+                if smoothed is not None:
+                    # If raw F0 is > 1.6× smoothed, it's almost certainly H2/H3
+                    if f0_cal > 1.6 * smoothed:
+                        # Debug print if you want:
+                        # print(f"Rejecting harmonic F0: raw={f0_cal:.1f}, smoothed={smoothed:.1f}")
+                        f0_cal = None
+
+            if f0_cal is not None:
                 self._capture_buffer.append((raw_f1, raw_f2, f0_cal))
 
         # Spectrogram
@@ -485,9 +495,13 @@ class CalibrationWindow(QMainWindow):
         vowel = self.state.current_vowel
         buffer_snapshot = list(self._capture_buffer)
 
+        # Timestamp for logging
+        ts = time.strftime("%H:%M:%S")
+
+        # No frames captured
         if not buffer_snapshot:
             self.status_panel.appendPlainText(
-                f"No valid frames for /{vowel}/ — please sing again"
+                f"[{ts}] No valid frames for /{vowel}/ — please sing again"
             )
             self.session.increment_retry(vowel)
             self._capture_buffer.clear()
@@ -495,30 +509,46 @@ class CalibrationWindow(QMainWindow):
             self.phase_timer.start(1000)
             return
 
+        # Unpack arrays
         f1_vals, f2_vals, f0_vals = zip(*buffer_snapshot)
         f1_arr = np.asarray(f1_vals, dtype=float)
         f2_arr = np.asarray(f2_vals, dtype=float)
         f0_arr = np.asarray([v for v in f0_vals if v is not None], dtype=float)
 
+        # No pitch frames
         if f0_arr.size == 0:
             self.status_panel.appendPlainText(
-                f"No valid pitch for /{vowel}/ — retrying"
+                f"[{ts}] No valid pitch for /{vowel}/ — retrying"
             )
             self.session.increment_retry(vowel)
             self._capture_buffer.clear()
             self.phase_timer.start(1000)
             return
 
+        # Compute medians
         f1_med = float(np.median(f1_arr))
         f2_med = float(np.median(f2_arr))
         f0_med = float(np.median(f0_arr))
 
+        # Frame count
+        frame_count = len(buffer_snapshot)
+
+        # Clear buffer
         self._capture_buffer.clear()
-        self._apply_capture_result(vowel, f1_med, f2_med, f0_med)
+
+        # Apply result
+        self._apply_capture_result(
+            vowel,
+            f1_med,
+            f2_med,
+            f0_med,
+            frame_count=frame_count,
+            timestamp=ts,
+        )
 
         self.phase_timer.start(1000)
 
-    def _apply_capture_result(self, vowel, f1, f2, f0):
+    def _apply_capture_result(self, vowel, f1, f2, f0, frame_count=0, timestamp=""):
         accepted, should_retry, msg = self.session.handle_result(
             vowel,
             f1, f2, f0,
@@ -526,25 +556,37 @@ class CalibrationWindow(QMainWindow):
             stability=0.0,
         )
 
-        self.status_panel.appendPlainText(msg)
+        # Status panel always gets the session message
+        self.status_panel.appendPlainText(f"[{timestamp}] {msg}")
+
+        color = self._vowel_colors.get(vowel, "black")
+
+        # Format aligned monospace block
+        html_line = (
+            f'<span style="color:{color}; font-family:monospace;">'
+            f'[{timestamp}] /{vowel}/  '
+            f'F1={f1:6.1f}   F2={f2:6.1f}   F0={f0:6.1f}   '
+            f'({frame_count} frames)'
+            f'</span>'
+        )
 
         if accepted:
-            self.status_panel.appendPlainText(
-                f"/{vowel}/ F1={f1:.1f}, F2={f2:.1f}, F0={f0:.1f}"
-            )
+            # Append to captures panel
+            self.capture_panel.appendHtml(html_line)
 
             # Store durable anchor
             self._vowel_anchors[vowel] = (f1, f2)
             self._redraw_vowel_anchors()
             self.canvas.draw_idle()
 
+            # Reset F0 lock and advance
             self._reset_f0_lock()
             self.state.advance()
             return True
 
         if should_retry:
             self.status_panel.appendPlainText(
-                f"Retrying /{vowel}/ — please sing clearly"
+                f"[{timestamp}] Retrying /{vowel}/ — please sing clearly"
             )
             return False
 

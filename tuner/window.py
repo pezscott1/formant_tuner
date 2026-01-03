@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
     QListWidgetItem,
     QLineEdit,
+    QAbstractItemView,
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
@@ -26,6 +27,14 @@ from tuner.tuner_plotter import update_spectrum, update_vowel_chart
 from utils.music_utils import hz_to_midi, render_piano
 from calibration.dialog import ProfileDialog
 from calibration.window import CalibrationWindow
+
+
+class ClearableListWidget(QListWidget):
+    def mousePressEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item is None:
+            self.clearSelection()
+        super().mousePressEvent(event)
 
 
 class FakeListWidget:
@@ -155,13 +164,16 @@ class TunerWindow(QMainWindow):
         profile_layout.setContentsMargins(0, 0, 0, 0)
         profile_layout.setSpacing(6)
 
-        self.profile_list = QListWidget()
+        self.profile_list = ClearableListWidget()
         self.profile_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.profile_list.setStyleSheet(
             "QListWidget { font-size: 11pt; padding: 4px; border: 1px solid #ccc; "
             "border-radius: 4px; }"
         )
         profile_layout.addWidget(self.profile_list)
+        self.profile_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.profile_list.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.profile_list.setFocusPolicy(Qt.StrongFocus)
         self.btn_view_profile = QPushButton("View Profile")
         self.btn_view_profile.clicked.connect(  # type:ignore
             self.on_view_profile_clicked)
@@ -276,6 +288,8 @@ class TunerWindow(QMainWindow):
         self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type: ignore
         (self.profile_list.itemClicked.connect  # type: ignore
             (self._apply_selected_profile_item))
+        self.profile_list.itemSelectionChanged.connect(  # type: ignore
+            self._on_profile_selection_changed)
 
     # ---------------------------------------------------------
     # Timers
@@ -297,6 +311,21 @@ class TunerWindow(QMainWindow):
             return
         viewer = ProfileViewerWindow(self.tuner.active_profile, parent=self)
         viewer.show()
+
+    def _on_profile_selection_changed(self):
+        items = self.profile_list.selectedItems()
+        if not items:
+            # Nothing selected → clear active profile
+            self.tuner.active_profile = None
+            self.tuner.engine.vowel_hint = None
+            self.active_label.setText("Active: None")
+            print("PROFILE DESELECTED → active_profile=None")
+            return
+
+        # Something selected → load it
+        item = items[0]
+        base = item.data(Qt.UserRole)
+        self.tuner.load_profile(base)
 
     def _populate_profiles(self):
         """Populate profile list with a 'New Profile' item plus existing profiles."""
@@ -539,12 +568,32 @@ class TunerWindow(QMainWindow):
         processed = self.tuner.poll_latest_processed()
         if not processed:
             return
+        hf = processed.get("hybrid_formants")
+        if isinstance(hf, (list, tuple)) and len(hf) == 3:
+            hf1, hf2, hf3 = hf
+        else:
+            hf1 = hf2 = hf3 = None
+
+        print(
+            f"[TUNER] f0_raw={processed.get('f0_raw')}  "
+            f"f0_smooth={processed.get('f0')}  "
+            f"conf={processed.get('confidence')}  "
+            f"hybrid_f1={hf1}  "
+            f"hybrid_f2={hf2}  "
+            f"hybrid_f3={hf3}  "
+            f"vowel_raw={processed.get('vowel_guess')}  "
+            f"vowel_smooth={processed.get('vowel')}  "
+            f"vowel_score={processed.get('vowel_score')}  "
+            f"res_score={processed.get('resonance_score')}  "
+            f"overall={processed.get('overall')}"
+        )
+        hf = processed.get("hybrid_formants")
+        if isinstance(hf, (list, tuple)) and len(hf) == 3:
+            f1, f2, f3 = hf
+        else:
+            f1 = f2 = f3 = None
 
         f0 = processed["f0"]
-        if "hybrid_formants" in processed:
-            f1, f2, f3 = processed["hybrid_formants"]
-        else:
-            f1, f2, f3 = processed["formants"]
         vowel_raw = processed["vowel_guess"]
         vowel_smooth = processed["vowel"]
         vowel_score = processed["vowel_score"]

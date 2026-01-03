@@ -23,6 +23,7 @@ class LiveAnalyzer:
                  formant_smoother, label_smoother, sample_rate=48000):
         self.engine = engine
         self.pitch_smoother = pitch_smoother
+        self.pitch_smoother.current = None
         self.formant_smoother = formant_smoother
         self.label_smoother = label_smoother
         self.sample_rate = sample_rate
@@ -72,6 +73,7 @@ class LiveAnalyzer:
         # Extract raw values
         f0_raw = raw_dict.get("f0")
         f1_raw, f2_raw, f3_raw = raw_dict.get("formants", (None, None, None))
+        hybrid = raw_dict.get("hybrid_formants")
         vowel_raw = raw_dict.get("vowel") or raw_dict.get("vowel_guess")
         lpc_conf = float(raw_dict.get("confidence", 0.0))
 
@@ -114,18 +116,22 @@ class LiveAnalyzer:
         # 7. Build processed frame
         # =========================================================
         processed = {
+            # Pitch
+            "f0_raw": f0_raw,
             "f0": f0_s,
+
+            # Formants
             "formants": (f1_s, f2_s, f3_s),
+            "hybrid_formants": hybrid,
 
             # Smoothed vowel
             "vowel": vowel_s,
 
-            # Raw vowel guess (UI needs this!)
+            # Raw vowel guess
             "vowel_guess": vowel_raw,
 
             # Confidence from LPC
             "confidence": lpc_conf,
-
             # Scores
             "vowel_score": vowel_score,
             "resonance_score": resonance_score,
@@ -212,6 +218,9 @@ class LiveAnalyzer:
         """Start the background analyzer worker."""
         if self._worker_thread is not None:
             return
+
+        # Reset smoothing state at start
+        self.reset()
 
         self._stop_flag.clear()
         self._worker_thread = threading.Thread(

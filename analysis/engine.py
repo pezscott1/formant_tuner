@@ -19,6 +19,7 @@ class FormantAnalysisEngine:
             use_hybrid=False,
             vowel_hint=None,
     ):
+        self.profile_classifier = None  # NEW: tuner will attach a calibrated classifier
         self.voice_type = voice_type
         self.debug = debug
         self.calibrating = False
@@ -42,7 +43,7 @@ class FormantAnalysisEngine:
 
     def process_frame(self, frame: np.ndarray, sr: int) -> dict:
         f0, voiced = self._compute_pitch_and_voicing(frame, sr)
-        f1, f2, f3, conf, method = self._compute_formants(frame, sr)
+        f1, f2, f3, conf, method, hybrid = self._compute_formants(frame, sr)
         vowel, vowel_guess, vowel_confidence, vowel_score, resonance_score = \
             self._compute_vowel_and_scores(f1, f2, f3, f0, conf)
 
@@ -62,7 +63,8 @@ class FormantAnalysisEngine:
             resonance_score=resonance_score,
             overall=overall,
             voiced=voiced,
-            segment=frame,  # 🔹 pass the actual frame
+            segment=frame,
+            hybrid_formants=hybrid,  # NEW
         )
         self._latest_raw = out
         return out
@@ -81,20 +83,33 @@ class FormantAnalysisEngine:
         if f2 is None:
             return None, None, 0.0, 0.0, 0.0
 
-        # Initialize all outputs
+        # ---------------------------------------------------------
+        # NEW unified vowel classification
+        # ---------------------------------------------------------
+
         vowel = None
         vowel_guess = None
         vowel_confidence = 0.0
 
-        # Gate ONLY on LPC confidence
-        if conf is not None and conf >= VOWEL_GUESS_CONF_MIN:
+        # Prefer calibrated classifier if provided
+        if self.profile_classifier is not None:
+            try:
+                vowel_guess, vowel_confidence = self.profile_classifier(f1, f2)
+                vowel = vowel_guess if vowel_confidence >= VOWEL_GUESS_CONF_MIN else None
+            except Exception as e:
+                print("PROFILE CLASSIFIER ERROR:", e)
+                vowel = None
+                vowel_guess = None
+                vowel_confidence = 0.0
+
+        # Fallback to legacy classifier only if no profile classifier
+        elif conf is not None and conf >= VOWEL_GUESS_CONF_MIN:
             try:
                 res = vowel_mod.classify_vowel(f1, f2, voice_type=self.voice_type)
                 if isinstance(res, tuple) and len(res) >= 2:
                     vowel_guess = res[0]
                     vowel_confidence = float(res[1])
-                    if vowel_confidence >= VOWEL_GUESS_CONF_MIN:
-                        vowel = vowel_guess
+                    vowel = vowel_guess if vowel_confidence >= VOWEL_GUESS_CONF_MIN else None
             except Exception as e:
                 print("CLASSIFIER ERROR:", e)
                 vowel = None
@@ -140,17 +155,25 @@ class FormantAnalysisEngine:
 
     def _compute_formants(self, frame: np.ndarray, sr: int):
         if self.use_hybrid or self.calibrating:
-            result = estimate_formants_hybrid(frame, sr, vowel_hint=self.vowel_hint)
+            print("[ENGINE] hybrid ON, vowel_hint=", self.vowel_hint)
+            hres = estimate_formants_hybrid(frame, sr, vowel_hint=self.vowel_hint)
+            f1 = hres.f1
+            f2 = hres.f2
+            f3 = hres.f3
+            conf = hres.confidence
+            method = hres.method  # "lpc", "te", or "hybrid_front"
+            hybrid = (f1, f2, f3)  # or hres.lpc / hres.te if you prefer
         else:
-            result = lpc_mod.estimate_formants(frame, sr, debug=True)
+            print("[ENGINE] else loop, not hybrid, vowel_hint=", self.vowel_hint)
+            lres = lpc_mod.estimate_formants(frame, sr, debug=True)
+            f1 = lres.f1
+            f2 = lres.f2
+            f3 = lres.f3
+            conf = lres.confidence
+            method = getattr(lres, "method", "lpc")
+            hybrid = None
 
-        f1 = result.f1
-        f2 = result.f2
-        f3 = result.f3
-        conf = result.confidence
-        method = getattr(result, "method", "lpc")
-
-        return f1, f2, f3, conf, method
+        return f1, f2, f3, conf, method, hybrid
 
     def _classify_vowel(self, f1: Optional[float],
                         f2: Optional[float]) -> tuple[Any, Any, Any] | None:
@@ -166,26 +189,18 @@ class FormantAnalysisEngine:
 
     @staticmethod
     def _build_result_dict(
-            f1: Optional[float],
-            f2: Optional[float],
-            f3: Optional[float],
-            f0: Optional[float],
-            conf: float,
-            method: str,
-            vowel: Optional[str],
-            vowel_guess: Optional[str],
-            vowel_confidence: float,
-            vowel_score: float,
-            resonance_score: float,
-            overall: float,
-            voiced: bool,
-            segment: np.ndarray,  # 🔹 new param
+            f1, f2, f3, f0, conf, method,
+            vowel, vowel_guess, vowel_confidence,
+            vowel_score, resonance_score, overall,
+            voiced, segment,
+            hybrid_formants=None,  # NEW
     ) -> dict:
         return {
             "f1": f1,
             "f2": f2,
             "f3": f3,
             "formants": (f1, f2, f3),
+            "hybrid_formants": hybrid_formants,  # NEW
             "f0": f0,
             "confidence": conf,
             "method": method,
@@ -197,7 +212,7 @@ class FormantAnalysisEngine:
             "overall": overall,
             "fb_f1": f1,
             "fb_f2": f2,
-            "segment": segment,  # 🔹 no longer None
+            "segment": segment,
             "lpc_debug": {},
             "voiced": voiced,
         }

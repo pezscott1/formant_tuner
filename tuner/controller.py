@@ -18,8 +18,9 @@ class Tuner:
         self.stream = None
         self.current_tolerance = None
         # Engine: allow injection for tests, otherwise construct
-        self.engine = engine or FormantAnalysisEngine(voice_type=voice_type)
-
+        self.engine = engine or FormantAnalysisEngine(
+            voice_type=voice_type, use_hybrid=True,)
+        self.engine.profile_classifier = self._classify_vowel_from_profile
         # Smoothers
         self.pitch_smoother = PitchSmoother(sr=sample_rate, min_confidence=0.25)
         self.formant_smoother = MedianSmoother(min_confidence=0.25)
@@ -79,10 +80,7 @@ class Tuner:
         Read latest raw frame from engine, pass through LiveAnalyzer,
         then (optionally) classify the vowel using the active profile.
         """
-        raw = self.engine.get_latest_raw()
-        if raw is None:
-            return None
-        processed = self.live_analyzer.process_raw(raw)
+        processed = self.live_analyzer.get_latest_processed()
         if processed is None:
             return None
 
@@ -117,9 +115,14 @@ class Tuner:
         if f1 is None or f2 is None:
             return None, 0.0
 
-        profile = self.active_profile
-        if not profile:
-            return None, 0.0
+        if not self.active_profile:
+            # fallback to reference vowel centers
+            from analysis.vowel_data import VOWEL_CENTERS
+            centers = VOWEL_CENTERS.get(self.voice_type, {})
+            # convert to same dict format as calibrated profiles
+            profile = {v: {"f1": c[0], "f2": c[1]} for v, c in centers.items()}
+        else:
+            profile = self.active_profile
 
         # Collect centroids
         centroids = {
@@ -173,6 +176,9 @@ class Tuner:
             return False
 
         try:
+            # Fresh smoothing state for each session
+            self.live_analyzer.reset()
+
             self.stream = stream_factory()
             self.stream.start()
             self.live_analyzer.start_worker()

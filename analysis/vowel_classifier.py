@@ -16,11 +16,12 @@ import numpy as np
 from analysis.vowel_data import VOWEL_CENTERS
 
 
-def classify_vowel(f1, f2, voice_type=None):
+def classify_vowel(f1, f2, centers=None, voice_type=None):
+    if centers is None:
+        vt = (voice_type or "baritone").lower()
+        centers = VOWEL_CENTERS.get(vt)
     if f1 is None or not np.isfinite(f1):
         return None, 0.0, {"reason": "missing_f1"}
-    vt = (voice_type or "baritone").lower()
-    centers = VOWEL_CENTERS.get(vt)
     if centers is None:
         return None, 0.0, None
     print("CLASSIFIER RUNNING:", f1, f2)

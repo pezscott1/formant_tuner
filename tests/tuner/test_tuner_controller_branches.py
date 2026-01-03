@@ -2,11 +2,15 @@ from unittest.mock import MagicMock
 from tuner.controller import Tuner
 
 
+# ---------------------------------------------------------
+# Dummy objects aligned with the NEW Tuner architecture
+# ---------------------------------------------------------
 class DummyEngine:
     def __init__(self):
         self.voice_type = "bass"
         self.user_formants = None
         self._raw = None
+        self.vowel_hint = None
 
     def get_latest_raw(self):
         return self._raw
@@ -33,18 +37,21 @@ class DummyProfileManager:
         }
 
     def extract_formants(self, raw):
-        return {"a": (500, 1500, 100, 0.9, 5)}
+        # MUST return dict of dicts for new classifier
+        return {"a": {"f1": 500, "f2": 1500, "f0": 100}}
 
     def delete_profile(self, base):
         self.deleted.append(base)
 
 
 class DummyLiveAnalyzer:
+    """
+    Must expose get_latest_processed() for the new Tuner API.
+    """
     def __init__(self):
-        self.processed_queue = MagicMock()
-        self.processed_queue.get_nowait = MagicMock(side_effect=Exception)
         self.started = False
         self.stopped = False
+        self._processed = None
 
     def start_worker(self):
         self.started = True
@@ -55,10 +62,8 @@ class DummyLiveAnalyzer:
     def reset(self):
         pass
 
-    def process_raw(self, raw):
-        return {"f0": 100, "formants": (500, 1500, 2500),
-                "vowel": "a", "vowel_guess": "a",
-                "vowel_score": 0.5, "resonance_score": 0.4, "overall": 0.45}
+    def get_latest_processed(self):
+        return self._processed
 
 
 def make_tuner():
@@ -71,6 +76,9 @@ def make_tuner():
     return t, engine, pm, la
 
 
+# ---------------------------------------------------------
+# Tests
+# ---------------------------------------------------------
 def test_list_profiles():
     t, _, pm, _ = make_tuner()
     assert t.list_profiles() == ["alpha", "beta"]
@@ -82,9 +90,9 @@ def test_load_profile_sets_user_formants():
 
     assert "a" in t.active_profile
     vals = t.active_profile["a"]
-    assert vals[0] == 500
-    assert vals[1] == 1500
-    assert vals[2] == 100
+    assert vals["f1"] == 500
+    assert vals["f2"] == 1500
+    assert vals["f0"] == 100
 
 
 def test_delete_profile():
@@ -128,7 +136,12 @@ def test_stop_mic():
 
 def test_poll_latest_processed():
     t, engine, _, la = make_tuner()
+
+    # Engine raw frame
     engine._raw = {"segment": [1, 2, 3]}
-    la.process_raw = MagicMock(return_value={"f0": 100})
+
+    # Analyzer processed frame
+    la._processed = {"f0": 100}
+
     out = t.poll_latest_processed()
     assert out["f0"] == 100

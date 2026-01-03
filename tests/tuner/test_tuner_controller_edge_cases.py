@@ -1,4 +1,3 @@
-
 from unittest.mock import MagicMock, patch
 from tuner.controller import Tuner
 
@@ -17,6 +16,7 @@ def test_poll_latest_processed_returns_none_when_engine_has_no_frame(
     mock_engine_cls.return_value = mock_engine
 
     mock_analyzer = MagicMock()
+    mock_analyzer.get_latest_processed.return_value = None
     mock_analyzer_cls.return_value = mock_analyzer
 
     mock_profiles = MagicMock()
@@ -40,7 +40,7 @@ def test_poll_latest_processed_returns_none_when_analyzer_returns_none(
     mock_engine_cls.return_value = mock_engine
 
     mock_analyzer = MagicMock()
-    mock_analyzer.process_raw.return_value = None
+    mock_analyzer.get_latest_processed.return_value = None
     mock_analyzer_cls.return_value = mock_analyzer
 
     mock_profiles = MagicMock()
@@ -71,13 +71,16 @@ def test_poll_latest_processed_missing_formants_skips_profile_classification(
     }
 
     mock_analyzer = MagicMock()
-    mock_analyzer.process_raw.return_value = processed
+    mock_analyzer.get_latest_processed.return_value = processed
     mock_analyzer_cls.return_value = mock_analyzer
 
     mock_profiles = MagicMock()
     mock_profiles.apply_profile.return_value = "my_profile"
-    mock_engine.user_formants = {
-        "a": {"f1": 700, "f2": 1100},
+    mock_profiles.load_profile_json.return_value = {
+        "a": {"f1": 700, "f2": 1100}
+    }
+    mock_profiles.extract_formants.return_value = {
+        "a": {"f1": 700, "f2": 1100}
     }
     mock_profiles_cls.return_value = mock_profiles
 
@@ -86,7 +89,6 @@ def test_poll_latest_processed_missing_formants_skips_profile_classification(
 
     out = t.poll_latest_processed()
 
-    # No formants → classification skipped
     assert out == processed
     assert "profile_vowel" not in out
     assert "profile_confidence" not in out
@@ -114,13 +116,16 @@ def test_poll_latest_processed_none_formants_suppresses_classification(
     }
 
     mock_analyzer = MagicMock()
-    mock_analyzer.process_raw.return_value = processed
+    mock_analyzer.get_latest_processed.return_value = processed
     mock_analyzer_cls.return_value = mock_analyzer
 
     mock_profiles = MagicMock()
     mock_profiles.apply_profile.return_value = "my_profile"
-    mock_engine.user_formants = {
-        "a": {"f1": 700, "f2": 1100},
+    mock_profiles.load_profile_json.return_value = {
+        "a": {"f1": 700, "f2": 1100}
+    }
+    mock_profiles.extract_formants.return_value = {
+        "a": {"f1": 700, "f2": 1100}
     }
     mock_profiles_cls.return_value = mock_profiles
 
@@ -155,14 +160,16 @@ def test_poll_latest_processed_profile_missing_fields(
     }
 
     mock_analyzer = MagicMock()
-    mock_analyzer.process_raw.return_value = processed
+    mock_analyzer.get_latest_processed.return_value = processed
     mock_analyzer_cls.return_value = mock_analyzer
 
-    # Missing f2 → invalid centroid
     mock_profiles = MagicMock()
     mock_profiles.apply_profile.return_value = "my_profile"
-    mock_engine.user_formants = {
-        "a": {"f1": 700},  # missing f2 → invalid
+    mock_profiles.load_profile_json.return_value = {
+        "a": {"f1": 700}  # missing f2 → invalid
+    }
+    mock_profiles.extract_formants.return_value = {
+        "a": {"f1": 700}  # still invalid
     }
     mock_profiles_cls.return_value = mock_profiles
 
@@ -193,17 +200,20 @@ def test_poll_latest_processed_unstable_frame_suppresses_classification(
         "formants": (500, 1500, 2500),
         "vowel": "a",
         "confidence": 0.8,
-        "stable": False,  # unstable
+        "stable": False,
     }
 
     mock_analyzer = MagicMock()
-    mock_analyzer.process_raw.return_value = processed
+    mock_analyzer.get_latest_processed.return_value = processed
     mock_analyzer_cls.return_value = mock_analyzer
 
     mock_profiles = MagicMock()
     mock_profiles.apply_profile.return_value = "my_profile"
-    mock_engine.user_formants = {
-        "a": {"f1": 700, "f2": 1100},
+    mock_profiles.load_profile_json.return_value = {
+        "a": {"f1": 700, "f2": 1100}
+    }
+    mock_profiles.extract_formants.return_value = {
+        "a": {"f1": 700, "f2": 1100}
     }
     mock_profiles_cls.return_value = mock_profiles
 
