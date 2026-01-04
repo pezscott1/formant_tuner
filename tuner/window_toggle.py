@@ -156,7 +156,8 @@ class VowelMapView(QWidget):
                 alpha = int(conf * 255)
                 painter.setPen(QPen(QColor(255, 255, 255, alpha), 2))
                 painter.setBrush(Qt.NoBrush)
-                painter.drawEllipse(int(x - radius // 2), int(y - radius // 2), radius, radius)
+                painter.drawEllipse(int(x - radius // 2),
+                                    int(y - radius // 2), radius, radius)
 
             # vowel-colored dot
             vowel = self.bus.vowels[-1] if self.bus.vowels else None
@@ -169,13 +170,15 @@ class VowelMapView(QWidget):
     def f1_to_y(self, f1, h):
         if f1 is None or self.f1_min is None or self.f1_max is None:
             return -1000  # offscreen sentinel
-        y_norm = (np.log10(f1) - np.log10(self.f1_min)) / (np.log10(self.f1_max) - np.log10(self.f1_min))
+        y_norm = ((np.log10(f1) - np.log10(self.f1_min)) /
+                  (np.log10(self.f1_max) - np.log10(self.f1_min)))
         return h * y_norm
 
     def f2_to_x(self, f2, w):
         if f2 is None or self.f2_min is None or self.f2_max is None:
             return -1000
-        x_norm = (np.log10(f2) - np.log10(self.f2_min)) / (np.log10(self.f2_max) - np.log10(self.f2_min))
+        x_norm = ((np.log10(f2) - np.log10(self.f2_min)) /
+                  (np.log10(self.f2_max) - np.log10(self.f2_min)))
         return w * (1 - x_norm)
 
     def draw_targets(self, painter, w, h):

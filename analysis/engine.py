@@ -1,6 +1,6 @@
 from __future__ import annotations
 import numpy as np
-from typing import Optional, Any
+from typing import Optional
 from analysis.pitch import estimate_pitch
 import analysis.lpc as lpc_mod
 import analysis.vowel_classifier as vowel_mod

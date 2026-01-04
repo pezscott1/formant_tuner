@@ -611,9 +611,8 @@ class TunerWindow(QMainWindow):
         if smoothed and conf > 0.5:
             f1 = smoothed.get("f1")
             f2 = smoothed.get("f2")
-            _f3 = None  # we are ignoring F3 in the tuner
         else:
-            f1 = f2 = _f3 = None
+            f1 = f2 = None
 
         vowel_smooth = processed["vowel"]
         # Raw audio segment for spectrogram
@@ -649,10 +648,12 @@ class TunerWindow(QMainWindow):
             smooth_f2 = smoothed.get("f2")
 
             if raw_f1 is not None and smooth_f1 is not None:
-                print(f"[F1 Δ] hybrid={raw_f1:.1f}  smoothed={smooth_f1:.1f}  Δ={abs(raw_f1 - smooth_f1):.1f}")
+                print(f"[F1 Δ] hybrid={raw_f1:.1f}  "
+                      f"smoothed={smooth_f1:.1f}  Δ={abs(raw_f1 - smooth_f1):.1f}")
 
             if raw_f2 is not None and smooth_f2 is not None:
-                print(f"[F2 Δ] hybrid={raw_f2:.1f}  smoothed={smooth_f2:.1f}  Δ={abs(raw_f2 - smooth_f2):.1f}")
+                print(f"[F2 Δ] hybrid={raw_f2:.1f}  "
+                      f"smoothed={smooth_f2:.1f}  Δ={abs(raw_f2 - smooth_f2):.1f}")
 
         print(
             f"[TUNER] f0_raw={processed.get('f0_raw')}  "
