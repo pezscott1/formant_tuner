@@ -5,24 +5,6 @@ from analysis.vowel_data import PITCH_RANGES, VOWEL_CENTERS
 
 
 # ---------------------------------------------------------
-# Utility: check if a calibration entry is valid
-# ---------------------------------------------------------
-
-def _valid_calibration_entry(entry):
-    if not entry:
-        return False
-    f1 = entry.get("f1")
-    f2 = entry.get("f2")
-    f0 = entry.get("f0")
-    # Must have real formants and real pitch
-    if f1 is None or f2 is None:
-        return False
-    if f0 is None or np.isnan(f0):
-        return False
-    return True
-
-
-# ---------------------------------------------------------
 # Adaptive vowel window
 # ---------------------------------------------------------
 

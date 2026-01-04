@@ -16,7 +16,7 @@ from typing import Optional
 import librosa
 import numpy as np
 from numpy.typing import NDArray
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from scipy.signal import find_peaks
 
 
@@ -36,9 +36,6 @@ class FormantResult:
     bandwidths: list[float]
     debug: dict
     lpc_order: Optional[int] = None
-
-    def to_dict(self):
-        return asdict(self)
 
 
 # ---------------------------------------------------------------------------

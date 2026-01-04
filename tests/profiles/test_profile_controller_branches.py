@@ -67,14 +67,6 @@ def test_display_name():
     assert ProfileManager.display_name("my_profile") == "my profile"
 
 
-def test_base_from_display_normal():
-    assert ProfileManager.base_from_display("my profile") == "my_profile"
-
-
-def test_base_from_display_plus():
-    assert ProfileManager.base_from_display("➕ New Profile") is None
-
-
 # ----------------------------------------------------------------------
 # profile_exists
 # ----------------------------------------------------------------------

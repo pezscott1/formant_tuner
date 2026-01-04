@@ -182,8 +182,3 @@ def test_compute_formants_hybrid_path(monkeypatch):
 
     f1, f2, f3, conf, method, hybrid = eng._compute_formants(np.zeros(100), 44100)
     assert hybrid == (500, 1500, 2500)
-
-
-def test_classify_vowel_none_when_no_classifier():
-    eng = FormantAnalysisEngine()
-    assert eng._classify_vowel(500, 1500) is None

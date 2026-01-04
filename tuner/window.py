@@ -1,5 +1,6 @@
 # tuner/window.py
-import threading
+from collections import deque
+import time
 import numpy as np
 import sounddevice as sd
 from PyQt5.QtWidgets import (
@@ -17,6 +18,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QLineEdit,
     QAbstractItemView,
+    QStackedWidget,
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
@@ -24,9 +26,10 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from profile_viewer.profile_viewer import ProfileViewerWindow
 from tuner.tuner_plotter import update_spectrum, update_vowel_chart
-from utils.music_utils import hz_to_midi, render_piano
+from tuner.window_toggle import ModeToggleBar, AnalysisView, VowelMapView
 from calibration.dialog import ProfileDialog
 from calibration.window import CalibrationWindow
+from tuner.spectrogram_view import SpectrogramView
 
 
 class ClearableListWidget(QListWidget):
@@ -76,11 +79,13 @@ class TunerWindow(QMainWindow):
         self.current_tolerance = 50
         self.voice_type = getattr(self.analyzer, "voice_type", "bass")
         self.stream = None
-        self.stream_lock = threading.Lock()
 
         if self.headless:
             self._build_headless()
             return
+
+        self.bus = VisualizationBus(max_frames=200)
+        self.spectrogram_view = SpectrogramView(self.bus)
 
         # Normal UI mode
         self._build_ui()
@@ -244,22 +249,20 @@ class TunerWindow(QMainWindow):
         main_layout.addWidget(left_frame)
 
         # ================= Right panel =================
+        # ================= Right panel =================
+
         right_splitter = QSplitter(Qt.Vertical)
-        main_layout.addWidget(right_splitter, stretch=1)
 
         # Top: tolerance only
         control_frame = QFrame()
         control_layout = QHBoxLayout(control_frame)
-
         control_layout.addWidget(QLabel("Tolerance (Hz):"))
         self.tol_field = QLineEdit(str(self.current_tolerance))
         self.tol_field.setFixedWidth(60)
         control_layout.addWidget(self.tol_field)
         control_layout.addStretch(1)
 
-        right_splitter.addWidget(control_frame)
-
-        # Bottom: vowel chart, spectrum, piano
+        # Bottom: vowel chart, spectrum
         plot_frame = QFrame()
         plot_layout = QVBoxLayout(plot_frame)
 
@@ -270,13 +273,37 @@ class TunerWindow(QMainWindow):
 
         self.ax_chart = self.fig.add_subplot(gs[0])
         self.ax_vowel = self.fig.add_subplot(gs[1])
-        self.ax_piano = self.fig.add_subplot(gs[2])
-
         self.canvas = FigureCanvas(self.fig)
         plot_layout.addWidget(self.canvas)
 
+        # Add widgets to splitter
+        right_splitter.addWidget(control_frame)
         right_splitter.addWidget(plot_frame)
-        right_splitter.setSizes([80, 800])
+        right_splitter.addWidget(self.spectrogram_view)
+        right_splitter.setSizes([80, 600, 300])
+
+        # Wrap splitter in AnalysisView
+        self.analysis_view = AnalysisView(right_splitter)
+
+        # Create vowel map view
+        self.vowel_map_view = VowelMapView(self.bus)
+
+        # Stacked widget
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.analysis_view)  # index 0
+        self.stack.addWidget(self.vowel_map_view)  # index 1
+
+        # Toggle bar
+        self.toggle_bar = ModeToggleBar(self.stack)
+
+        # Right container
+        right_container = QWidget()
+        right_layout = QVBoxLayout(right_container)
+        right_layout.addWidget(self.toggle_bar)
+        right_layout.addWidget(self.stack)
+
+        # Add to main layout
+        main_layout.addWidget(right_container, stretch=1)
 
         # Signals
         (self.tol_field.editingFinished.connect  # type: ignore
@@ -315,17 +342,21 @@ class TunerWindow(QMainWindow):
     def _on_profile_selection_changed(self):
         items = self.profile_list.selectedItems()
         if not items:
-            # Nothing selected → clear active profile
             self.tuner.active_profile = None
             self.tuner.engine.vowel_hint = None
             self.active_label.setText("Active: None")
             print("PROFILE DESELECTED → active_profile=None")
             return
 
-        # Something selected → load it
         item = items[0]
         base = item.data(Qt.UserRole)
         self.tuner.load_profile(base)
+        # Copy formants from engine → analyzer
+        self.live_analyzer.user_formants = dict(self.tuner.engine.user_formants)
+        # Update vowel map
+        self.vowel_map_view.analyzer = self.live_analyzer
+        self.vowel_map_view.compute_dynamic_ranges()
+        self.vowel_map_view.update()
 
     def _populate_profiles(self):
         """Populate profile list with a 'New Profile' item plus existing profiles."""
@@ -522,6 +553,9 @@ class TunerWindow(QMainWindow):
             if status:
                 print("[AUDIO STATUS]", status)
             mono = indata[:, 0].astype(np.float64, copy=False)
+            # Store raw audio for spectrogram
+            self.bus.audio.append(mono.copy())
+            # Still feed analyzer
             self.live_analyzer.submit_audio_segment(mono)
 
         def find_device():
@@ -565,28 +599,76 @@ class TunerWindow(QMainWindow):
         if (hasattr(self.live_analyzer, "is_running")
                 and not self.live_analyzer.is_running):
             return
+
         processed = self.tuner.poll_latest_processed()
         if not processed:
             return
+
+        # Use the same smoothed formants the classifier uses
+        smoothed = processed.get("smoothed_formants")
+        conf = processed.get("confidence", 0.0)
+
+        if smoothed and conf > 0.5:
+            f1 = smoothed.get("f1")
+            f2 = smoothed.get("f2")
+            _f3 = None  # we are ignoring F3 in the tuner
+        else:
+            f1 = f2 = _f3 = None
+
+        vowel_smooth = processed["vowel"]
+        # Raw audio segment for spectrogram
+        segment = processed.get("segment")
+        stable = processed.get("stable")
+        stability_score = processed.get("stability_score")
+        confidence = processed.get("confidence")
+
+        # Push into visualization bus (no more spec_col)
+        self.bus.push(
+            f1=f1,
+            f2=f2,
+            f3=None,
+            vowel=vowel_smooth,
+            ts=time.time(),
+            segment=segment,
+            stable=stable,
+            stability_score=stability_score,
+            confidence=confidence,
+        )
+
+        self.vowel_map_view.update_from_bus(self.bus, analyzer=self.analyzer)
+        self.spectrogram_view.update_from_bus(self.bus)
         hf = processed.get("hybrid_formants")
         if isinstance(hf, (list, tuple)) and len(hf) == 3:
-            hf1, hf2, hf3 = hf
+            raw_f1, raw_f2, raw_f3 = hf
         else:
-            hf1 = hf2 = hf3 = None
+            raw_f1 = raw_f2 = raw_f3 = None
+
+        # --- ADD DELTA BLOCK HERE ---
+        if smoothed:
+            smooth_f1 = smoothed.get("f1")
+            smooth_f2 = smoothed.get("f2")
+
+            if raw_f1 is not None and smooth_f1 is not None:
+                print(f"[F1 Δ] hybrid={raw_f1:.1f}  smoothed={smooth_f1:.1f}  Δ={abs(raw_f1 - smooth_f1):.1f}")
+
+            if raw_f2 is not None and smooth_f2 is not None:
+                print(f"[F2 Δ] hybrid={raw_f2:.1f}  smoothed={smooth_f2:.1f}  Δ={abs(raw_f2 - smooth_f2):.1f}")
 
         print(
             f"[TUNER] f0_raw={processed.get('f0_raw')}  "
             f"f0_smooth={processed.get('f0')}  "
             f"conf={processed.get('confidence')}  "
-            f"hybrid_f1={hf1}  "
-            f"hybrid_f2={hf2}  "
-            f"hybrid_f3={hf3}  "
+            f"hybrid_f1={raw_f1}  "
+            f"hybrid_f2={raw_f2}  "
+            f"hybrid_f3={raw_f3}  "
             f"vowel_raw={processed.get('vowel_guess')}  "
             f"vowel_smooth={processed.get('vowel')}  "
             f"vowel_score={processed.get('vowel_score')}  "
             f"res_score={processed.get('resonance_score')}  "
             f"overall={processed.get('overall')}"
         )
+
+        # Re‑extract for plotting (unchanged)
         hf = processed.get("hybrid_formants")
         if isinstance(hf, (list, tuple)) and len(hf) == 3:
             f1, f2, f3 = hf
@@ -638,14 +720,6 @@ class TunerWindow(QMainWindow):
         except Exception as e:
             print("[TUNER] update_vowel_chart error:", e)
 
-        # Piano keyboard
-        try:
-            self.ax_piano.cla()
-            midi_note = hz_to_midi(f0) if (f0 is not None and f0 > 0) else None
-            render_piano(self.ax_piano, midi_note)
-        except Exception as e:
-            print("[TUNER] piano render error:", e)
-
         self.canvas.draw_idle()
 
     # ---------------------------------------------------------
@@ -657,3 +731,35 @@ class TunerWindow(QMainWindow):
         except AttributeError:
             pass
         super().closeEvent(event)
+
+
+class VisualizationBus:
+    def __init__(self, max_frames=200):
+        self.audio = deque(maxlen=max_frames)     # raw audio segments
+        self.f1 = deque(maxlen=max_frames)
+        self.f2 = deque(maxlen=max_frames)
+        self.f3 = deque(maxlen=max_frames)
+        self.vowels = deque(maxlen=max_frames)
+        self.timestamps = deque(maxlen=max_frames)
+        self.stable = deque(maxlen=max_frames)
+        self.stability_score = deque(maxlen=max_frames)
+        self.confidence = deque(maxlen=max_frames)
+
+    def push(self, f1, f2, f3, vowel, ts, segment,
+             stable=None, stability_score=None, confidence=None):
+        # Raw audio
+        if segment is not None:
+            self.audio.append(np.asarray(segment, dtype=float))
+        else:
+            self.audio.append(None)
+
+        # Formants
+        self.f1.append(f1)
+        self.f2.append(f2)
+        self.f3.append(f3)
+
+        self.vowels.append(vowel)
+        self.timestamps.append(ts)
+        self.stable.append(stable)
+        self.stability_score.append(stability_score)
+        self.confidence.append(confidence)

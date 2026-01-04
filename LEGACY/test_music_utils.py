@@ -1,7 +1,7 @@
 # tests/test_music_utils.py
 from unittest.mock import MagicMock
 import matplotlib.pyplot as plt
-from utils.music_utils import (
+from LEGACY.utils.music_utils import (
     hz_to_midi,
     freq_to_note_name,
     render_piano,

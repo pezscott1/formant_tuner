@@ -10,6 +10,7 @@ omit =
     calibration/dialog.py
     diagnostic.py
     main.py
+    LEGACY/*
     profile_viewer/profile_viewer.py
 
     # Skip tests from coverage

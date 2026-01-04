@@ -177,18 +177,6 @@ class FormantAnalysisEngine:
 
         return f1, f2, f3, conf, method, hybrid
 
-    def _classify_vowel(self, f1: Optional[float],
-                        f2: Optional[float]) -> tuple[Any, Any, Any] | None:
-        if self.vowel_classifier is None:
-            return None
-
-        best, conf, second = self.vowel_classifier.classify_vowel(
-            f1=f1,
-            f2=f2,
-            voice_type=self.voice_type
-        )
-        return best, conf, second
-
     @staticmethod
     def _build_result_dict(
             f1, f2, f3, f0, conf, method,

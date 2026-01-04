@@ -56,9 +56,6 @@ class CalibrationWindow(QMainWindow):
 
         # Core vowel set
         self.vowels = ["i", "ɛ", "ɑ", "ɔ", "u"]
-        # f0 locking state
-        self._f0_locked = None
-        self._f0_candidates = []
 
         # Calibration session
         self.session = CalibrationSession(
@@ -71,7 +68,7 @@ class CalibrationWindow(QMainWindow):
         self.state = CalibrationStateMachine(self.vowels)
 
         # Smoothers
-        self.pitch_smoother = PitchSmoother(sr=48000, min_confidence=0.25)
+        self.pitch_smoother = PitchSmoother(min_confidence=0.25)
         self.formant_smoother = MedianSmoother(min_confidence=0.25)
         self.label_smoother = LabelSmoother(min_confidence=0.25)
 
@@ -185,9 +182,6 @@ class CalibrationWindow(QMainWindow):
     # ---------------------------------------------------------
     # Phase machine tick
     # ---------------------------------------------------------
-    def _reset_f0_lock(self):
-        self._f0_locked = None
-        self._f0_candidates = []
 
     def _tick_phase(self):
         event = self.state.tick()
@@ -219,7 +213,6 @@ class CalibrationWindow(QMainWindow):
             )
 
         elif evt == "retry":
-            self._reset_f0_lock()
             self._mic_active = False
             self.analyzer.pause()
             self.vowel_capture_finished.emit()  # type:ignore
@@ -228,7 +221,6 @@ class CalibrationWindow(QMainWindow):
             )
 
         elif evt == "next_vowel":
-            self._reset_f0_lock()
             self._mic_active = False
             self.analyzer.pause()
             self.vowel_capture_finished.emit()  # type:ignore
@@ -266,42 +258,6 @@ class CalibrationWindow(QMainWindow):
                 self.status_panel.appendPlainText("Calibration complete!")
                 self._finish()
                 return
-
-    @staticmethod
-    def fmt_pitch(x):
-        if x is None:
-            return "None"
-        try:
-            return f"{float(x):.1f}"
-        except Exception:
-            return str(x)
-
-    @staticmethod
-    def lock_f0(values):
-        arr = np.asarray(values, dtype=float)
-        if arr.size < 5:
-            return None
-
-        # Normalize into the same octave band
-        norm = []
-        for v in arr:
-            base = v
-            while base > 200:
-                base /= 2
-            while base < 80:
-                base *= 2
-            norm.append(base)
-
-        norm = np.asarray(norm)
-
-        # Median of normalized values
-        f0_norm = float(np.median(norm))
-
-        # Restore original octave: choose the octave closest to raw values
-        candidates = [f0_norm, f0_norm * 2, f0_norm / 2]
-        best = min(candidates, key=lambda x: np.mean(np.abs(arr - x)))
-
-        return best
 
     # ---------------------------------------------------------
     # Poll shared engine
@@ -598,7 +554,6 @@ class CalibrationWindow(QMainWindow):
             self.canvas.draw_idle()
 
             # Reset F0 lock and advance
-            self._reset_f0_lock()
             self.state.advance()
             return True
 

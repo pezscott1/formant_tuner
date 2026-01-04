@@ -32,7 +32,7 @@ class LiveAnalyzer:
         self._audio_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=8)
         # Engine → UI queue (processed dicts)
         self.processed_queue: "queue.Queue[dict]" = queue.Queue(maxsize=8)
-
+        self.user_formants = {}
         self._worker_thread: threading.Thread | None = None
         self._stop_flag = threading.Event()
         self._latest_raw = None
@@ -85,10 +85,19 @@ class LiveAnalyzer:
         # =========================================================
         # 3. Formant smoothing
         # =========================================================
+
+        # Prefer hybrid formants if present
+        hf = raw_dict.get("hybrid_formants")
+        if isinstance(hf, (list, tuple)) and len(hf) == 3:
+            f1_in, f2_in, f3_in = hf
+        else:
+            # Fall back to raw formants
+            f1_in, f2_in, f3_in = f1_raw, f2_raw, f3_raw
+
         f1_s, f2_s, f3_s = self.formant_smoother.update(
-            f1=f1_raw,
-            f2=f2_raw,
-            f3=f3_raw,
+            f1=f1_in,
+            f2=f2_in,
+            f3=f3_in,
             confidence=lpc_conf,
         )
 
@@ -123,6 +132,12 @@ class LiveAnalyzer:
             # Formants
             "formants": (f1_s, f2_s, f3_s),
             "hybrid_formants": hybrid,
+
+            "smoothed_formants": {
+                "f1": f1_s,
+                "f2": f2_s,
+                "f3": f3_s,
+            },
 
             # Smoothed vowel
             "vowel": vowel_s,

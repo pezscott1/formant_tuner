@@ -35,16 +35,6 @@ class TEFormantResult:
     confidence: float = 0.0
     debug: Optional[Dict] = None
 
-    def to_dict(self):
-        return {
-            "f1": self.f1,
-            "f2": self.f2,
-            "f3": self.f3,
-            "peaks": self.peaks,
-            "debug": self.debug,
-        }
-
-
 # ---------------------------------------------------------------------------
 # Main TE estimator
 # ---------------------------------------------------------------------------

@@ -47,14 +47,6 @@ class ProfileManager:
     def display_name(base):
         return base.replace("_", " ")
 
-    @staticmethod
-    def base_from_display(display):
-        if display.startswith("➕"):
-            return None
-        return display.replace(" ", "_")
-
-    base_name_from_display = base_from_display
-
     # ---------------------------------------------------------
     # Existence checks
     # ---------------------------------------------------------

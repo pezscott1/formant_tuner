@@ -1,8 +1,8 @@
 # calibration/plotter.py
+import matplotlib.ticker as mticker
 import numpy as np
 import librosa
 import logging
-
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(
@@ -84,11 +84,14 @@ def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=1.0):
 def update_spectrogram(self, freqs, times, s):
     """
     Draw ONLY the spectrogram.
-    Vowel anchors are handled by CalibrationWindow.
+    Vowel anchors and formant overlays are handled elsewhere.
+    Now uses log-frequency scaling so F1/F2 appear in correct vertical positions.
     """
     if freqs is None or times is None or s is None:
         return
+
     freqs = np.asarray(freqs)
+
     # Limit to 4 kHz
     mask = freqs <= 4000
     if mask.sum() < 2:
@@ -103,8 +106,11 @@ def update_spectrogram(self, freqs, times, s):
     db_floor = arr_db_max - 60
     arr_db = np.clip(arr_db, db_floor, arr_db_max)
 
-    # Draw
+    # Clear axis
     self.ax_spec.clear()
+
+    # --- NEW: log-frequency axis ---
+    # pcolormesh works fine with log y-scale as long as freqs_small is monotonic
     mesh = self.ax_spec.pcolormesh(
         times,
         freqs_small,
@@ -112,6 +118,19 @@ def update_spectrogram(self, freqs, times, s):
         shading="auto",
         cmap="magma",
     )
+
+    # Apply log scaling AFTER drawing
+
+    self.ax_spec.set_yscale("log")
+    self.ax_spec.set_ylim(50, 4000)
+
+    # Clean Hz labels on log axis
+    formatter = mticker.ScalarFormatter()
+    formatter.set_scientific(False)
+    formatter.set_useOffset(False)
+    self.ax_spec.yaxis.set_major_formatter(formatter)
+
+    self.ax_spec.set_yticks([50, 100, 200, 400, 800, 1600, 3200])
 
     # Colorbar
     if not hasattr(self, "_spec_colorbar") or self._spec_colorbar is None:
@@ -121,9 +140,8 @@ def update_spectrogram(self, freqs, times, s):
     else:
         self._spec_colorbar.update_normal(mesh)
 
-    self.ax_spec.set_ylim(0, 4000)
     self.ax_spec.set_xlabel("Time (s)")
     self.ax_spec.set_ylabel("Frequency (Hz)")
-    self.ax_spec.set_title("Spectrogram")
+    self.ax_spec.set_title("Spectrogram (log scale)")
 
     self.canvas.draw_idle()

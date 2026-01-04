@@ -1,5 +1,5 @@
 import numpy as np
-from utils.music_utils import freq_to_note_name
+from LEGACY.utils.music_utils import freq_to_note_name
 
 
 # ============================================================

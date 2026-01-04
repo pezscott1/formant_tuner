@@ -39,7 +39,6 @@ class Tuner:
             profiles_dir=profiles_dir,
             analyzer=self.engine,
         )
-        self.last_vowel = None
         self.voice_type = voice_type
         self.active_profile = None
 
@@ -101,9 +100,6 @@ class Tuner:
         processed["profile_confidence"] = confidence
 
         if vowel is not None and confidence > 0.2:
-            # Update controller state
-            self.last_vowel = vowel
-            # Crucial: drive the hybrid selector hint
             self.engine.vowel_hint = vowel
 
         return processed
@@ -195,7 +191,6 @@ class Tuner:
         try:
             stream.stop()
             stream.close()
-            self.last_vowel = None
             self.engine.vowel_hint = None
         except Exception:
             pass

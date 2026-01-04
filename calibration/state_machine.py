@@ -1,4 +1,5 @@
 import logging
+import time
 from time import monotonic
 
 logger = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ class CalibrationStateMachine:
 
     def force_capture_mode(self):
         self.phase = "capture"
-        self.capture_start_time = monotonic()
+        self.capture_start_time = time.time()
 
     def is_done(self):
         return self.phase == "finished"
