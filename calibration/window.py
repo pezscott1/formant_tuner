@@ -196,6 +196,7 @@ class CalibrationWindow(QMainWindow):
 
         elif evt == "start_sing":
             self._mic_active = True
+            self.pitch_smoother.reset()
             self.analyzer.resume()
             self.vowel_capture_started.emit()  # type:ignore
             self.status_panel.appendPlainText(f"Sing /{event['vowel']}/…")
@@ -207,6 +208,7 @@ class CalibrationWindow(QMainWindow):
 
         elif evt == "start_capture":
             self._mic_active = True
+            self.pitch_smoother.reset()
             self.analyzer.resume()
             self.status_panel.appendPlainText(
                 f"Capturing /{self.state.current_vowel}/…"
@@ -214,6 +216,7 @@ class CalibrationWindow(QMainWindow):
 
         elif evt == "retry":
             self._mic_active = False
+            self.pitch_smoother.reset()
             self.analyzer.pause()
             self.vowel_capture_finished.emit()  # type:ignore
             self.status_panel.appendPlainText(
@@ -222,6 +225,7 @@ class CalibrationWindow(QMainWindow):
 
         elif evt == "next_vowel":
             self._mic_active = False
+            self.pitch_smoother.reset()
             self.analyzer.pause()
             self.vowel_capture_finished.emit()  # type:ignore
             self.status_panel.appendPlainText(

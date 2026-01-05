@@ -2,6 +2,7 @@ import os
 import pytest
 if os.environ.get("CI") == "true":
     pytest.skip("Skipping Qt/Matplotlib UI tests in CI", allow_module_level=True)
+
 import numpy as np
 import matplotlib.pyplot as plt
 import types
@@ -29,6 +30,22 @@ class FakeAnalyzer:
 
 
 # ------------------------------------------------------------
+# Fake text overlay object
+# ------------------------------------------------------------
+
+class FakeText:
+    def __init__(self, ax=None):
+        self._text = ""
+        self.axes = ax
+
+    def set_text(self, txt):
+        self._text = txt
+
+    def get_text(self):
+        return self._text
+
+
+# ------------------------------------------------------------
 # Fake window
 # ------------------------------------------------------------
 
@@ -53,13 +70,16 @@ class FakeWindow:
         self.vowel_measured_artist = None
         self.vowel_line_artist = None
 
+        self.spec_status_text = FakeText(self.ax_chart)
+        self.vowel_status_text = FakeText(self.ax_vowel)
+
 
 # ------------------------------------------------------------
 # update_spectrum tests
 # ------------------------------------------------------------
 
 def test_update_spectrum_no_segment():
-    """No FFT path, but target formant lines + title appear."""
+    """No FFT path, but target formant lines + overlay text appear."""
     window = FakeWindow(segment=None)
 
     update_spectrum(
@@ -73,11 +93,13 @@ def test_update_spectrum_no_segment():
 
     # Should have drawn at least the 3 target formant lines
     assert len(window.ax_chart.lines) >= 3
-    assert "Spectrum /i/" in window.ax_chart.get_title()
+
+    # Overlay text now contains vowel info
+    assert "/i/" in window.spec_status_text.get_text()
 
 
 def test_update_spectrum_with_segment_and_pitch():
-    """FFT path + pitch title + measured lines."""
+    """FFT path + pitch overlay + measured lines."""
     segment = np.random.randn(2048)
     window = FakeWindow(segment=segment, confidence=1.0)
 
@@ -93,10 +115,10 @@ def test_update_spectrum_with_segment_and_pitch():
     # FFT plotted
     assert len(window.ax_chart.lines) > 0
 
-    # Title includes pitch
-    title = window.ax_chart.get_title()
-    assert "Spectrum /a/" in title
-    assert "Hz" in title
+    # Overlay text includes pitch
+    txt = window.spec_status_text.get_text()
+    assert "/a/" in txt
+    assert "220.0 Hz" in txt
 
 
 # ------------------------------------------------------------
@@ -104,7 +126,7 @@ def test_update_spectrum_with_segment_and_pitch():
 # ------------------------------------------------------------
 
 def test_update_vowel_chart_basic_point_and_line():
-    """Measured point + line + title."""
+    """Measured point + line + overlay text."""
     window = FakeWindow(confidence=1.0, stable=True)
 
     update_vowel_chart(
@@ -119,9 +141,9 @@ def test_update_vowel_chart_basic_point_and_line():
 
     assert window.vowel_measured_artist is not None
 
-    title = window.ax_vowel.get_title()
-    assert "/i/" in title
-    assert "Overall=0.75" in title
+    txt = window.vowel_status_text.get_text()
+    assert "/i/" in txt
+    assert "Overall=0.75" in txt
 
 
 def test_update_vowel_chart_nan_handling():

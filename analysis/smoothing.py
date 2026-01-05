@@ -32,7 +32,7 @@ def hps_pitch(signal, sr, max_f0=500, min_f0=50):
 # ---------------------------------------------------------
 class PitchSmoother:
     def __init__(self, alpha=0.25, jump_limit=200, min_confidence=0.0,
-                 hps_enabled=False, sr=48000):
+                 hps_enabled=False, sr=None):
         self.alpha = alpha
         self.jump_limit = jump_limit
         self.min_confidence = min_confidence
@@ -74,9 +74,9 @@ class PitchSmoother:
         elif hasattr(new, "frequency"):
             new = new.frequency
 
-        # ignore None
-        if new is None:
-            return self.current
+        if new is None or confidence < self.min_confidence:
+            self.current = None
+            return None
 
         try:
             new = float(new)
@@ -92,20 +92,14 @@ class PitchSmoother:
         if confidence < self.min_confidence:
             return self.current
 
-        # jump suppression on raw value (before octave correction)
         if abs(new - self.current) > self.jump_limit:
+            self.current = new
             return self.current
 
         # octave correction on values that passed jump suppression
         corrected = self._octave_correct(new)
 
-        # If octave correction snapped exactly to an octave,
-        # tests allow us to land *exactly* on that value
-        if corrected in (self.current * 2.0, self.current * 0.5):
-            self.current = corrected
-            return self.current
-
-        # EMA smoothing (normal case)
+        # EMA smoothing always applies unless jump suppression triggered
         self.current = self.alpha * corrected + (1.0 - self.alpha) * self.current
         return self.current
 

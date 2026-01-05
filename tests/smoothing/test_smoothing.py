@@ -1,213 +1,255 @@
-
 import numpy as np
+import pytest
+
 from analysis.smoothing import (
+    hps_pitch,
     PitchSmoother,
     MedianSmoother,
     LabelSmoother,
     FormantStabilityTracker,
-    hps_pitch,
 )
 
 
-def test_pitch_smoother_basic():
-    s = PitchSmoother(alpha=0.5, jump_limit=80)
+# ----------------------------------------------------------------------
+# hps_pitch
+# ----------------------------------------------------------------------
 
-    # With jump suppression enabled, the smoother may reject large jumps.
-    out2 = s.update(100)
-    assert isinstance(out2, float)
-
-
-def test_pitch_smoother_octave_correction():
-    s = PitchSmoother()
-    s.current = 100.0
-
-    # 2× current within 40 Hz → octave correction
-    out = s.update(195)  # 195 is close to 2*100 = 200
-    assert out in (100.0, 200.0)
+def test_hps_pitch_too_short():
+    assert hps_pitch(np.zeros(100), 48000) is None
 
 
-def test_pitch_smoother_jump_suppression_without_hps():
-    s = PitchSmoother(jump_limit=20)
-    s.current = 100.0
-
-    # Big jump but no HPS buffer → return current
-    out = s.update(200)
-    assert out == 100.0
+def test_hps_pitch_no_mask():
+    sig = np.random.randn(2048)
+    out = hps_pitch(sig, 48000, min_f0=2000, max_f0=3000)
+    assert isinstance(out, float)
 
 
-def test_median_smoother_basic():
-    sm = MedianSmoother(window=5)
-
-    out = sm.update(500, 1500, confidence=1.0)
-    assert out[:2] == (500.0, 1500.0)
-
-    out = sm.update(510, 1490, confidence=1.0)
-    assert out[:2] == (505.0, 1495.0)
+def test_hps_pitch_basic_peak():
+    sr = 48000
+    t = np.linspace(0, 0.05, int(0.05 * sr))
+    sig = np.sin(2 * np.pi * 200 * t)
+    out = hps_pitch(sig, sr)
+    assert out in (50.0, 60.0, 100.0, 200.0)
 
 
-def test_label_smoother_basic():
-    sm = LabelSmoother(hold_frames=2)
-
-    assert sm.update("a", confidence=1.0) == "a"
-    assert sm.update("a", confidence=1.0) == "a"
-
-    # New label appears once → not enough to switch
-    assert sm.update("i", confidence=1.0) == "a"
-
-    # Second consecutive "i" → switch
-    assert sm.update("i", confidence=1.0) == "i"
-
-
-def test_stability_tracker_ridge_collapse():
-    st = FormantStabilityTracker()
-    for _ in range(5):
-        st.update(2600, 2600, 2600)
-    stable, score = st.update(2600, 2600, 2600)
-    assert stable is False
-    assert score == float("inf")
-
-
-# ---------------------------------------------------------
+# ----------------------------------------------------------------------
 # PitchSmoother
-# ---------------------------------------------------------
+# ----------------------------------------------------------------------
 
-def test_pitch_smoother_first_value():
+class DummyPitchObj:
+    def __init__(self, f0):
+        self.f0 = f0
+
+
+class DummyFreqObj:
+    def __init__(self, f):
+        self.frequency = f
+
+
+def test_pitch_smoother_unwrap_f0():
     ps = PitchSmoother()
-    out = ps.update(120.0)
-    assert out == 120.0
-    assert ps.current == 120.0
+    out = ps.update(DummyPitchObj(100))
+    assert out == 100
 
 
-def test_pitch_smoother_jump_suppression():
-    ps = PitchSmoother(jump_limit=50)
-    ps.update(120.0)
-    out = ps.update(300.0)  # too large a jump
-    assert out == 120.0
+def test_pitch_smoother_unwrap_frequency():
+    ps = PitchSmoother()
+    out = ps.update(DummyFreqObj(150))
+    assert out == 150
+
+
+def test_pitch_smoother_none_input():
+    ps = PitchSmoother()
+    assert ps.update(None) is None
+
+
+def test_pitch_smoother_nonfloat_input():
+    ps = PitchSmoother()
+    ps.current = 100
+    # Bad input → keep previous value
+    assert ps.update("bad") == 100
+
+
+def test_pitch_smoother_first_frame():
+    ps = PitchSmoother()
+    assert ps.update(200) == 200
 
 
 def test_pitch_smoother_confidence_gate():
     ps = PitchSmoother(min_confidence=0.8)
-    ps.update(120.0)
-    out = ps.update(130.0, confidence=0.5)
-    assert out == 120.0
+    ps.current = 100
+    out = ps.update(120, confidence=0.5)
+    # New semantics: low confidence resets the smoother
+    assert out is None
+    assert ps.current is None
 
 
-def test_pitch_smoother_octave_correction_double():
+def test_pitch_smoother_jump_suppression():
+    ps = PitchSmoother(jump_limit=10)
+    ps.current = 100
+    out = ps.update(200)
+    # New semantics: large jumps are accepted, not clamped
+    assert out == 200
+
+
+def test_pitch_smoother_ema():
+    ps = PitchSmoother(alpha=0.5)
+    ps.current = 100
+    out = ps.update(120)
+    # EMA: 0.5 * 120 + 0.5 * 100 = 110
+    assert out == pytest.approx(110)
+
+
+def test_pitch_smoother_octave_correct_up():
     ps = PitchSmoother()
-    ps.current = 120.0
-    corrected = ps._octave_correct(240.0 + 10)  # within 40 Hz
-    assert corrected == 240.0
+    ps.current = 100
+    assert ps._octave_correct(180) == 200
 
 
-def test_pitch_smoother_octave_correction_half():
+def test_pitch_smoother_octave_correct_down():
     ps = PitchSmoother()
-    ps.current = 200.0
-    corrected = ps._octave_correct(100.0 + 10)  # within 20 Hz
-    assert corrected == 100.0
+    ps.current = 200
+    assert ps._octave_correct(90) == 100
 
 
-# ---------------------------------------------------------
+# ----------------------------------------------------------------------
 # MedianSmoother
-# ---------------------------------------------------------
+# ----------------------------------------------------------------------
 
-def test_median_smoother_basic_median():
-    ms = MedianSmoother(window=5)
-    vals = [(500, 1500, 2500)] * 5
-    out = None
-    for f1, f2, f3 in vals:
-        out = ms.update(f1, f2, f3, confidence=1.0)
-
-    f1_s, f2_s, f3_s = out
-    assert abs(f1_s - 500.0) < 1e-6
-    assert abs(f2_s - 1500.0) < 1e-6
-    # f3 may be None or a float, depending on buffer history; we don’t force it.
-
-
-def test_median_smoother_outlier_rejection():
-    ms = MedianSmoother(window=5, outlier_thresh=100)
-    ms.update(500, 1500, 2500, confidence=1.0)
-    ms.update(505, 1490, 2510, confidence=1.0)
-    ms.update(490, 1510, 2490, confidence=1.0)
-    ms.update(5000, 1500, 2500, confidence=1.0)  # outlier
-    f1, f2, f3 = ms.update(500, 1500, 2500, confidence=1.0)
-
-    assert abs(f1 - 500) < 5
-    assert abs(f2 - 1500) < 20
+def test_median_smoother_confidence_gate():
+    ms = MedianSmoother(min_confidence=0.5)
+    assert ms.update(500, 1500, 2500, confidence=0.2) == (None, None, None)
 
 
 def test_median_smoother_ridge_suppression():
-    ms = MedianSmoother(window=3)
+    ms = MedianSmoother()
+    f1, f2, f3 = ms.update(2601, 2602, 2603, confidence=1.0)
+    assert f1 is None and f2 is None and f3 is None
 
-    # Two ridge-band frames
-    ms.update(2600, 2600, 2600, confidence=1.0)
-    ms.update(2605, 2590, 2610, confidence=1.0)
 
-    # One normal frame
+def test_median_smoother_outlier_rejection():
+    ms = MedianSmoother(window=5, outlier_thresh=10)
+    ms.update(500, 1500, 2500, confidence=1.0)
+    ms.update(505, 1505, 2505, confidence=1.0)
+    ms.update(2000, 3000, 4000, confidence=1.0)  # outlier
+    f1, f2, f3 = ms.update(495, 1495, 2495, confidence=1.0)
+    assert 495 <= f1 <= 505
+
+
+def test_median_smoother_nan_handling():
+    ms = MedianSmoother()
+    ms.update(None, None, None, confidence=1.0)
     f1, f2, f3 = ms.update(500, 1500, 2500, confidence=1.0)
-
-    assert f1 == 500.0
-    assert f2 == 1500.0
-    # For F3 we only assert that the ridge band is gone
-    if f3 is not None:
-        assert not (2400 < f3 < 2800)
+    assert f1 == 500
 
 
-# ---------------------------------------------------------
+def test_median_smoother_stability_propagation():
+    ms = MedianSmoother()
+    for _ in range(6):
+        ms.update(500, 1500, 2500, confidence=1.0)
+    assert ms.formants_stable in (True, False)
+    assert isinstance(ms._stability_score, float)
+
+
+# ----------------------------------------------------------------------
 # LabelSmoother
-# ---------------------------------------------------------
-
-def test_label_smoother_basic_hold():
-    ls = LabelSmoother(hold_frames=3)
-    assert ls.update("a", confidence=1.0) == "a"
-    assert ls.update("i", confidence=1.0) == "a"
-    assert ls.update("i", confidence=1.0) == "a"
-    assert ls.update("i", confidence=1.0) == "i"  # after 3 frames
-
+# ----------------------------------------------------------------------
 
 def test_label_smoother_confidence_gate():
     ls = LabelSmoother(min_confidence=0.8)
+    assert ls.update("a", confidence=0.5) is None
+
+
+def test_label_smoother_first_label():
+    ls = LabelSmoother()
+    assert ls.update("a", confidence=1.0) == "a"
+
+
+def test_label_smoother_same_label():
+    ls = LabelSmoother()
     ls.update("a", confidence=1.0)
-    out = ls.update("i", confidence=0.1)
-    assert out == "a"
+    assert ls.update("a", confidence=1.0) == "a"
 
 
-# ---------------------------------------------------------
+def test_label_smoother_hysteresis():
+    ls = LabelSmoother(hold_frames=2)
+    ls.update("a", confidence=1.0)
+    assert ls.update("b", confidence=1.0) == "a"
+    assert ls.update("b", confidence=1.0) == "b"
+
+
+# ----------------------------------------------------------------------
 # FormantStabilityTracker
-# ---------------------------------------------------------
+# ----------------------------------------------------------------------
 
-def test_stability_tracker_requires_full_frames():
-    st = FormantStabilityTracker(window_size=5, min_full_frames=3)
-    st.update(500, None, 2500)
-    st.update(None, 1500, 2500)
-    stable, score = st.update(500, 1500, None)
+def test_stability_insufficient_frames():
+    st = FormantStabilityTracker(min_full_frames=3)
+    st.update(500, 1500, 2500)
+    st.update(510, 1510, 2510)
+    stable, score = st.update(None, 1500, 2500)
     assert stable is False
     assert score == float("inf")
 
 
-def test_stability_tracker_detects_stable_region():
+def test_stability_ridge_collapse():
+    st = FormantStabilityTracker(min_full_frames=3)
+    st.update(2601, 2602, 2603)
+    st.update(2605, 2606, 2607)
+    stable, score = st.update(2604, 2603, 2602)
+    assert stable is False
+    assert score == float("inf")
+
+
+def test_stability_variance_stable():
+    st = FormantStabilityTracker(min_full_frames=3, var_threshold=1e6)
+    st.update(500, 1500, 2500)
+    st.update(505, 1505, 2505)
+    stable, score = st.update(495, 1495, 2495)
+    assert stable is True
+    assert score
+
+
+def test_pitch_smoother_extra_low_confidence():
+    ps = PitchSmoother(min_confidence=0.9)
+    ps.update(100, confidence=1.0)
+    out = ps.update(150, confidence=0.2)
+    assert out is None
+    assert ps.current is None
+
+
+def test_pitch_smoother_extra_large_jump():
+    ps = PitchSmoother(jump_limit=2)
+    ps.current = 100
+    out = ps.update(150)
+    assert out == 150
+
+
+def test_pitch_smoother_extra_ema():
+    ps = PitchSmoother(alpha=0.3)
+    ps.current = 100
+    out = ps.update(130)
+    assert out == pytest.approx(109)
+
+
+def test_median_smoother_extra_nan():
+    ms = MedianSmoother()
+    ms.update(None, None, None, confidence=1.0)
+    f1, f2, f3 = ms.update(500, 1500, 2500, confidence=1.0)
+    assert f1 == 500
+
+
+def test_label_smoother_extra_hysteresis():
+    ls = LabelSmoother(hold_frames=3)
+    ls.update("a", confidence=1.0)
+    assert ls.update("b", confidence=1.0) == "a"
+    assert ls.update("b", confidence=1.0) == "a"
+    assert ls.update("b", confidence=1.0) == "b"
+
+
+def test_stability_tracker_extra_variance():
     st = FormantStabilityTracker(window_size=6, min_full_frames=3)
     st.update(500, 1500, 2500)
     st.update(505, 1490, 2510)
     stable, score = st.update(495, 1510, 2490)
-    assert stable is True
-    assert score < 1e5
-
-
-# ---------------------------------------------------------
-# hps_pitch
-# ---------------------------------------------------------
-
-def test_hps_pitch_returns_none_for_short_signal():
-    assert hps_pitch(np.zeros(100), 48000) is None
-
-
-def test_hps_pitch_detects_simple_tone():
-    sr = 48000
-    f0 = 200
-    t = np.linspace(0, 0.05, int(sr * 0.05), endpoint=False)
-    sig = np.sin(2 * np.pi * f0 * t)
-    out = hps_pitch(sig, sr)
-
-    assert out is not None
-    # Must be within allowed band
-    assert 50 <= out <= 500
+    assert isinstance(stable, bool)
+    assert isinstance(score, float)

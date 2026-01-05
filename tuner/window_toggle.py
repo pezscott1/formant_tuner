@@ -18,6 +18,12 @@ class ModeToggleBar(QWidget):
 
         self.btn_analysis.clicked.connect(self.show_analysis)  # type: ignore
         self.btn_vowelmap.clicked.connect(self.show_vowelmap)  # type: ignore
+        self.setFixedHeight(50)
+        self.setContentsMargins(0, 0, 0, 0)
+        self.btn_vowelmap.setFixedHeight(28)
+        self.btn_analysis.setFixedHeight(28)
+        self.btn_vowelmap.setStyleSheet("padding: 2px 6px; font-size: 9pt;")
+        self.btn_analysis.setStyleSheet("padding: 2px 6px; font-size: 9pt;")
 
         layout = QHBoxLayout()
         layout.addWidget(self.btn_analysis)
@@ -78,7 +84,8 @@ class VowelMapView(QWidget):
         self.update()
 
     def draw_grid(self, painter, w, h):
-        if self.f1_min is None or self.f1_max is None or self.f2_min is None or self.f2_max is None:
+        if (self.f1_min is None or self.f1_max is None
+                or self.f2_min is None or self.f2_max is None):
             return
         painter.setPen(QPen(QColor(60, 60, 60), 1))
 

@@ -32,6 +32,14 @@ def update_spectrum(window, vowel, target_formants,
 
     ax = window.ax_chart
     ax.clear()
+    # Recreate spectrum status text if needed
+    if not hasattr(window, "spec_status_text") or window.spec_status_text.axes is not ax:
+        window.spec_status_text = ax.text(
+            0.02, 0.95, "",
+            transform=ax.transAxes,
+            va="top", ha="left",
+            fontsize=12, fontweight="bold", color="#CC0000"
+        )
 
     # ---------------- Extract dict-based formants ----------------
     target_formants = _normalize_formants(target_formants)
@@ -82,15 +90,18 @@ def update_spectrum(window, vowel, target_formants,
             if f is not None and np.isfinite(f):
                 ax.axvline(f, color="red", linestyle=":", alpha=0.8)
 
-    # ====== Title ======
-    if pitch and pitch > 0:
-        note = freq_to_note_name(pitch)
-        ax.set_title(
-            f"Spectrum /{vowel}/ — {note} ({pitch:.1f} Hz)  "
-            f"[{method}, conf={conf:.2f}]"
-        )
-    else:
-        ax.set_title(f"Spectrum /{vowel}/  [{method}, conf={conf:.2f}]")
+    # ====== Static title + per-axis status text ======
+    ax.set_title(f"Spectrum")
+
+    # Update spectrum status text
+    if hasattr(window, "spec_status_text"):
+        if pitch and pitch > 0:
+            note = freq_to_note_name(pitch)
+            status = f"/{vowel}/ — {note} ({pitch:.1f} Hz)  [{method}, conf={conf:.2f}]"
+        else:
+            status = f"/{vowel}/  [{method}, conf={conf:.2f}]"
+
+        window.spec_status_text.set_text(status)
 
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Amplitude")
@@ -135,7 +146,7 @@ def update_vowel_chart(
     # Gating: invalid → title only
     # ------------------------------------------------------------
     if (not measured_valid) or (not stable) or (conf < 0.25):
-        _set_title(ax, vowel, vowel_score, resonance_score, overall)
+        _set_title(window, ax, vowel, vowel_score, resonance_score, overall)
         window.canvas.draw_idle()
         return
 
@@ -158,7 +169,7 @@ def update_vowel_chart(
     # ------------------------------------------------------------
     # Title + redraw
     # ------------------------------------------------------------
-    _set_title(ax, vowel, vowel_score, resonance_score, overall)
+    _set_title(window, ax, vowel, vowel_score, resonance_score, overall)
     window.canvas.draw_idle()
 
 
@@ -226,8 +237,15 @@ def _draw_target_line(ax, tf1, tf2, mf1, mf2):
         return None
 
 
-def _set_title(ax, vowel, vowel_score, resonance_score, overall):
-    ax.set_title(
-        f"/{vowel}/  Overall={overall:.2f}  "
-        f"(Vowel={vowel_score:.2f}, Resonance={resonance_score:.2f})"
-    )
+def _set_title(window, ax, vowel, vowel_score, resonance_score, overall):
+    v = vowel or "None"
+
+    overall = 0.0 if overall is None else float(overall)
+    vowel_score = 0.0 if vowel_score is None else float(vowel_score)
+    resonance_score = 0.0 if resonance_score is None else float(resonance_score)
+
+    if hasattr(window, "vowel_status_text"):
+        window.vowel_status_text.set_text(
+            f"/{v}/  Overall={overall:.2f}  "
+            f"(Vowel={vowel_score:.2f}, Resonance={resonance_score:.2f})"
+        )

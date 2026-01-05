@@ -179,15 +179,17 @@ class TunerWindow(QMainWindow):
         self.profile_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.profile_list.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.profile_list.setFocusPolicy(Qt.StrongFocus)
+
         self.btn_view_profile = QPushButton("View Profile")
-        self.btn_view_profile.clicked.connect(  # type:ignore
-            self.on_view_profile_clicked)
+        self.btn_view_profile.clicked.connect(self.on_view_profile_clicked)  # type:ignore
         self.btn_view_profile.setEnabled(False)
+
         btn_row = QHBoxLayout()
         self.delete_btn = QPushButton("Delete")
         self.refresh_btn = QPushButton("Refresh")
         btn_row.addWidget(self.delete_btn)
         btn_row.addWidget(self.refresh_btn)
+
         profile_layout.addLayout(btn_row)
         profile_layout.addWidget(self.btn_view_profile)
         left_layout.addWidget(profile_container)
@@ -204,9 +206,9 @@ class TunerWindow(QMainWindow):
         self.calib_btn = QPushButton("Calibrate")
 
         for b, color in (
-            (self.start_btn, "#4CAF50"),
-            (self.stop_btn, "#f44336"),
-            (self.calib_btn, "#2196F3"),
+                (self.start_btn, "#4CAF50"),
+                (self.stop_btn, "#f44336"),
+                (self.calib_btn, "#2196F3"),
         ):
             b.setFixedHeight(75)
             b.setStyleSheet(
@@ -249,7 +251,6 @@ class TunerWindow(QMainWindow):
         main_layout.addWidget(left_frame)
 
         # ================= Right panel =================
-        # ================= Right panel =================
 
         right_splitter = QSplitter(Qt.Vertical)
 
@@ -268,11 +269,19 @@ class TunerWindow(QMainWindow):
 
         self.fig = plt.figure(figsize=(8, 6))
         self.fig.tight_layout()
-        self.fig.subplots_adjust(hspace=0.3, bottom=0.12)
-        gs = self.fig.add_gridspec(3, 1, height_ratios=[3, 4, 1])
+        self.fig.subplots_adjust(hspace=0.3, bottom=0.2)
+        gs = self.fig.add_gridspec(2, 1, height_ratios=[5, 5])
 
         self.ax_chart = self.fig.add_subplot(gs[0])
         self.ax_vowel = self.fig.add_subplot(gs[1])
+        self.vowel_status_text = self.ax_vowel.text(
+            0.02, 0.95, "",
+            transform=self.ax_vowel.transAxes,
+            va="top", ha="left",
+            fontsize=12,
+            fontweight="bold",
+            color="#CC0000"  # same standout red
+        )
         self.canvas = FigureCanvas(self.fig)
         plot_layout.addWidget(self.canvas)
 
@@ -280,7 +289,7 @@ class TunerWindow(QMainWindow):
         right_splitter.addWidget(control_frame)
         right_splitter.addWidget(plot_frame)
         right_splitter.addWidget(self.spectrogram_view)
-        right_splitter.setSizes([80, 600, 300])
+        right_splitter.setSizes([60, 800, 500])
 
         # Wrap splitter in AnalysisView
         self.analysis_view = AnalysisView(right_splitter)
@@ -307,14 +316,14 @@ class TunerWindow(QMainWindow):
 
         # Signals
         (self.tol_field.editingFinished.connect  # type: ignore
-            (self._update_tolerance_from_field))
+         (self._update_tolerance_from_field))
         self.start_btn.clicked.connect(lambda: self._start_mic_ui())  # type: ignore
         self.stop_btn.clicked.connect(lambda: self._stop_mic_ui())  # type: ignore
         self.refresh_btn.clicked.connect(self._populate_profiles)  # type: ignore
         self.delete_btn.clicked.connect(self._delete_selected_profile)  # type: ignore
         self.calib_btn.clicked.connect(self._on_calibrate_clicked)  # type: ignore
         (self.profile_list.itemClicked.connect  # type: ignore
-            (self._apply_selected_profile_item))
+         (self._apply_selected_profile_item))
         self.profile_list.itemSelectionChanged.connect(  # type: ignore
             self._on_profile_selection_changed)
 
