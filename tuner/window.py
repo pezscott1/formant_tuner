@@ -181,7 +181,8 @@ class TunerWindow(QMainWindow):
         self.profile_list.setFocusPolicy(Qt.StrongFocus)
 
         self.btn_view_profile = QPushButton("View Profile")
-        self.btn_view_profile.clicked.connect(self.on_view_profile_clicked)  # type:ignore
+        self.btn_view_profile.clicked.connect(   # type:ignore
+            self.on_view_profile_clicked)
         self.btn_view_profile.setEnabled(False)
 
         btn_row = QHBoxLayout()

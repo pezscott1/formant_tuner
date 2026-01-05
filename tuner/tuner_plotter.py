@@ -33,7 +33,8 @@ def update_spectrum(window, vowel, target_formants,
     ax = window.ax_chart
     ax.clear()
     # Recreate spectrum status text if needed
-    if not hasattr(window, "spec_status_text") or window.spec_status_text.axes is not ax:
+    if (not hasattr(window, "spec_status_text")
+            or window.spec_status_text.axes is not ax):
         window.spec_status_text = ax.text(
             0.02, 0.95, "",
             transform=ax.transAxes,
@@ -91,7 +92,7 @@ def update_spectrum(window, vowel, target_formants,
                 ax.axvline(f, color="red", linestyle=":", alpha=0.8)
 
     # ====== Static title + per-axis status text ======
-    ax.set_title(f"Spectrum")
+    ax.set_title("Spectrum")
 
     # Update spectrum status text
     if hasattr(window, "spec_status_text"):
