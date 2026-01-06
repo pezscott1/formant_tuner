@@ -1,3 +1,4 @@
+# main.py
 from analysis.engine import FormantAnalysisEngine
 from tuner.window import TunerWindow
 from tuner.controller import Tuner

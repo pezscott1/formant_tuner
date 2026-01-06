@@ -1,4 +1,5 @@
 # calibration/plotter.py
+from matplotlib.ticker import LogLocator, ScalarFormatter, NullFormatter
 import numpy as np
 import librosa
 import logging
@@ -95,7 +96,7 @@ def update_spectrogram(self, freqs, times, s):
 
     # Limit to 50–4000 Hz
     freqs: np.ndarray
-    mask = (freqs >= 50) & (freqs <= 4000)
+    mask = (freqs >= 150) & (freqs <= 4000)
     if mask.sum() < 2:
         return
 
@@ -104,7 +105,7 @@ def update_spectrogram(self, freqs, times, s):
 
     # Log-frequency resampling
     num_bins = 512
-    log_freqs = np.logspace(np.log10(50), np.log10(4000), num_bins)
+    log_freqs = np.logspace(np.log10(150), np.log10(4000), num_bins)
     S_log = np.zeros((num_bins, S.shape[1]))
     for i in range(S.shape[1]):
         S_log[:, i] = np.interp(log_freqs, freqs_small, S[:, i])
@@ -139,10 +140,15 @@ def update_spectrogram(self, freqs, times, s):
         vmax=0,
     )
 
-    # Linear axis (data is already log-resampled)
-    self.ax_spec.set_yscale("linear")
-    self.ax_spec.set_ylim(50, 4000)
-    self.ax_spec.set_yticks([50, 100, 200, 400, 800, 1600, 3200])
+    self.ax_spec.set_yscale("log")
+    self.ax_spec.set_ylim(150, 4000)
+    # Log-locator for correct spacing
+    self.ax_spec.yaxis.set_major_locator(LogLocator(base=10, subs=[1, 2, 4, 8]))
+    # Clean labels
+    self.ax_spec.yaxis.set_major_formatter(ScalarFormatter())
+    self.ax_spec.yaxis.set_minor_formatter(NullFormatter())
+    # Explicit ticks (optional but recommended)
+    self.ax_spec.set_yticks([150, 300, 600, 1200, 2400, 4000])
     self.ax_spec.set_ylabel("Frequency (Hz)")
     self.ax_spec.set_xlabel("Time (s)")
     self.ax_spec.set_title("Spectrogram (log-frequency, PyQt-matched)")
@@ -154,5 +160,6 @@ def update_spectrogram(self, freqs, times, s):
         )
     else:
         self._spec_colorbar.update_normal(mesh)
-
+    # Match tuner window: always show full 3-second window
+    self.ax_spec.set_xlim(times[0], times[-1])
     self.canvas.draw_idle()

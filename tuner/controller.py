@@ -82,7 +82,6 @@ class Tuner:
         processed = self.live_analyzer.get_latest_processed()
         if processed is None:
             return None
-
         # If no profile loaded, just return smoothed processed values
         if not self.active_profile or "formants" not in processed:
             return processed

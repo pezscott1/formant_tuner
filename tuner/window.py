@@ -3,7 +3,6 @@ from collections import deque
 import time
 import numpy as np
 import sounddevice as sd
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -17,12 +16,12 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QSizePolicy,
     QListWidgetItem,
-    QLineEdit,
     QAbstractItemView,
     QStackedWidget,
+    QApplication,
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPalette, QColor
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from profile_viewer.profile_viewer import ProfileViewerWindow
@@ -31,6 +30,7 @@ from tuner.window_toggle import ModeToggleBar, AnalysisView, VowelMapView
 from calibration.dialog import ProfileDialog
 from calibration.window import CalibrationWindow
 from tuner.spectrogram_view import SpectrogramView
+from analysis.vowel_data import expanded_vowels_for_voice, STANDARD_VOWELS
 
 
 class ClearableListWidget(QListWidget):
@@ -75,11 +75,12 @@ class TunerWindow(QMainWindow):
         self.profile_manager = tuner.profile_manager
         self.live_analyzer = tuner.live_analyzer
         self.sample_rate = sample_rate
-
         # State
         self.current_tolerance = 50
         self.voice_type = getattr(self.analyzer, "voice_type", "bass")
         self.stream = None
+        self.vowel_chart_has_seen_valid = False
+        self.spectrum_has_seen_valid = False
 
         if self.headless:
             self._build_headless()
@@ -92,17 +93,35 @@ class TunerWindow(QMainWindow):
         self._build_ui()
         self._populate_profiles()
         self._setup_timers()
-
-        # Initial window size
-        screen = self.screen().availableGeometry()
-        w = int(screen.width() * 0.75)
-        h = int(screen.height() * 0.75)
+        screen = QApplication.primaryScreen().availableGeometry()
+        w = int(screen.width() * 0.80)
+        h = int(screen.height() * 0.80)
+        self.setMaximumHeight(h)
+        self.setMinimumHeight(h)
         self.resize(w, h)
-        self.move(screen.center().x() - w // 2, screen.center().y() - h // 2)
+
+        # Center horizontally and vertically
+        self.move(
+            screen.center().x() - w // 2,
+            screen.center().y() - h // 2,
+        )
+
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("white"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("black"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("white"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("black"))
+        palette.setColor(QPalette.ColorRole.Button, QColor("white"))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("black"))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor("#0078d7"))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor("white"))
+
+        self.setPalette(palette)
 
     # ---------------------------------------------------------
     # UI construction
     # ---------------------------------------------------------
+
     def _build_headless(self):
         """
         Minimal Qt-compatible headless UI for tests.
@@ -153,13 +172,14 @@ class TunerWindow(QMainWindow):
         left_frame.setMinimumWidth(250)
         left_frame.setMaximumWidth(450)
         left_layout = QVBoxLayout(left_frame)
-        left_frame.setStyleSheet(
-            "QFrame { background-color: #f2f2f2; border: 1px solid #ccc; "
-            "border-radius: 6px; padding: 8px; }"
-        )
-
         label = QLabel("Profiles")
-        label.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        label.setStyleSheet("""
+            font-size: 20pt;
+            font-weight: bold;
+            color: black;
+            background-color: white;
+        """)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setFixedHeight(50)
         left_layout.addWidget(label)
 
@@ -169,24 +189,34 @@ class TunerWindow(QMainWindow):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         profile_layout = QVBoxLayout(profile_container)
         profile_layout.setContentsMargins(0, 0, 0, 0)
-        profile_layout.setSpacing(6)
-
         self.profile_list = ClearableListWidget()
         self.profile_list.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.profile_list.setStyleSheet(
-            "QListWidget { font-size: 11pt; padding: 4px; border: 1px solid #ccc; "
-            "border-radius: 4px; }"
-        )
+        self.profile_list.setStyleSheet("""
+            QListWidget {
+                background: white;
+                color: black;
+                font-size: 11pt;
+            }
+            QListWidget::item {
+                padding: 2px 4px;
+                margin: 2px 0px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+            }
+            QListWidget::item:selected {
+                background: #cce0ff;
+                color: black;
+                border: 1px solid #0078d7;
+            }
+        """)
         profile_layout.addWidget(self.profile_list)
         self.profile_list.setSelectionMode(
             QAbstractItemView.SelectionMode.SingleSelection)
         self.profile_list.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectItems)
-        self.profile_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-
         self.btn_view_profile = QPushButton("View Profile")
-        self.btn_view_profile.clicked.connect(   # type:ignore
+        self.btn_view_profile.clicked.connect(  # type:ignore
             self.on_view_profile_clicked)
         self.btn_view_profile.setEnabled(False)
 
@@ -195,6 +225,24 @@ class TunerWindow(QMainWindow):
         self.refresh_btn = QPushButton("Refresh")
         btn_row.addWidget(self.delete_btn)
         btn_row.addWidget(self.refresh_btn)
+        self.profile_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        button_style = """
+            QPushButton {
+                background-color: white;
+                color: black;
+                border: 1px solid #888;
+                padding: 6px 10px;
+                font-size: 10pt;
+                font-weight: bold;
+            }
+            QPushButton:disabled {
+                background-color: #e0e0e0;
+                color: #888;
+            }
+        """
+        self.btn_view_profile.setStyleSheet(button_style)
+        self.delete_btn.setStyleSheet(button_style)
+        self.refresh_btn.setStyleSheet(button_style)
 
         profile_layout.addLayout(btn_row)
         profile_layout.addWidget(self.btn_view_profile)
@@ -205,7 +253,6 @@ class TunerWindow(QMainWindow):
         mic_layout = QVBoxLayout(mic_container)
         mic_layout.setContentsMargins(0, 0, 0, 0)
         mic_layout.setSpacing(20)
-        mic_layout.addStretch()
 
         self.start_btn = QPushButton("Start Mic")
         self.stop_btn = QPushButton("Stop Mic")
@@ -217,6 +264,7 @@ class TunerWindow(QMainWindow):
                 (self.calib_btn, "#2196F3"),
         ):
             b.setFixedHeight(75)
+            b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             b.setStyleSheet(
                 f"""
                 QPushButton {{
@@ -225,7 +273,11 @@ class TunerWindow(QMainWindow):
                     font-size: 12pt;
                     font-weight: bold;
                     border-radius: 6px;
-                    padding: 6px;
+                    padding: 6px 10px;
+                    border: 1px solid #888;
+                }}
+                QPushButton:pressed {{
+                    background-color: #e0e0e0;
                 }}
                 """
             )
@@ -240,17 +292,17 @@ class TunerWindow(QMainWindow):
         )
         hint_label.setWordWrap(True)
         hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint_label.setStyleSheet("font-size: 9pt; color: gray;")
-        hint_label.setMinimumHeight(150)
-        mic_layout.addWidget(hint_label)
-
+        hint_label.setMinimumHeight(60)
+        hint_label.setMaximumHeight(80)
+        hint_label.setStyleSheet("font-size: 8pt; color: gray;")
+        left_layout.addWidget(hint_label)
         left_layout.addStretch()
 
         self.active_label = QLabel("Active: None")
         self.active_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.active_label.setFixedHeight(150)
+        self.active_label.setFixedHeight(40)
         self.active_label.setStyleSheet(
-            "font-weight: bold; font-size: 11pt; color: darkblue;"
+            "font-weight: bold; font-size: 10pt; color: darkblue;"
         )
         left_layout.addWidget(self.active_label)
 
@@ -260,42 +312,47 @@ class TunerWindow(QMainWindow):
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # Top: tolerance only
-        control_frame = QFrame()
-        control_layout = QHBoxLayout(control_frame)
-        control_layout.addWidget(QLabel("Tolerance (Hz):"))
-        self.tol_field = QLineEdit(str(self.current_tolerance))
-        self.tol_field.setFixedWidth(60)
-        control_layout.addWidget(self.tol_field)
-        control_layout.addStretch(1)
-
         # Bottom: vowel chart, spectrum
         plot_frame = QFrame()
         plot_layout = QVBoxLayout(plot_frame)
+        plot_layout.setContentsMargins(0, 0, 0, 0)
+        plot_layout.setSpacing(0)
 
         self.fig = plt.figure(figsize=(8, 6))
-        self.fig.tight_layout()
-        self.fig.subplots_adjust(hspace=0.3, bottom=0.2)
         gs = self.fig.add_gridspec(2, 1, height_ratios=[5, 5])
 
         self.ax_chart = self.fig.add_subplot(gs[0])
         self.ax_vowel = self.fig.add_subplot(gs[1])
+        bg = "#f0f0f0"
+        self.fig.patch.set_facecolor(bg)
+        self.ax_chart.set_facecolor(bg)
+        self.ax_vowel.set_facecolor(bg)
+
+        for ax in (self.ax_chart, self.ax_vowel):
+            ax.tick_params(colors="black", labelcolor="black")
+            ax.xaxis.label.set_color("black")
+            ax.yaxis.label.set_color("black")
+            ax.title.set_color("black")
+            for spine in ax.spines.values():
+                spine.set_color("black")
+
         self.vowel_status_text = self.ax_vowel.text(
             0.02, 0.95, "",
             transform=self.ax_vowel.transAxes,
             va="top", ha="left",
             fontsize=12,
             fontweight="bold",
-            color="#CC0000"  # same standout red
+            color="#CC0000"
         )
+
         self.canvas = FigureCanvas(self.fig)
+        self.canvas.setStyleSheet("background-color: #f0f0f0;")
         plot_layout.addWidget(self.canvas)
 
         # Add widgets to splitter
-        right_splitter.addWidget(control_frame)
         right_splitter.addWidget(plot_frame)
         right_splitter.addWidget(self.spectrogram_view)
-        right_splitter.setSizes([60, 800, 500])
+        right_splitter.setSizes([800, 500])
 
         # Wrap splitter in AnalysisView
         self.analysis_view = AnalysisView(right_splitter)
@@ -316,13 +373,34 @@ class TunerWindow(QMainWindow):
         right_layout = QVBoxLayout(right_container)
         right_layout.addWidget(self.toggle_bar)
         right_layout.addWidget(self.stack)
+        right_container.setStyleSheet("background-color: #e6f0ff;")
 
         # Add to main layout
         main_layout.addWidget(right_container, stretch=1)
 
+        # Pre-populate right panel with idle plots
+        update_spectrum(
+            window=self,
+            vowel=None,
+            target_formants={"f1": None, "f2": None, "f3": None},
+            measured_formants={"f1": None, "f2": None, "f3": None},
+            pitch=None,
+            _tolerance=self.current_tolerance,
+        )
+
+        update_vowel_chart(
+            window=self,
+            vowel=None,
+            target_formants={"f1": None, "f2": None, "f3": None},
+            measured_formants={"f1": None, "f2": None, "f3": None},
+            vowel_score=None,
+            resonance_score=None,
+            overall=None,
+        )
+
+        self.canvas.draw_idle()
+
         # Signals
-        (self.tol_field.editingFinished.connect  # type: ignore
-         (self._update_tolerance_from_field))
         self.start_btn.clicked.connect(lambda: self._start_mic_ui())  # type: ignore
         self.stop_btn.clicked.connect(lambda: self._stop_mic_ui())  # type: ignore
         self.refresh_btn.clicked.connect(self._populate_profiles)  # type: ignore
@@ -342,7 +420,6 @@ class TunerWindow(QMainWindow):
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self._update_display)  # type: ignore
         self.update_timer.start(60)  # ~16 fps
-
     # ---------------------------------------------------------
     # Profiles
     # ---------------------------------------------------------
@@ -374,15 +451,18 @@ class TunerWindow(QMainWindow):
         self.vowel_map_view.update()
 
     def _populate_profiles(self):
-        """Populate profile list with a 'New Profile' item plus existing profiles."""
         if self.headless:
             return
         self.profile_list.clear()
 
+        # Set list font BEFORE adding items
+        font = QFont("Arial", 12)
+        self.profile_list.setFont(font)
+
         # New profile pseudo-item
         new_item = QListWidgetItem("➕ New Profile")
         new_item.setForeground(QColor("darkgreen"))
-        new_item.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
+        new_item.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         new_item.setData(Qt.ItemDataRole.UserRole, None)
         self.profile_list.addItem(new_item)
 
@@ -394,7 +474,6 @@ class TunerWindow(QMainWindow):
             item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, base)
             self.profile_list.addItem(item)
-
         active = getattr(self.profile_manager, "active_profile_name", None)
         if active and active in names:
             self._set_active_profile(active)
@@ -489,6 +568,11 @@ class TunerWindow(QMainWindow):
                     "Please enter a profile name.",
                 )
                 return
+            optional = []
+            if expanded:
+                full = expanded_vowels_for_voice(voice_type)
+                optional = [v for v in full if v not in STANDARD_VOWELS]
+
             self.calib_win = CalibrationWindow(
                 profile_name=name,
                 voice_type=voice_type,
@@ -497,8 +581,10 @@ class TunerWindow(QMainWindow):
                 profile_manager=self.profile_manager,
                 existing_profile=None,
                 parent=self,
-                expanded_mode=expanded
+                expanded_mode=expanded,
+                optional_vowels=optional,
             )
+
             self.calib_win.vowel_capture_started.connect(self._start_mic_ui)
             self.calib_win.vowel_capture_finished.connect(self._stop_mic_ui)
             self._start_mic_ui()
@@ -510,6 +596,11 @@ class TunerWindow(QMainWindow):
         # Existing profile
         voice_type = getattr(self.analyzer, "voice_type", "bass")
         existing_data = self.profile_manager.load_profile(base) or {}
+
+        # Determine optional vowels from existing profile or voice type
+        full = expanded_vowels_for_voice(voice_type)
+        optional = [v for v in full if v not in STANDARD_VOWELS]
+
         self.calib_win = CalibrationWindow(
             profile_name=base,
             voice_type=voice_type,
@@ -518,7 +609,10 @@ class TunerWindow(QMainWindow):
             profile_manager=self.profile_manager,
             existing_profile=existing_data,
             parent=self,
+            expanded_mode=True,  # existing profile should preserve mode
+            optional_vowels=optional,
         )
+
         self.update_timer.stop()
         self.live_analyzer.pause()
         ok = self._start_mic_ui()
@@ -549,26 +643,13 @@ class TunerWindow(QMainWindow):
             pass
 
     # ---------------------------------------------------------
-    # Tolerance handling
-    # ---------------------------------------------------------
-    def _update_tolerance_from_field(self):
-        text = self.tol_field.text()
-        try:
-            value = int(text)
-        except Exception:
-            value = self.current_tolerance
-        if value is None:
-            value = self.current_tolerance
-        else:
-            self.current_tolerance = value
-        self.tol_field.setText(str(value))
-
-    # ---------------------------------------------------------
     # Mic handling
     # ---------------------------------------------------------
 
     def _start_mic_ui(self):
         def callback(indata, _frames, _time, status):
+            print("AUDIO CALLBACK ANALYZER ID:", id(self.live_analyzer))
+
             if status:
                 print("[AUDIO STATUS]", status)
             mono = indata[:, 0].astype(np.float64, copy=False)
@@ -602,6 +683,8 @@ class TunerWindow(QMainWindow):
 
     def _stop_mic_ui(self):
         self.tuner.stop_mic()
+        self.vowel_chart_has_seen_valid = False
+        self.spectrum_has_seen_valid = False
         self.stream = None
 
     # ---------------------------------------------------------

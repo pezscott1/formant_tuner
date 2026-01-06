@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QFrame, QPushButton,
+    QApplication,
 )
 from PyQt6.QtCore import QTimer, pyqtSignal
 import matplotlib.pyplot as plt
@@ -38,7 +39,8 @@ class CalibrationWindow(QMainWindow):
         profile_manager=None,
         existing_profile=None,
         parent=None,
-        expanded_mode=False
+        expanded_mode=False,
+        optional_vowels=None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Calibration")
@@ -55,17 +57,20 @@ class CalibrationWindow(QMainWindow):
 
         # Mic/render state
         self._mic_active = False
+        self.optional_vowels = optional_vowels or []
+        self.expanded_mode = expanded_mode
 
-        self.vowels = (
-            expanded_vowels_for_voice(voice_type)
-            if expanded_mode else
-            STANDARD_VOWELS
-        )
+        if self.expanded_mode:
+            # Use the full expanded list in the correct order
+            self.vowels_to_calibrate = expanded_vowels_for_voice(voice_type)
+        else:
+            self.vowels_to_calibrate = STANDARD_VOWELS
+
         # Calibration session
         self.session = CalibrationSession(
             profile_name=profile_name,
             voice_type=voice_type,
-            vowels=self.vowels,
+            vowels=self.vowels_to_calibrate,
             profile_manager=self.profile_manager,
             existing_profile=existing_profile,
         )
@@ -74,9 +79,8 @@ class CalibrationWindow(QMainWindow):
             for v, entry in self.session.data.items()
             if entry.get("f1") is not None and entry.get("f2") is not None
         }
-
-        self.state = CalibrationStateMachine(self.vowels)
-
+        self.state = CalibrationStateMachine(self.vowels_to_calibrate)
+        print("Calibrating vowels:", self.vowels_to_calibrate)
         # Smoothers
         self.pitch_smoother = PitchSmoother(min_confidence=0.25)
         self.formant_smoother = MedianSmoother(min_confidence=0.25)
@@ -89,16 +93,22 @@ class CalibrationWindow(QMainWindow):
             formant_smoother=self.formant_smoother,
             label_smoother=self.label_smoother,
         )
-
         self.capture_timeout = 3.0
 
         # Store durable vowel anchors
         self._interpolated_vowels = {}
         self._vowel_colors = {}
         self._color_cycle = itertools.cycle([
-            "red", "green", "blue", "purple", "orange",
-            "brown", "teal", "magenta", "olive", "navy",
+            "#e41a1c", "#377eb8", "#4daf4a", "#984ea3",
+            "#ff7f00", "#ffff33", "#a65628", "#f781bf",
+            "#999999", "#66c2a5", "#fc8d62", "#8da0cb"
         ])
+        all_vowels = self.vowels_to_calibrate
+        self._vowel_colors = {
+            v: next(self._color_cycle)
+            for v in all_vowels
+        }
+
         # -----------------------------------------------------
         # UI Setup
         # -----------------------------------------------------
@@ -123,16 +133,18 @@ class CalibrationWindow(QMainWindow):
         self.poll_timer.timeout.connect(self._poll_audio)  # type:ignore
         self.poll_timer.start(80)
 
-        # Window sizing
-        if parent is not None:
-            self.resize(parent.size())
-            geo = parent.geometry()
-            self.move(
-                geo.center().x() - self.width() // 2,
-                geo.center().y() - self.height() // 2,
-            )
-        else:
-            self.resize(900, 700)
+        screen = QApplication.primaryScreen().availableGeometry()
+        w = int(screen.width() * 0.80)
+        h = int(screen.height() * 0.80)
+        self.setMaximumHeight(h)
+        self.setMinimumHeight(h)
+        self.resize(w, h)
+
+        # Center horizontally and vertically
+        self.move(
+            screen.center().x() - w // 2,
+            screen.center().y() - h // 2,
+        )
 
         self.show()
 
@@ -141,9 +153,26 @@ class CalibrationWindow(QMainWindow):
             self._vowel_colors[vowel] = next(self._color_cycle)
         return self._vowel_colors[vowel]
 
+    def _compute_vowel_axis_limits(self):
+        f1_vals = []
+        f2_vals = []
+        for f1, f2 in self._vowel_anchors.values():
+            if f1:
+                f1_vals.append(f1)
+            if f2:
+                f2_vals.append(f2)
+
+        if f1_vals:
+            self.f1_min = min(f1_vals) * 0.9
+            self.f1_max = max(f1_vals) * 1.1
+        if f2_vals:
+            self.f2_min = min(f2_vals) * 0.9
+            self.f2_max = max(f2_vals) * 1.1
+
     # ---------------------------------------------------------
     # UI Construction
     # ---------------------------------------------------------
+
     def _build_left_panel(self):
         frame = QFrame()
         layout = QVBoxLayout(frame)
@@ -169,17 +198,18 @@ class CalibrationWindow(QMainWindow):
         layout = QVBoxLayout(frame)
 
         self.fig, (self.ax_spec, self.ax_vowel) = plt.subplots(2, 1, figsize=(8, 6))
-        self.fig.set_dpi(150)
-        self.fig.tight_layout()
-        self.fig.subplots_adjust(bottom=0.12)
+        self.fig.subplots_adjust(
+            top=0.97,
+            bottom=0.08,
+            hspace=0.42
+        )
 
         self.canvas = Canvas(self.fig)
         layout.addWidget(self.canvas)
-
+        self._compute_vowel_axis_limits()
         # Spectrogram axes
-        self.ax_spec.set_ylabel("Frequency (Hz)")
-        self.ax_spec.set_xlabel("Time (s)")
-
+        self.ax_spec.set_xlabel("Time (s)", labelpad=10)
+        self.ax_spec.set_ylabel("Frequency (Hz)", labelpad=10)
         # Vowel axes
         self.ax_vowel.set_xlabel("F2 (Hz)")
         self.ax_vowel.set_ylabel("F1 (Hz)")
@@ -459,6 +489,10 @@ class CalibrationWindow(QMainWindow):
     def _redraw_vowel_anchors(self):
         ax = self.ax_vowel
         ax.cla()
+        if hasattr(self, "f1_min"):
+            ax.set_ylim(self.f1_max, self.f1_min)
+        if hasattr(self, "f2_min"):
+            ax.set_xlim(self.f2_max, self.f2_min)
 
         ax.set_xlabel("F2 (Hz)")
         ax.set_ylabel("F1 (Hz)")
