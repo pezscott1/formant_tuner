@@ -451,7 +451,8 @@ class TunerWindow(QMainWindow):
         # Assign colors for all calibrated vowels immediately when profile loads
         self.vowel_map_view.vowel_colors = {}
         for vowel in self.analyzer.user_formants.keys():
-            self.vowel_map_view.vowel_colors[vowel] = next(self.vowel_map_view._color_cycle)
+            self.vowel_map_view.vowel_colors[vowel] = (
+                next(self.vowel_map_view.color_cycle))
         self.vowel_map_view.update()
 
     def _populate_profiles(self):

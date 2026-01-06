@@ -131,7 +131,7 @@ class VowelMapView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._color_cycle = itertools.cycle([
+        self.color_cycle = itertools.cycle([
             QColor(0, 200, 255),
             QColor(0, 150, 255),
             QColor(255, 100, 100),
@@ -351,7 +351,7 @@ class VowelMapView(QWidget):
         if self.analyzer:
             for vowel in self.analyzer.user_formants.keys():
                 if vowel not in self.vowel_colors:
-                    self.vowel_colors[vowel] = next(self._color_cycle)
+                    self.vowel_colors[vowel] = next(self.color_cycle)
 
         # Compute axis limits with generous margins
         if f1_vals:

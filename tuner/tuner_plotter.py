@@ -112,27 +112,48 @@ def update_spectrum(window, vowel, target_formants,
       - Shows method + confidence in status text
     """
 
-    # Normalize formants (tests sometimes use tuples)
+    ax = window.ax_chart
     target_formants = _normalize_formants(target_formants)
     measured_formants = _normalize_formants(measured_formants)
 
-    ax = window.ax_chart
+    _clear_axis(ax)
+    _apply_axis_styling(ax)
+    _ensure_status_text(window, ax)
 
-    # Clear
+    raw = _safe_get_latest_raw(window)
+    segment = raw.get("segment") if raw else None
+    method = raw.get("method", "none") if raw else "none"
+    conf = float(raw.get("confidence", 0.0)) if raw else 0.0
+
+    _draw_fft(ax, segment, window.sample_rate)
+    _draw_formant_lines(ax, target_formants, color="blue", style="--", alpha=0.7)
+    _draw_formant_lines(ax, measured_formants, color="red", style=":", alpha=0.8)
+
+    _set_axis_labels(ax)
+    _set_title_spectrum(ax)
+
+    _update_status_text(window, vowel, pitch, method, conf)
+
+    if hasattr(window.canvas, "draw_idle"):
+        window.canvas.draw_idle()
+
+
+def _clear_axis(ax):
     if hasattr(ax, "clear"):
         ax.clear()
 
-    # Styling (guard nested attributes for DummyAxis)
+
+def _apply_axis_styling(ax):
     if hasattr(ax, "tick_params"):
         ax.tick_params(colors="black", labelcolor="black")
 
-    if (hasattr(ax, "xaxis") and hasattr(ax.xaxis, "label")
-            and hasattr(ax.xaxis.label, "set_color")):
-        ax.xaxis.label.set_color("black")
+    if hasattr(ax, "xaxis") and hasattr(ax.xaxis, "label"):
+        if hasattr(ax.xaxis.label, "set_color"):
+            ax.xaxis.label.set_color("black")
 
-    if (hasattr(ax, "yaxis") and hasattr(ax.yaxis, "label")
-            and hasattr(ax.yaxis.label, "set_color")):
-        ax.yaxis.label.set_color("black")
+    if hasattr(ax, "yaxis") and hasattr(ax.yaxis, "label"):
+        if hasattr(ax.yaxis.label, "set_color"):
+            ax.yaxis.label.set_color("black")
 
     if hasattr(ax, "title") and hasattr(ax.title, "set_color"):
         ax.title.set_color("black")
@@ -142,7 +163,8 @@ def update_spectrum(window, vowel, target_formants,
             if hasattr(spine, "set_color"):
                 spine.set_color("black")
 
-    # Recreate spectrum status text if needed
+
+def _ensure_status_text(window, ax):
     if (not hasattr(window, "spec_status_text")
             or window.spec_status_text.axes is not ax):
         if hasattr(ax, "text"):
@@ -153,72 +175,62 @@ def update_spectrum(window, vowel, target_formants,
                 fontsize=12, fontweight="bold", color="#CC0000"
             )
 
-    # Pull latest audio + metadata
-    raw = None
-    if getattr(window, "analyzer", None) is not None:
-        try:
-            raw = window.analyzer.get_latest_raw()
-        except Exception:
-            raw = None
 
-    segment = raw.get("segment") if raw else None
-    method = raw.get("method", "none") if raw else "none"
-    conf = float(raw.get("confidence", 0.0)) if raw else 0.0
+def _safe_get_latest_raw(window):
+    analyzer = getattr(window, "analyzer", None)
+    if analyzer is None:
+        return None
+    try:
+        return analyzer.get_latest_raw()
+    except Exception:
+        return None
 
-    # Extract formants
-    f1_t = target_formants.get("f1")
-    f2_t = target_formants.get("f2")
-    f3_t = target_formants.get("f3")
 
-    f1_m = measured_formants.get("f1")
-    f2_m = measured_formants.get("f2")
-    f3_m = measured_formants.get("f3")
+def _draw_fft(ax, segment, sample_rate):
+    if segment is None or not hasattr(ax, "plot"):
+        return
+    seg = np.asarray(segment, dtype=float).flatten()
+    if seg.size == 0:
+        return
+    fft = np.abs(np.fft.rfft(seg))
+    freqs = np.fft.rfftfreq(len(seg), 1.0 / sample_rate)
+    ax.plot(freqs, fft, color="black", linewidth=1.0)
 
-    # FFT path
-    if segment is not None and hasattr(ax, "plot"):
-        seg = np.asarray(segment, dtype=float).flatten()
-        if seg.size > 0:
-            fft = np.abs(np.fft.rfft(seg))
-            freqs = np.fft.rfftfreq(len(seg), 1.0 / window.sample_rate)
-            ax.plot(freqs, fft, color="black", linewidth=1.0)
 
-    # Target formant lines (always drawn if finite)
-    if hasattr(ax, "axvline"):
-        for f in (f1_t, f2_t, f3_t):
-            if f is not None and np.isfinite(f):
-                ax.axvline(f, color="blue", linestyle="--", alpha=0.7)
+def _draw_formant_lines(ax, formants, color, style, alpha):
+    if not hasattr(ax, "axvline"):
+        return
+    for f in (formants.get("f1"), formants.get("f2"), formants.get("f3")):
+        if f is not None and np.isfinite(f):
+            ax.axvline(f, color=color, linestyle=style, alpha=alpha)
 
-    # Measured formant lines — tests expect presence regardless of conf
-    if hasattr(ax, "axvline"):
-        for f in (f1_m, f2_m, f3_m):
-            if f is not None and np.isfinite(f):
-                ax.axvline(f, color="red", linestyle=":", alpha=0.8)
 
-    # Title
-    if hasattr(ax, "set_title"):
-        ax.set_title("Spectrum")
-
-    # Status text
-    if hasattr(window, "spec_status_text"):
-        if pitch and pitch > 0:
-            note = freq_to_note_name(pitch)
-            status = f"/{vowel}/ — {note} ({pitch:.1f} Hz)  [{method}, conf={conf:.2f}]"
-        else:
-            status = f"/{vowel}/  [{method}, conf={conf:.2f}]"
-        window.spec_status_text.set_text(status)
-
+def _set_axis_labels(ax):
     if hasattr(ax, "set_xlabel"):
         ax.set_xlabel("Frequency (Hz)")
     if hasattr(ax, "set_ylabel"):
         ax.set_ylabel("Amplitude")
 
-    if hasattr(window.canvas, "draw_idle"):
-        window.canvas.draw_idle()
 
+def _set_title_spectrum(ax):
+    if hasattr(ax, "set_title"):
+        ax.set_title("Spectrum")
+
+
+def _update_status_text(window, vowel, pitch, method, conf):
+    if not hasattr(window, "spec_status_text"):
+        return
+    if pitch and pitch > 0:
+        note = freq_to_note_name(pitch)
+        status = f"/{vowel}/ — {note} ({pitch:.1f} Hz)  [{method}, conf={conf:.2f}]"
+    else:
+        status = f"/{vowel}/  [{method}, conf={conf:.2f}]"
+    window.spec_status_text.set_text(status)
 
 # ============================================================
 # Vowel chart
 # ============================================================
+
 
 def update_vowel_chart(
     window,
