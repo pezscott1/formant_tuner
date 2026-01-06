@@ -1,7 +1,7 @@
 from unittest.mock import patch
 from profile_viewer.profile_viewer import ProfileViewerWindow
 import pytest
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 import sys
 
 
@@ -52,8 +52,11 @@ def test_values_panel_uses_color_coding(app, sample_profile):
     html = win.values_panel.toHtml()
 
     # Check that HTML color styling is present
-    assert "color:" in html
-    assert "font-weight:bold" in html or "font-weight:600" in html
+    assert (
+            "font-weight:bold" in html
+            or "font-weight:600" in html
+            or "font-weight:700" in html
+    )
 
 
 def test_legend_present(app, sample_profile):

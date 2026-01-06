@@ -109,9 +109,17 @@ class CalibrationStateMachine:
 
     def retry_current_vowel(self):
         self.retry_count += 1
-        if self.retry_count >= self.MAX_RETRIES:
-            return {"event": "max_retries", "vowel": self.current_vowel}
 
+        if self.retry_count >= self.MAX_RETRIES:
+            skipped = self.current_vowel
+            advance_event = self.advance()
+            return {
+                "event": "max_retries",
+                "vowel": skipped,
+                "advance": advance_event,
+            }
+
+        # Otherwise retry same vowel
         self.phase = "prep"
         self.prep_secs = self.prep_seconds_default
         self.sing_secs = self.sing_seconds_default

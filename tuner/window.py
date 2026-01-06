@@ -3,7 +3,8 @@ from collections import deque
 import time
 import numpy as np
 import sounddevice as sd
-from PyQt5.QtWidgets import (
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -20,8 +21,8 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QStackedWidget,
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from profile_viewer.profile_viewer import ProfileViewerWindow
@@ -107,7 +108,7 @@ class TunerWindow(QMainWindow):
         Minimal Qt-compatible headless UI for tests.
         Provides real QLabel and QListWidget so tests behave identically.
         """
-        from PyQt5.QtWidgets import QLabel, QListWidget
+        from PyQt6.QtWidgets import QLabel, QListWidget
 
         # Real label so .text() and .setText() work
         self.active_label = QLabel("Active profile: None")
@@ -164,21 +165,21 @@ class TunerWindow(QMainWindow):
 
         # Profile list container
         profile_container = QWidget()
-        profile_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        profile_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         profile_layout = QVBoxLayout(profile_container)
         profile_layout.setContentsMargins(0, 0, 0, 0)
         profile_layout.setSpacing(6)
 
         self.profile_list = ClearableListWidget()
-        self.profile_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.profile_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.profile_list.setStyleSheet(
             "QListWidget { font-size: 11pt; padding: 4px; border: 1px solid #ccc; "
             "border-radius: 4px; }"
         )
         profile_layout.addWidget(self.profile_list)
-        self.profile_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.profile_list.setSelectionBehavior(QAbstractItemView.SelectItems)
-        self.profile_list.setFocusPolicy(Qt.StrongFocus)
+        self.profile_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.profile_list.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.profile_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.btn_view_profile = QPushButton("View Profile")
         self.btn_view_profile.clicked.connect(   # type:ignore
@@ -234,7 +235,7 @@ class TunerWindow(QMainWindow):
             "highlight it first, then click Calibrate."
         )
         hint_label.setWordWrap(True)
-        hint_label.setAlignment(Qt.AlignCenter)
+        hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint_label.setStyleSheet("font-size: 9pt; color: gray;")
         hint_label.setMinimumHeight(150)
         mic_layout.addWidget(hint_label)
@@ -242,7 +243,7 @@ class TunerWindow(QMainWindow):
         left_layout.addStretch()
 
         self.active_label = QLabel("Active: None")
-        self.active_label.setAlignment(Qt.AlignCenter)
+        self.active_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.active_label.setFixedHeight(150)
         self.active_label.setStyleSheet(
             "font-weight: bold; font-size: 11pt; color: darkblue;"
@@ -253,7 +254,7 @@ class TunerWindow(QMainWindow):
 
         # ================= Right panel =================
 
-        right_splitter = QSplitter(Qt.Vertical)
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Top: tolerance only
         control_frame = QFrame()
@@ -359,7 +360,7 @@ class TunerWindow(QMainWindow):
             return
 
         item = items[0]
-        base = item.data(Qt.UserRole)
+        base = item.data(Qt.ItemDataRole.UserRole)
         self.tuner.load_profile(base)
         # Copy formants from engine → analyzer
         self.live_analyzer.user_formants = dict(self.tuner.engine.user_formants)
@@ -376,9 +377,9 @@ class TunerWindow(QMainWindow):
 
         # New profile pseudo-item
         new_item = QListWidgetItem("➕ New Profile")
-        new_item.setForeground(Qt.darkGreen)
-        new_item.setFont(QFont("Consolas", 11, QFont.Bold))
-        new_item.setData(Qt.UserRole, None)
+        new_item.setForeground(QColor("darkgreen"))
+        new_item.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
+        new_item.setData(Qt.ItemDataRole.UserRole, None)
         self.profile_list.addItem(new_item)
 
         names = self.tuner.list_profiles()
@@ -387,7 +388,7 @@ class TunerWindow(QMainWindow):
                 continue
             display = self.profile_manager.display_name(base)
             item = QListWidgetItem(display)
-            item.setData(Qt.UserRole, base)
+            item.setData(Qt.ItemDataRole.UserRole, base)
             self.profile_list.addItem(item)
 
         active = getattr(self.profile_manager, "active_profile_name", None)
@@ -395,7 +396,7 @@ class TunerWindow(QMainWindow):
             self._set_active_profile(active)
             for i in range(self.profile_list.count()):
                 item = self.profile_list.item(i)
-                if item.data(Qt.UserRole) == active:
+                if item.data(Qt.ItemDataRole.UserRole) == active:
                     self.profile_list.setCurrentItem(item)
                     break
 
@@ -408,7 +409,7 @@ class TunerWindow(QMainWindow):
         item = self.profile_list.currentItem()
         if not item:
             return None
-        return item.data(Qt.UserRole)
+        return item.data(Qt.ItemDataRole.UserRole)
 
     def _delete_selected_profile(self):
         base = self._get_selected_profile_base()
@@ -421,9 +422,10 @@ class TunerWindow(QMainWindow):
             self,
             "Delete profile",
             f"Delete profile '{display}'?",
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+
         )
-        if resp != QMessageBox.Yes:
+        if resp != QMessageBox.StandardButton.Yes:
             return
         try:
             self.profile_manager.delete_profile(base)
@@ -438,7 +440,7 @@ class TunerWindow(QMainWindow):
     def _apply_selected_profile_item(self, item: QListWidgetItem):
         if self.headless:
             return
-        base = item.data(Qt.UserRole)
+        base = item.data(Qt.ItemDataRole.UserRole)
         if base is None:
             self.btn_view_profile.setEnabled(False)
             return
@@ -467,11 +469,11 @@ class TunerWindow(QMainWindow):
                 "Please select a profile before calibrating.",
             )
             return
-        base = item.data(Qt.UserRole)
+        base = item.data(Qt.ItemDataRole.UserRole)
         # New Profile
         if base is None:
             dlg = ProfileDialog(self)
-            if dlg.exec_() != dlg.Accepted:
+            if dlg.exec() != dlg.DialogCode.Accepted:
                 return
             profile_name, voice_type = dlg.get_values()
             if not profile_name:
@@ -489,6 +491,7 @@ class TunerWindow(QMainWindow):
                 profile_manager=self.profile_manager,
                 existing_profile=None,
                 parent=self,
+                expanded_mode=True,
             )
             self.calib_win.vowel_capture_started.connect(self._start_mic_ui)
             self.calib_win.vowel_capture_finished.connect(self._stop_mic_ui)

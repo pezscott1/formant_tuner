@@ -2,7 +2,7 @@
 import time
 import traceback
 import numpy as np
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -11,16 +11,17 @@ from PyQt5.QtWidgets import (
     QPlainTextEdit,
     QFrame, QPushButton,
 )
-from PyQt5.QtCore import QTimer, pyqtSignal
+from PyQt6.QtCore import QTimer, pyqtSignal
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-
+from analysis.vowel_data import STANDARD_VOWELS, expanded_vowels_for_voice
 from tuner.live_analyzer import LiveAnalyzer
 from analysis.smoothing import LabelSmoother, PitchSmoother, MedianSmoother
 from analysis.plausibility import is_plausible_formants
 from calibration.session import CalibrationSession
 from calibration.state_machine import CalibrationStateMachine
 from calibration.plotter import safe_spectrogram, update_spectrogram
+import itertools
 
 
 class CalibrationWindow(QMainWindow):
@@ -37,6 +38,7 @@ class CalibrationWindow(QMainWindow):
         profile_manager=None,
         existing_profile=None,
         parent=None,
+        expanded_mode=False
     ):
         super().__init__(parent)
         self.setWindowTitle("Calibration")
@@ -54,9 +56,11 @@ class CalibrationWindow(QMainWindow):
         # Mic/render state
         self._mic_active = False
 
-        # Core vowel set
-        self.vowels = ["i", "ɛ", "ɑ", "ɔ", "u"]
-
+        self.vowels = (
+            expanded_vowels_for_voice(voice_type)
+            if expanded_mode else
+            STANDARD_VOWELS
+        )
         # Calibration session
         self.session = CalibrationSession(
             profile_name=profile_name,
@@ -65,6 +69,12 @@ class CalibrationWindow(QMainWindow):
             profile_manager=self.profile_manager,
             existing_profile=existing_profile,
         )
+        self._vowel_anchors = {
+            v: (entry["f1"], entry["f2"])
+            for v, entry in self.session.data.items()
+            if entry.get("f1") is not None and entry.get("f2") is not None
+        }
+
         self.state = CalibrationStateMachine(self.vowels)
 
         # Smoothers
@@ -84,15 +94,11 @@ class CalibrationWindow(QMainWindow):
 
         # Store durable vowel anchors
         self._interpolated_vowels = {}
-        self._vowel_anchors = {}
-        self._vowel_colors = {
-            "i": "red",
-            "ɛ": "green",
-            "ɑ": "blue",
-            "ɔ": "purple",
-            "u": "orange",
-        }
-
+        self._vowel_colors = {}
+        self._color_cycle = itertools.cycle([
+            "red", "green", "blue", "purple", "orange",
+            "brown", "teal", "magenta", "olive", "navy",
+        ])
         # -----------------------------------------------------
         # UI Setup
         # -----------------------------------------------------
@@ -130,6 +136,11 @@ class CalibrationWindow(QMainWindow):
 
         self.show()
 
+    def _color_for(self, vowel):
+        if vowel not in self._vowel_colors:
+            self._vowel_colors[vowel] = next(self._color_cycle)
+        return self._vowel_colors[vowel]
+
     # ---------------------------------------------------------
     # UI Construction
     # ---------------------------------------------------------
@@ -158,6 +169,7 @@ class CalibrationWindow(QMainWindow):
         layout = QVBoxLayout(frame)
 
         self.fig, (self.ax_spec, self.ax_vowel) = plt.subplots(2, 1, figsize=(8, 6))
+        self.fig.set_dpi(150)
         self.fig.tight_layout()
         self.fig.subplots_adjust(bottom=0.12)
 
@@ -190,8 +202,9 @@ class CalibrationWindow(QMainWindow):
         if evt == "prep_countdown":
             self._mic_active = False
             self.analyzer.pause()
-            self.status_panel.appendPlainText(
-                f"Prepare: /{self.state.current_vowel}/ in {event['secs']}…"
+            self.status_panel.appendPlainText(f"Prepare: /{self.state.current_vowel}/ in {event['secs']}…")
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
             )
 
         elif evt == "start_sing":
@@ -200,10 +213,16 @@ class CalibrationWindow(QMainWindow):
             self.analyzer.resume()
             self.vowel_capture_started.emit()  # type:ignore
             self.status_panel.appendPlainText(f"Sing /{event['vowel']}/…")
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
+            )
 
         elif evt == "sing_countdown":
             self.status_panel.appendPlainText(
                 f"Sing /{self.state.current_vowel}/ – {event['secs']}s"
+            )
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
             )
 
         elif evt == "start_capture":
@@ -212,6 +231,9 @@ class CalibrationWindow(QMainWindow):
             self.analyzer.resume()
             self.status_panel.appendPlainText(
                 f"Capturing /{self.state.current_vowel}/…"
+            )
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
             )
 
         elif evt == "retry":
@@ -222,6 +244,30 @@ class CalibrationWindow(QMainWindow):
             self.status_panel.appendPlainText(
                 f"Retrying /{self.state.current_vowel}/…"
             )
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
+            )
+
+        elif evt == "max_retries":
+            vowel = event["vowel"]
+            self.status_panel.appendPlainText(
+                f"Skipping /{vowel}/ after {self.state.MAX_RETRIES} failed attempts"
+            )
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
+            )
+            # If recalibrating, keep old anchor and weight
+            # (existing_profile is passed into CalibrationSession)
+            # So we simply do nothing here.
+
+            adv = event.get("advance")
+            if adv and adv["event"] == "finished":
+                self.status_panel.appendPlainText("Calibration complete!")
+                self._finish()
+                return
+
+            # Otherwise continue to next vowel
+            return
 
         elif evt == "next_vowel":
             self._mic_active = False
@@ -230,6 +276,9 @@ class CalibrationWindow(QMainWindow):
             self.vowel_capture_finished.emit()  # type:ignore
             self.status_panel.appendPlainText(
                 f"Next vowel: /{event['vowel']}/"
+            )
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
             )
 
         elif evt == "capture_ready":
@@ -244,6 +293,9 @@ class CalibrationWindow(QMainWindow):
             self.analyzer.pause()
             self.vowel_capture_finished.emit()  # type:ignore
             self.status_panel.appendPlainText("Calibration complete!")
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
+            )
             self._finish()
             return
 
@@ -253,6 +305,9 @@ class CalibrationWindow(QMainWindow):
             self.status_panel.appendPlainText(
                 f"/{vowel}/ capture timed out after {self.capture_timeout:.1f}s"
             )
+            self.status_panel.verticalScrollBar().setValue(
+                self.status_panel.verticalScrollBar().maximum()
+            )
             self._mic_active = False
             self.analyzer.pause()
             self.vowel_capture_finished.emit()  # type:ignore
@@ -260,6 +315,9 @@ class CalibrationWindow(QMainWindow):
             ev = self.state.advance()
             if ev["event"] == "finished":
                 self.status_panel.appendPlainText("Calibration complete!")
+                self.status_panel.verticalScrollBar().setValue(
+                    self.status_panel.verticalScrollBar().maximum()
+                )
                 self._finish()
                 return
 
@@ -327,7 +385,7 @@ class CalibrationWindow(QMainWindow):
         self._spec_buffer = np.concatenate((self._spec_buffer, seg_arr))
 
         sr = 48000
-        max_samples = int(sr * 1.0)
+        max_samples = int(sr * 3.0)
         if self._spec_buffer.size > max_samples:
             self._spec_buffer = self._spec_buffer[-max_samples:]
 
@@ -420,7 +478,7 @@ class CalibrationWindow(QMainWindow):
 
         # Draw calibrated vowels
         for vowel, (f1, f2) in self._vowel_anchors.items():
-            color = self._vowel_colors.get(vowel, "black")
+            color = self._color_for(vowel)
             ax.scatter(
                 f2, f1,
                 s=200,
@@ -483,7 +541,16 @@ class CalibrationWindow(QMainWindow):
             )
             self.session.increment_retry(vowel)
             self._capture_buffer.clear()
-            self.state.retry_current_vowel()
+            event = self.state.retry_current_vowel()
+            # If max retries reached, handle it immediately
+            if event["event"] == "max_retries":
+                self.status_panel.appendPlainText(
+                    f"[{ts}] Skipping /{vowel}/ after {self.state.MAX_RETRIES} failed attempts"
+                )
+                # Advance to next vowel (already done inside state machine)
+                self.phase_timer.start(1000)
+                return
+            # Otherwise normal retry
             self.phase_timer.start(1000)
             return
 
@@ -536,8 +603,7 @@ class CalibrationWindow(QMainWindow):
 
         # Status panel always gets the session message
         self.status_panel.appendPlainText(f"[{timestamp}] {msg}")
-
-        color = self._vowel_colors.get(vowel, "black")
+        color = self._color_for(vowel)
 
         # Format aligned monospace block
         html_line = (

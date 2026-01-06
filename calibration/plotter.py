@@ -1,5 +1,4 @@
 # calibration/plotter.py
-import matplotlib.ticker as mticker
 import numpy as np
 import librosa
 import logging
@@ -83,54 +82,70 @@ def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=1.0):
 
 def update_spectrogram(self, freqs, times, s):
     """
-    Draw ONLY the spectrogram.
-    Vowel anchors and formant overlays are handled elsewhere.
-    Now uses log-frequency scaling so F1/F2 appear in correct vertical positions.
+    Calibration spectrogram tuned to match PyQt:
+    - log-frequency resampling
+    - per-column dB normalization
+    - proper bin edges for pcolormesh
+    - no double log-scaling
+    - crisp harmonics across full range
     """
+
     if freqs is None or times is None or s is None:
         return
 
-    freqs = np.asarray(freqs)
-
-    # Limit to 4 kHz
-    mask = freqs <= 4000
+    # Limit to 50–4000 Hz
+    freqs: np.ndarray
+    mask = (freqs >= 50) & (freqs <= 4000)
     if mask.sum() < 2:
-        mask = np.arange(len(freqs))
+        return
 
-    S_small = s[mask, :]
+    S = s[mask, :]
     freqs_small = freqs[mask]
 
-    # dB scaling
-    arr_db = 10 * np.log10(S_small + 1e-12)
-    arr_db_max = np.max(arr_db)
-    db_floor = arr_db_max - 60
-    arr_db = np.clip(arr_db, db_floor, arr_db_max)
+    # Log-frequency resampling
+    num_bins = 512
+    log_freqs = np.logspace(np.log10(50), np.log10(4000), num_bins)
+    S_log = np.zeros((num_bins, S.shape[1]))
+    for i in range(S.shape[1]):
+        S_log[:, i] = np.interp(log_freqs, freqs_small, S[:, i])
+    S = S_log
+    freqs_small = log_freqs
 
-    # Clear axis
+    # Per-column dB normalization
+    arr_db = 10 * np.log10(S + 1e-12)
+    arr_db -= np.max(arr_db, axis=0, keepdims=True)
+    arr_db = np.clip(arr_db, -60, 0)
+
+    # Compute frequency and time edges for pcolormesh
+    freq_edges = np.zeros(len(freqs_small) + 1)
+    freq_edges[1:-1] = (freqs_small[:-1] + freqs_small[1:]) / 2
+    freq_edges[0] = freqs_small[0] - (freqs_small[1] - freqs_small[0]) / 2
+    freq_edges[-1] = freqs_small[-1] + (freqs_small[-1] - freqs_small[-2]) / 2
+
+    time_edges = np.zeros(len(times) + 1)
+    time_edges[1:-1] = (times[:-1] + times[1:]) / 2
+    time_edges[0] = times[0] - (times[1] - times[0]) / 2
+    time_edges[-1] = times[-1] + (times[-1] - times[-2]) / 2
+
+    # Draw spectrogram
     self.ax_spec.clear()
-
-    # --- NEW: log-frequency axis ---
-    # pcolormesh works fine with log y-scale as long as freqs_small is monotonic
     mesh = self.ax_spec.pcolormesh(
-        times,
-        freqs_small,
+        time_edges,
+        freq_edges,
         arr_db,
         shading="auto",
         cmap="magma",
+        vmin=-60,
+        vmax=0,
     )
 
-    # Apply log scaling AFTER drawing
-
-    self.ax_spec.set_yscale("log")
+    # Linear axis (data is already log-resampled)
+    self.ax_spec.set_yscale("linear")
     self.ax_spec.set_ylim(50, 4000)
-
-    # Clean Hz labels on log axis
-    formatter = mticker.ScalarFormatter()
-    formatter.set_scientific(False)
-    formatter.set_useOffset(False)
-    self.ax_spec.yaxis.set_major_formatter(formatter)
-
     self.ax_spec.set_yticks([50, 100, 200, 400, 800, 1600, 3200])
+    self.ax_spec.set_ylabel("Frequency (Hz)")
+    self.ax_spec.set_xlabel("Time (s)")
+    self.ax_spec.set_title("Spectrogram (log-frequency, PyQt-matched)")
 
     # Colorbar
     if not hasattr(self, "_spec_colorbar") or self._spec_colorbar is None:
@@ -139,9 +154,5 @@ def update_spectrogram(self, freqs, times, s):
         )
     else:
         self._spec_colorbar.update_normal(mesh)
-
-    self.ax_spec.set_xlabel("Time (s)")
-    self.ax_spec.set_ylabel("Frequency (Hz)")
-    self.ax_spec.set_title("Spectrogram (log scale)")
 
     self.canvas.draw_idle()

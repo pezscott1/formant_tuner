@@ -1,9 +1,9 @@
 from calibration.plotter import safe_spectrogram
 import numpy as np
 from matplotlib import cm
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtGui import QPainter, QImage, QPen, QColor
-from PyQt5.QtCore import Qt
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QImage, QPen, QColor
+from PyQt6.QtCore import Qt
 
 
 class SpectrogramView(QWidget):
@@ -35,12 +35,13 @@ class SpectrogramView(QWidget):
         painter = QPainter(self)
 
         # Always paint a full background so the widget keeps its full visual size
-        painter.fillRect(self.rect(), Qt.black)
+        painter.fillRect(self.rect(), QColor("black"))
 
         # ---------------------------------------------------------------------
         # 1) Gather audio
         # ---------------------------------------------------------------------
-        chunks = [a for a in getattr(self.bus, "audio", []) if a is not None and len(a) > 0]
+        chunks = [a for a in getattr(self.bus, "audio", [])
+                  if a is not None and len(a) > 0]
         if not chunks:
             return
 
@@ -74,7 +75,7 @@ class SpectrogramView(QWidget):
         )
 
         if S is None or S.size == 0:
-            painter.fillRect(self.rect(), Qt.black)
+            painter.fillRect(self.rect(), QColor("black"))
             return
 
         # ---------------------------------------------------------------------
@@ -130,7 +131,7 @@ class SpectrogramView(QWidget):
             w_img,
             h_img,
             w_img * 3,
-            QImage.Format_RGB888,
+            QImage.Format.Format_RGB888,
         )
 
         # ---------------------------------------------------------------------
@@ -142,8 +143,8 @@ class SpectrogramView(QWidget):
         scaled = qimg.scaled(
             self.width(),
             self.height(),
-            Qt.IgnoreAspectRatio,
-            Qt.FastTransformation,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.FastTransformation,
         )
 
         w_scaled = scaled.width()

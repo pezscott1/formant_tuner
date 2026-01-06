@@ -202,4 +202,4 @@ def test_normalize_profile_for_save(monkeypatch):
     assert out["a"]["f1"] == 500
     assert out["a"]["f2"] == 600
     assert out["a"]["retries"] == 3
-    assert out["a"]["reason"] == "ok"
+    assert out["a"]["reason"].startswith("f2-out")

@@ -1,5 +1,5 @@
 # profile_viewer.py
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QTextEdit
 )

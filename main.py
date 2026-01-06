@@ -1,7 +1,7 @@
 from analysis.engine import FormantAnalysisEngine
 from tuner.window import TunerWindow
 from tuner.controller import Tuner
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 import os
 os.environ["QT_LOGGING_RULES"] = "qt.qpa.fonts=false"
 

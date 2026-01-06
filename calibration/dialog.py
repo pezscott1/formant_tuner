@@ -1,6 +1,6 @@
 # calibration/dialog.py
 
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QComboBox, QPushButton
 )

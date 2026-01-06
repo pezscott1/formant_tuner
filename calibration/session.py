@@ -1,6 +1,8 @@
+# calibration/session.py
 from datetime import datetime, timezone
 from analysis.plausibility import is_plausible_formants
 import numpy as np
+from analysis.vowel_data import TRIANGLES, TRIANGLE_WEIGHTS
 
 
 class CalibrationSession:
@@ -25,27 +27,8 @@ class CalibrationSession:
                     # Make a shallow copy so we can enrich it
                     self.data[vowel] = entry.copy()
 
-    # ---------------------------------------------------------
-    # Barycentric vowel triangles
-    # --------------------------------------------------------
-    TRIANGLES = {
-        "æ": ("ɛ", "ɑ", "i"),
-        "e": ("i", "ɛ", "ɑ"),
-        "ɪ": ("i", "ɛ", "u"),
-        "o": ("u", "ɔ", "ɑ"),
-    }
-
-    @staticmethod
-    def _weights_for(vowel):
-        if vowel == "æ":
-            return 0.45, 0.35, 0.20
-        if vowel == "e":
-            return 0.5, 0.3, 0.2
-        if vowel == "ɪ":
-            return 0.6, 0.3, 0.1
-        if vowel == "o":
-            return 0.5, 0.3, 0.2
-        return 1/3, 1/3, 1/3
+    def _weights_for(self, vowel):
+        return TRIANGLE_WEIGHTS.get(vowel, (1 / 3, 1 / 3, 1 / 3))
 
     def get_calibrated_anchors(self):
         """Return a dict of vowel → (f1, f2) for calibrated vowels only."""
@@ -74,8 +57,7 @@ class CalibrationSession:
         anchors = self.get_calibrated_anchors()
         out = {}
 
-        for vowel, (A, B, C) in self.TRIANGLES.items():
-            # Only interpolate if all three anchors exist
+        for vowel, (A, B, C) in TRIANGLES.items():
             if {A, B, C} <= anchors.keys():
                 w = self._weights_for(vowel)
                 # Get F0 values for the triangle vertices
@@ -253,6 +235,12 @@ class CalibrationSession:
 
         self.profile_manager.save_profile(base_name, profile_data)
         return base_name
+
+    def retry_count(self, vowel: str) -> int:
+        return self.retries_map.get(vowel, 0)
+
+    def reset_retry(self, vowel: str) -> None:
+        self.retries_map[vowel] = 0
 
 
 def normalize_profile_for_save(user_formants, retries_map):

@@ -111,7 +111,7 @@ def test_retry_current_vowel_max_retries():
     out = sm.retry_current_vowel()
     assert out["event"] == "max_retries"
     assert out["vowel"] == "a"
-    assert sm.retry_count == sm.MAX_RETRIES
+    assert sm.retry_count == 0
 
 
 def test_force_capture_mode():

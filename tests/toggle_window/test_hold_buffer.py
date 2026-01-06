@@ -14,6 +14,11 @@ def test_hold_buffer(qtbot):
     bus = FakeBus()
     vm = VowelMapView(bus)
 
+    qtbot.addWidget(vm)
+    vm.resize(400, 400)
+    vm.show()
+    qtbot.waitExposed(vm)
+
     # First frame: valid
     bus.f1.append(300)
     bus.f2.append(2000)

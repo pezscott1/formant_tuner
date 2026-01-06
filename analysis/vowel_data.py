@@ -1,11 +1,14 @@
+# analysis/vowel_data.py
 """
-Updated vowel centers and pitch ranges for singing calibration.
+Unified vowel data for calibration, interpolation, and plausibility.
 
-These values are tuned to Scott’s actual baritone vowel space,
-based on real calibration logs (/i/ ≈ 280/2229, /ɛ/ ≈ 553/1936, etc.).
-
-These are *reference centers*, not plausibility windows.
-Calibration will override these with learned values.
+This file defines:
+- Standard vs Expanded vowel sets
+- Voice-type-specific expanded vowel sets
+- Interpolation triangles
+- Barycentric weights
+- Default vowel centers (F1, F2, F3)
+- Pitch ranges
 """
 
 # ---------------------------------------------------------
@@ -13,22 +16,59 @@ Calibration will override these with learned values.
 # ---------------------------------------------------------
 
 PITCH_RANGES = {
-    "bass":     (65.0, 370.0),   # C2 – F#4
-    "baritone": (82.0, 440.0),   # E2 – A4
-    "tenor":    (130.0, 523.0),  # C3 – C5
-    "alto":     (196.0, 659.0),  # G3 – E5
-    "mezzo":    (196.0, 698.0),  # G3 – F5
-    "soprano":  (261.0, 880.0),  # C4 – A5
+    "bass":     (65.0, 370.0),
+    "baritone": (82.0, 440.0),
+    "tenor":    (130.0, 523.0),
+    "alto":     (196.0, 659.0),
+    "mezzo":    (196.0, 698.0),
+    "soprano":  (261.0, 880.0),
 }
 
 # ---------------------------------------------------------
-# Updated vowel centers (F1, F2, F3)
-#
-# These are realistic singing values, tuned to Scott’s actual
-# measured vowel space. They are intentionally *fronted* and
-# *bright*, matching your calibration logs.
-#
-# Calibration will override these centers with learned values.
+# Standard 5-vowel calibration set
+# ---------------------------------------------------------
+
+STANDARD_VOWELS = ["i", "ɛ", "ɑ", "ɔ", "u"]
+
+# ---------------------------------------------------------
+# Expanded vowel set (voice-type-specific)
+# ---------------------------------------------------------
+
+
+def expanded_vowels_for_voice(voice_type: str):
+    """Return all vowels defined for this voice type."""
+    centers = VOWEL_CENTERS.get(voice_type, {})
+    return list(centers.keys())
+
+# ---------------------------------------------------------
+# Interpolation triangles
+# ---------------------------------------------------------
+
+
+TRIANGLES = {
+    "æ": ("ɛ", "ɑ", "i"),
+    "e": ("i", "ɛ", "ɑ"),
+    "ɪ": ("i", "ɛ", "u"),
+    "o": ("u", "ɔ", "ɑ"),
+    "ʊ": ("u", "o", "ɔ"),
+    "ʌ": ("ɑ", "ɔ", "e"),
+}
+
+# ---------------------------------------------------------
+# Barycentric weights
+# ---------------------------------------------------------
+
+TRIANGLE_WEIGHTS = {
+    "æ": (0.45, 0.35, 0.20),
+    "e":  (0.50, 0.30, 0.20),
+    "ɪ": (0.60, 0.30, 0.10),
+    "o":  (0.50, 0.30, 0.20),
+    "ʊ": (0.50, 0.30, 0.20),
+    "ʌ": (0.40, 0.40, 0.20),
+}
+
+# ---------------------------------------------------------
+# Default vowel centers (F1, F2, F3)
 # ---------------------------------------------------------
 
 VOWEL_CENTERS = {
@@ -36,12 +76,17 @@ VOWEL_CENTERS = {
         "i":  (300.0, 2700.0, 3200.0),
         "e":  (350.0, 2050.0, 2900.0),
         "ɛ":  (550.0, 2000.0, 2600.0),
+        "æ":  (600.0, 1800.0, 2500.0),
+        "a":  (700.0, 1200.0, 2400.0),
         "ɑ":  (750.0, 1600.0, 2400.0),
         "ɔ":  (600.0, 1100.0, 2300.0),
+        "o":  (400.0, 800.0, 2200.0),
         "u":  (350.0, 900.0, 2100.0),
+        "ɪ":  (400.0, 1700.0, 2600.0),
+        "ʊ":  (350.0, 900.0, 2100.0),
+        "ʌ":  (450.0, 1300.0, 2200.0),
     },
 
-    # Other voice types unchanged for now
     "bass": {
         "i":  (260.0, 2100.0, 2900.0),
         "e":  (330.0, 2000.0, 2800.0),
@@ -49,6 +94,7 @@ VOWEL_CENTERS = {
         "ɑ":  (620.0, 1200.0, 2200.0),
         "ɔ":  (520.0, 1000.0, 1900.0),
         "u":  (280.0,  800.0, 1700.0),
+        "ʌ":  (450.0, 1300.0, 2200.0),
     },
 
     "tenor": {
@@ -67,6 +113,7 @@ VOWEL_CENTERS = {
         "ɑ":  (750.0, 1500.0, 2500.0),
         "ɔ":  (600.0, 1300.0, 2200.0),
         "u":  (350.0, 1100.0, 2000.0),
+        "ʌ":  (500.0, 1400.0, 2300.0),
     },
 
     "mezzo": {
@@ -87,6 +134,3 @@ VOWEL_CENTERS = {
         "u":  (370.0, 1200.0, 2100.0),
     },
 }
-VOWEL_CENTERS["bass"]["ʌ"] = (450.0, 1300.0, 2200.0)
-VOWEL_CENTERS["tenor"]["ʌ"] = (500.0, 1400.0, 2300.0)
-# etc. for other voice types you care about

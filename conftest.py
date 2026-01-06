@@ -6,10 +6,12 @@ from unittest.mock import MagicMock
 import matplotlib
 import gc
 os.environ.setdefault("COVERAGE_DISABLE_C_EXTENSION", "1")
-# Force non-GUI backend for matplotlib
-matplotlib.use("Agg")
 # Prevent Qt from creating real windows (critical on Windows)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+def pytest_configure():
+    matplotlib.use('QtAgg', force=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -39,7 +41,7 @@ def pytest_sessionfinish(session, exitstatus):
 @pytest.fixture(scope="session")
 def qapp():
     """Provide a single QApplication for all Qt tests."""
-    from PyQt5.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication
 
     app = QApplication.instance()
     if app is None:

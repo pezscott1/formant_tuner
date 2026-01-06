@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton
-from PyQt5.QtGui import QPainter, QColor, QPen
-from PyQt5.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton
+from PyQt6.QtGui import QPainter, QColor, QPen
+from PyQt6.QtCore import Qt
 import numpy as np
 
 
@@ -162,7 +162,7 @@ class VowelMapView(QWidget):
                 radius = max(10, min(40, int(score * 80)))
                 alpha = int(conf * 255)
                 painter.setPen(QPen(QColor(255, 255, 255, alpha), 2))
-                painter.setBrush(Qt.NoBrush)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.drawEllipse(int(x - radius // 2),
                                     int(y - radius // 2), radius, radius)
 
@@ -170,7 +170,7 @@ class VowelMapView(QWidget):
             vowel = self.bus.vowels[-1] if self.bus.vowels else None
             dot_color = self.VOWEL_COLORS.get(vowel, QColor(80, 255, 80))
 
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(dot_color)
             painter.drawEllipse(int(x - 5), int(y - 5), 10, 10)
 
