@@ -47,40 +47,71 @@ The system is designed for singers, educators, clinicians, and researchers who n
 
 ```
 formant_tuner/
-│
 ├── analysis/
-│   ├── engine.py              # unified formant analysis engine
-│   ├── lpc.py                 # LPC + envelope + cepstral formants
-│   ├── pitch.py               # pitch estimation (HPS + fallback)
-│   ├── vowel.py               # vowel ranges, guessing, plausibility
-│   ├── vowel_data.py          # reference formants + pitch ranges
-│   ├── scoring.py             # plausibility + tuning + live scoring
-│   ├── smoothing.py           # smoothing utilities
-│   └── utils.py               # helpers
+│   ├── engine.py
+│   ├── hybrid_formants.py
+│   ├── lpc.py
+│   ├── pitch.py
+│   ├── plausibility.py
+│   ├── scoring.py
+│   ├── smoothing.py
+│   ├── true_envelope.py
+│   ├── utils.py
+│   ├── vowel_classifier.py
+│   └── vowel_data.py
 │
 ├── calibration/
-│   ├── session.py             # capture + retry logic
-│   ├── plotter.py             # spectrogram + vowel scatter
-│   ├── state_machine.py       # prep/sing/capture phases
-│   ├── dialog.py              # profile creation + expanded mode
-│   └── window.py              # calibration UI
+│   ├── dialog.py
+│   ├── plotter.py
+│   ├── session.py
+│   ├── state_machine.py
+│   └── window.py
 │
 ├── tuner/
 │   ├── controller.py
-│   ├── live_analyzer.py       # smoothing + plausibility + UI updates
-│   ├── profile_controller.py  # profile loading/activation
-│   ├── tuner_plotter.py       # tuner visualization
-│   └── window.py              # main PyQt window
+│   ├── live_analyzer.py
+│   ├── profile_controller.py
+│   ├── spectrogram_view.py
+│   ├── tuner_plotter.py
+│   ├── window.py
+│   └── window_toggle.py
 │
-├── utils/
-│   └── music_utils.py         # musical helpers
+├── profiles/
+│   ├── active_profile.json
+│   ├── Scott_baritone_profile.json
+│   └── test_bass_profile.json
 │
-├── tests/                     # pytest suite
+├── profile_viewer/
+│   └── profile_viewer.py
 │
-├── main.py                    # application entry point
+├── scripts/
+│   ├── pyqt5_to_pyqt6_migration.py
+│   └── run_coverage.sh
+│
+├── tests/
+│   ├── analysis/
+│   ├── analyzer/
+│   ├── calibration/
+│   ├── engine/
+│   ├── lpc/
+│   ├── profile_viewer/
+│   ├── profiles/
+│   ├── scoring/
+│   ├── smoothing/
+│   ├── toggle_window/
+│   └── tuner/
+│
+├── LEGACY/
+│   └── utils/
+│
+├── logs/
+│
+├── main.py
+├── conftest.py
 ├── requirements.txt
-├── pytest.ini
-└── README.md
+├── README.md
+└── pytest.ini
+
 ```
 
 ## 🚀 Installation
