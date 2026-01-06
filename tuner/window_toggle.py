@@ -2,8 +2,9 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel)
 from PyQt6.QtGui import QPainter, QColor, QPen
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QRect
 import numpy as np
+import itertools
 
 
 class ModeToggleBar(QWidget):
@@ -130,21 +131,37 @@ class VowelMapView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-    VOWEL_COLORS = {
-        "i": QColor(0, 200, 255),
-        "e": QColor(0, 150, 255),
-        "æ": QColor(255, 100, 100),
-        "ɑ": QColor(255, 80, 0),
-        "ʌ": QColor(255, 180, 0),
-        "u": QColor(100, 255, 100),
-        "o": QColor(80, 200, 80),
-    }
+        self._color_cycle = itertools.cycle([
+            QColor(0, 200, 255),
+            QColor(0, 150, 255),
+            QColor(255, 100, 100),
+            QColor(255, 80, 0),
+            QColor(255, 180, 0),
+            QColor(100, 255, 100),
+            QColor(80, 200, 80),
+            QColor(200, 80, 200),
+            QColor(150, 150, 255),
+            QColor(255, 150, 150),
+            QColor(150, 255, 150),
+            QColor(255, 255, 150),
+        ])
+
+        self.vowel_colors = {}
 
     def update_from_bus(self, bus, analyzer=None):
         self.bus = bus
+
+        # Update analyzer if needed
         if analyzer and analyzer is not self.analyzer:
             self.analyzer = analyzer
-            self.compute_dynamic_ranges()
+
+        # Always ensure vowel colors exist for all calibrated vowels
+        if self.analyzer:
+            self.vowel_colors = {}
+            for vowel in self.analyzer.user_formants.keys():
+                self.vowel_colors[vowel] = next(self._color_cycle)
+
+        self.compute_dynamic_ranges()
         self.update()
 
     # ------------------------------------------------------------
@@ -187,7 +204,8 @@ class VowelMapView(QWidget):
     def draw_targets(self, painter, w, h):
         if not self.analyzer or not hasattr(self.analyzer, "user_formants"):
             return
-
+        occupied = []
+        # Use a neutral pen only for gridlines or fallback text
         painter.setPen(QPen(QColor(230, 230, 230), 1))
 
         for vowel, entry in self.analyzer.user_formants.items():
@@ -198,15 +216,32 @@ class VowelMapView(QWidget):
 
             x = float(self.f2_to_x(f2, w))
             y = float(self.f1_to_y(f1, h))
+            label_x = x + (24 if x < w / 2 else -30)
+            label_y = y + (-10 if y < h / 2 else 20)
+            label_rect = QRect(int(label_x), int(label_y - 12), 30, 20)
+            # Try up to 8 offsets around the point
+            offsets = [
+                (0, -20), (20, -20), (20, 0), (20, 20),
+                (0, 20), (-20, 20), (-20, 0), (-20, -20)
+            ]
 
-            color = self.VOWEL_COLORS.get(vowel, QColor(180, 180, 180))
+            for dx, dy in offsets:
+                test_rect = label_rect.translated(dx, dy)
+                if not any(test_rect.intersects(r) for r in occupied):
+                    label_rect = test_rect
+                    break
+            painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
+            occupied.append(label_rect)
+            color = self.vowel_colors.get(vowel, QColor(180, 180, 180))
+
+            # Draw the label in the vowel’s color
+            painter.setPen(QPen(color, 1))
+            painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
+            occupied.append(label_rect)
+
+            # Draw the vowel target ellipse
             painter.setPen(QPen(color, 2))
             painter.drawEllipse(int(x - 20), int(y - 20), 40, 40)
-
-            painter.setPen(QPen(QColor(230, 230, 230), 1))
-            label_dx = 24 if x < w / 2 else -30
-            label_dy = -10 if y < h / 2 else 20
-            painter.drawText(int(x + label_dx), int(y + label_dy), vowel)
 
     # ------------------------------------------------------------
     # Main paint event
@@ -264,7 +299,7 @@ class VowelMapView(QWidget):
                                     int(y - radius // 2), radius, radius)
 
             vowel = self.bus.vowels[-1] if self.bus.vowels else None
-            dot_color = self.VOWEL_COLORS.get(vowel, QColor(80, 255, 80))
+            dot_color = self.vowel_colors.get(vowel, QColor(80, 255, 80))
 
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(dot_color)
@@ -293,13 +328,11 @@ class VowelMapView(QWidget):
     # ------------------------------------------------------------
 
     def compute_dynamic_ranges(self):
-        if not self.analyzer or not hasattr(self.analyzer, "user_formants"):
-            return
-
         f1_vals = []
         f2_vals = []
 
-        for entry in self.analyzer.user_formants.values():
+        # Include calibrated vowels
+        for v, entry in self.analyzer.user_formants.items():
             f1 = entry.get("f1")
             f2 = entry.get("f2")
             if f1:
@@ -307,9 +340,34 @@ class VowelMapView(QWidget):
             if f2:
                 f2_vals.append(f2)
 
+        # NEW: handle bus=None (tests expect this)
+        if self.bus is not None and hasattr(self.bus, "get_recent_points"):
+            for pt in self.bus.get_recent_points():
+                f1 = pt.get("f1")
+                f2 = pt.get("f2")
+                if f1:
+                    f1_vals.append(f1)
+                if f2:
+                    f2_vals.append(f2)
+
+        # Include interpolated vowels if available
+        if hasattr(self.analyzer, "interpolated_vowels"):
+            for v in self.analyzer.interpolated_vowels.values():
+                f1_vals.append(v["f1"])
+                f2_vals.append(v["f2"])
+
+        # Compute axis limits with generous margins
         if f1_vals:
-            self.f1_min = min(f1_vals) * 0.9
-            self.f1_max = max(f1_vals) * 1.1
+            self.f1_min = min(f1_vals) * 0.85
+            self.f1_max = max(f1_vals) * 1.15
+        else:
+            self.f1_min = 200
+            self.f1_max = 1000
+
         if f2_vals:
-            self.f2_min = min(f2_vals) * 0.9
-            self.f2_max = max(f2_vals) * 1.1
+            self.f2_min = min(f2_vals) * 0.85
+            self.f2_max = max(f2_vals) * 1.15
+        else:
+            self.f2_min = 400
+            self.f2_max = 3000
+

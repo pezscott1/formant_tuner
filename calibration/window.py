@@ -656,7 +656,11 @@ class CalibrationWindow(QMainWindow):
 
             # Store durable anchor
             self._vowel_anchors[vowel] = (f1, f2)
+            # NEW: recompute limits dynamically
+            self._compute_vowel_axis_limits()
             self._redraw_vowel_anchors()
+            self.canvas.draw_idle()
+
             self.canvas.draw_idle()
 
             # Reset F0 lock and advance

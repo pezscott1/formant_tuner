@@ -126,10 +126,12 @@ def update_spectrum(window, vowel, target_formants,
     if hasattr(ax, "tick_params"):
         ax.tick_params(colors="black", labelcolor="black")
 
-    if hasattr(ax, "xaxis") and hasattr(ax.xaxis, "label") and hasattr(ax.xaxis.label, "set_color"):
+    if (hasattr(ax, "xaxis") and hasattr(ax.xaxis, "label")
+            and hasattr(ax.xaxis.label, "set_color")):
         ax.xaxis.label.set_color("black")
 
-    if hasattr(ax, "yaxis") and hasattr(ax.yaxis, "label") and hasattr(ax.yaxis.label, "set_color"):
+    if (hasattr(ax, "yaxis") and hasattr(ax.yaxis, "label")
+            and hasattr(ax.yaxis.label, "set_color")):
         ax.yaxis.label.set_color("black")
 
     if hasattr(ax, "title") and hasattr(ax.title, "set_color"):

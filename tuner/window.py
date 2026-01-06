@@ -448,6 +448,10 @@ class TunerWindow(QMainWindow):
         # Update vowel map
         self.vowel_map_view.analyzer = self.live_analyzer
         self.vowel_map_view.compute_dynamic_ranges()
+        # Assign colors for all calibrated vowels immediately when profile loads
+        self.vowel_map_view.vowel_colors = {}
+        for vowel in self.analyzer.user_formants.keys():
+            self.vowel_map_view.vowel_colors[vowel] = next(self.vowel_map_view._color_cycle)
         self.vowel_map_view.update()
 
     def _populate_profiles(self):
@@ -866,3 +870,26 @@ class VisualizationBus:
         self.stable.append(stable)
         self.stability_score.append(stability_score)
         self.confidence.append(confidence)
+
+    def get_recent_points(self):
+        """
+        Returns a list of dicts, each representing one frame of formant data.
+        """
+        pts = []
+        for f1, f2, f3, v, ts, st, st_score, conf in zip(
+                self.f1, self.f2, self.f3,
+                self.vowels, self.timestamps,
+                self.stable, self.stability_score,
+                self.confidence
+        ):
+            pts.append({
+                "f1": f1,
+                "f2": f2,
+                "f3": f3,
+                "vowel": v,
+                "timestamp": ts,
+                "stable": st,
+                "stability_score": st_score,
+                "confidence": conf,
+            })
+        return pts

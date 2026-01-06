@@ -35,9 +35,11 @@ class ProfileDialog(QDialog):
         self.optional_group.setVisible(False)
         layout.addWidget(self.optional_group)
         # React to expanded mode toggle
-        self.expanded_checkbox.toggled.connect(self.optional_group.setVisible)  # type:ignore
+        self.expanded_checkbox.toggled.connect(  # type:ignore
+            self.optional_group.setVisible)
         # React to voice type changes
-        self.voice_combo.currentTextChanged.connect(self.populate_optional_vowels)  # type:ignore
+        self.voice_combo.currentTextChanged.connect(  # type:ignore
+            self.populate_optional_vowels)
         # Initial population
         self.optional_checkboxes = {}
         self.populate_optional_vowels(self.voice_combo.currentText())
