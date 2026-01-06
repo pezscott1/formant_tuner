@@ -155,7 +155,6 @@ class CalibrationSession:
         # 4. Weighted averaging
         # -----------------------------
         old = self.data[vowel]
-
         old_f1 = old.get("f1", f1)
         old_f2 = old.get("f2", f2)
         old_f0 = old.get("f0", f0)

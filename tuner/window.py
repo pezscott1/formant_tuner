@@ -475,8 +475,10 @@ class TunerWindow(QMainWindow):
             dlg = ProfileDialog(self)
             if dlg.exec() != dlg.DialogCode.Accepted:
                 return
-            profile_name, voice_type = dlg.get_values()
-            if not profile_name:
+            vals = dlg.get_values()
+            name, voice_type = vals[:2]
+            expanded = vals[2] if len(vals) > 2 else False
+            if not name:
                 QMessageBox.warning(
                     self,
                     "Missing name",
@@ -484,14 +486,14 @@ class TunerWindow(QMainWindow):
                 )
                 return
             self.calib_win = CalibrationWindow(
-                profile_name=profile_name,
+                profile_name=name,
                 voice_type=voice_type,
                 engine=self.analyzer,
                 analyzer=self.live_analyzer,
                 profile_manager=self.profile_manager,
                 existing_profile=None,
                 parent=self,
-                expanded_mode=True,
+                expanded_mode=expanded
             )
             self.calib_win.vowel_capture_started.connect(self._start_mic_ui)
             self.calib_win.vowel_capture_finished.connect(self._stop_mic_ui)

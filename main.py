@@ -28,4 +28,4 @@ if __name__ == "__main__":
     win = TunerWindow(tuner)
     win.show()
 
-    app.exec_()
+    app.exec()

@@ -2,14 +2,14 @@
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QComboBox, QPushButton
+    QLabel, QLineEdit, QComboBox, QPushButton, QCheckBox
 )
 
 
 class ProfileDialog(QDialog):
     """
-    Simple dialog to collect a profile name and voice type.
-    Used when creating a new calibration profile.
+    Simple dialog to collect a profile name, voice type,
+    and optional expanded calibration mode.
     """
 
     def __init__(self, parent=None):
@@ -29,6 +29,11 @@ class ProfileDialog(QDialog):
         self.voice_combo.addItems(["bass", "baritone", "tenor", "alto", "soprano"])
         layout.addWidget(self.voice_combo)
 
+        # Expanded mode checkbox
+        self.expanded_checkbox = QCheckBox("Enable expanded calibration mode")
+        self.expanded_checkbox.setChecked(False)
+        layout.addWidget(self.expanded_checkbox)
+
         # Buttons
         btn_row = QHBoxLayout()
         ok_btn = QPushButton("OK")
@@ -37,9 +42,16 @@ class ProfileDialog(QDialog):
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
 
-        ok_btn.clicked.connect(self.accept)  # type:ignore
+        ok_btn.clicked.connect(self.accept)   # type:ignore
         cancel_btn.clicked.connect(self.reject)  # type:ignore
 
     def get_values(self):
-        """Return (name, voice_type)."""
-        return self.name_edit.text().strip(), self.voice_combo.currentText()
+        """
+        Return (name, voice_type, expanded_mode).
+        Existing callers can ignore the third value if they want.
+        """
+        return (
+            self.name_edit.text().strip(),
+            self.voice_combo.currentText(),
+            self.expanded_checkbox.isChecked(),
+        )
