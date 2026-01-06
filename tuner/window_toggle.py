@@ -150,17 +150,9 @@ class VowelMapView(QWidget):
 
     def update_from_bus(self, bus, analyzer=None):
         self.bus = bus
-
         # Update analyzer if needed
         if analyzer and analyzer is not self.analyzer:
             self.analyzer = analyzer
-
-        # Always ensure vowel colors exist for all calibrated vowels
-        if self.analyzer:
-            self.vowel_colors = {}
-            for vowel in self.analyzer.user_formants.keys():
-                self.vowel_colors[vowel] = next(self._color_cycle)
-
         self.compute_dynamic_ranges()
         self.update()
 
@@ -349,12 +341,17 @@ class VowelMapView(QWidget):
                     f1_vals.append(f1)
                 if f2:
                     f2_vals.append(f2)
-
         # Include interpolated vowels if available
         if hasattr(self.analyzer, "interpolated_vowels"):
             for v in self.analyzer.interpolated_vowels.values():
                 f1_vals.append(v["f1"])
                 f2_vals.append(v["f2"])
+
+        # Include interpolated vowels if available
+        if self.analyzer:
+            for vowel in self.analyzer.user_formants.keys():
+                if vowel not in self.vowel_colors:
+                    self.vowel_colors[vowel] = next(self._color_cycle)
 
         # Compute axis limits with generous margins
         if f1_vals:
@@ -370,4 +367,3 @@ class VowelMapView(QWidget):
         else:
             self.f2_min = 400
             self.f2_max = 3000
-
