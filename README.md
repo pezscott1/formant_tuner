@@ -1,49 +1,66 @@
-# Formant Tuner
-
+Formant Tuner
 Formant Tuner is a scientific and educational tool for real‑time vowel analysis, singer calibration, and acoustic feedback.
-It provides a PyQt‑based interface for measuring vowel formants (F1, F2, F3), pitch (F0), and resonance alignment, with a modern DSP pipeline and a robust calibration workflow.
+It provides a PyQt‑based interface for measuring vowel formants (F1, F2, F3), pitch (F0), and resonance alignment, backed by a modern DSP pipeline and a robust, test‑driven calibration workflow.
 
-The system is designed for singers, educators, clinicians, and researchers who want accurate, reproducible, real‑time vowel diagnostics.
+The system is designed for singers, educators, clinicians, and researchers who need accurate, reproducible, real‑time vowel diagnostics.
 
-## ✨ Features
+✨ Features
+🎙️ Live Microphone Capture
+Real‑time audio streaming via sounddevice
 
-### 🎙️ Live Microphone Capture
-- Real‑time audio streaming via sounddevice
-- Rolling audio buffers for stable spectrograms
-- Safe fallbacks for short or missing frames
+Rolling audio buffers for stable spectrograms
 
-### 🔬 DSP Pipeline
-- LPC‑based formant estimation (analysis/lpc.py)
-- Harmonic pitch estimation (analysis/pitch.py)
-- Multi‑stage smoothing (analysis/smoothing.py)
-- Robust vowel guessing (analysis/vowel.py)
-- Live scoring for tuning (analysis/scoring.py)
+Graceful fallbacks for short or missing frames
 
-### 📈 Visualization
-- Rolling spectrogram (0–4 kHz)
-- Real‑time vowel scatter plot (F2 vs F1)
-- Durable scatter artists for each vowel
-- Color‑coded feedback in calibration and tuning modes
+🔬 DSP Pipeline
+LPC‑based formant estimation (hybrid envelope + LPC)
 
-### 🗂️ Calibration Workflow
-- Prepare → Sing → Capture → Analyze
-- Automatic retries for low‑confidence frames
-- Median‑based capture logic
-- Saves calibrated F1/F2/F0 per vowel
-- Profiles stored as JSON and activated immediately
+Harmonic pitch estimation with fallback strategies
 
-### 🎛️ Tuner Mode
-- Continuous vowel tracking
-- Real‑time resonance scoring
-- Live feedback for singers and educators
+Multi‑stage smoothing for F0, F1, F2, F3
 
-### 🧪 High Test Coverage
-- Pytest suite covering DSP, smoothing, plausibility, engine wiring, calibration logic, and UI state transitions
-- No brittle pixel‑tests; structural tests for plotters
-- CI‑friendly, headless‑safe
+Confidence‑aware vowel guessing
 
-## 📁 Project Structure
-```
+Live scoring for tuning and resonance alignment
+
+📈 Visualization
+Rolling spectrogram (0–4 kHz)
+
+Real‑time vowel scatter plot (F2 vs F1)
+
+Durable artists for stable rendering
+
+Color‑coded feedback in calibration and tuner modes
+
+🗂️ Calibration Workflow
+Prepare → Sing → Capture → Analyze
+
+Automatic retries for low‑confidence frames
+
+Median‑based capture logic for stable vowel centers
+
+Expanded Mode option for advanced calibration
+
+Profiles saved as JSON and activated immediately
+
+🎛️ Tuner Mode
+Continuous vowel tracking
+
+Real‑time resonance scoring
+
+Scatter plot + pitch + formant feedback
+
+🧪 High Test Coverage
+~85–90% coverage across DSP, calibration, UI logic, and controllers
+
+Structural plotter tests (no pixel diffs)
+
+CI‑friendly and headless‑safe
+
+Full PyQt6 compatibility
+
+📁 Project Structure
+Code
 formant_tuner/
 │
 ├── analysis/
@@ -53,14 +70,14 @@ formant_tuner/
 │   ├── vowel.py               # vowel ranges, guessing, plausibility
 │   ├── vowel_data.py          # reference formants + pitch ranges
 │   ├── scoring.py             # plausibility + tuning + live scoring
-│   ├── smoothing.py           # all smoothing utilities
+│   ├── smoothing.py           # smoothing utilities
 │   └── utils.py               # helpers
 │
 ├── calibration/
-│   ├── session.py             # calibration logic (retry, capture)
+│   ├── session.py             # capture + retry logic
 │   ├── plotter.py             # spectrogram + vowel scatter
 │   ├── state_machine.py       # prep/sing/capture phases
-│   ├── dialog.py              # confirmation + error dialogs
+│   ├── dialog.py              # profile creation + expanded mode
 │   └── window.py              # calibration UI
 │
 ├── tuner/
@@ -68,46 +85,58 @@ formant_tuner/
 │   ├── live_analyzer.py       # smoothing + plausibility + UI updates
 │   ├── profile_controller.py  # profile loading/activation
 │   ├── tuner_plotter.py       # tuner visualization
-│   └── window.py              # thin PyQt wrapper
+│   └── window.py              # main PyQt window
 │
 ├── utils/
-│   └── music_utils.py         # musical helpers (note names, etc.)
+│   └── music_utils.py         # musical helpers
 │
-├── tests/                     # pytest suite (85–90% coverage)
+├── tests/                     # pytest suite
 │
 ├── main.py                    # application entry point
 ├── requirements.txt
 ├── pytest.ini
-├── structure.txt
 └── README.md
-```
-## 🚀 Installation
-```
+🚀 Installation
+Code
 pip install -r requirements.txt
 python main.py
-```
-## 🎯 Usage
+🎯 Usage
+Starting Calibration
+Launch the app
 
-### Starting Calibration
-- Launch the app
-- Choose New Profile
-- Click Calibrate
-- Follow the countdown prompts
-- Sing each vowel during the capture window
-- Accepted captures appear in the summary panel
-- Low‑confidence captures trigger retries automatically
+Select New Profile or highlight an existing one
 
-Profiles saved to:
+Click Calibrate
+
+In the dialog:
+
+Enter profile name
+
+Choose voice type
+
+(Optional) Enable Expanded Mode
+
+Follow the countdown prompts
+
+Sing each vowel during the capture window
+
+Accepted captures appear in the summary panel
+
+Low‑confidence captures retry automatically
+
+Profiles are saved to:
+
+Code
 calibration/profiles/<profile_name>.json
+Using the Tuner
+Switch to Tuner Mode
 
-### Using the Tuner
-- Switch to Tuner Mode
-- Live vowel tracking begins immediately
-- Scatter plot and scores update continuously
+Live vowel tracking begins immediately
 
-## 📄 Profile Format
+Scatter plot and scores update continuously
 
-``` 
+📄 Profile Format
+json
 {
   "i":  { "f1": 280.0, "f2": 2852.8, "f0": 145.0 },
   "ɛ":  { "f1": 595.6, "f2": 2794.9, "f0": 139.1 },
@@ -116,29 +145,39 @@ calibration/profiles/<profile_name>.json
   "u":  { "f1": 653.7, "f2": 2823.9, "f0": 127.3 },
   "voice_type": "baritone"
 }
-```
-
-
-## 🧠 Development Notes
-
+🧠 Development Notes
 DSP
-- LPC order auto‑selected based on sample rate
-- Median smoothing for F1/F2/F3
-- Plausibility gating prevents wild outliers
-- Back‑vowel heuristics for /ɔ/ and /u/
+LPC order auto‑selected based on sample rate
+
+Median smoothing for F1/F2/F3
+
+Plausibility gating prevents wild outliers
+
+Back‑vowel heuristics for /ɔ/ and /u/
 
 UI
-- All PyQt updates are exception‑tolerant
-- Plotting throttled for performance
-- Durable artists prevent flicker
+Fully migrated to PyQt6
+
+All updates exception‑tolerant
+
+Plotting throttled for performance
+
+Durable artists prevent flicker
+
+Expanded‑mode selection now lives in the profile dialog
 
 Testing
-- Engine wiring tests
-- Smoothing + plausibility tests
-- Calibration state machine tests
-- Structural plotter tests (no pixel diffs)
-- High‑coverage CI‑friendly suite
+Engine wiring tests
 
-## 📜 License
+Smoothing + plausibility tests
 
+Calibration state machine tests
+
+Structural plotter tests
+
+Full PyQt6 compatibility
+
+398 tests, all passing
+
+📜 License
 MIT License — free to use, modify, and distribute.

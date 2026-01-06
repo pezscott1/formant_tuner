@@ -20,6 +20,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      - name: Install Qt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libopengl0 \
+            libxkbcommon0 \
+            libxcb-xinerama0 \
+            libxcb-cursor0
+
       # Install system dependencies
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
