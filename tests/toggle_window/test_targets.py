@@ -14,8 +14,7 @@ def test_draw_targets_no_crash(qtbot):
     vm.analyzer = FakeAnalyzer()
     vm.compute_dynamic_ranges()
 
-    img = QImage(400, 400, QImage.Format.Format_ARGB32
-)
+    img = QImage(400, 400, QImage.Format.Format_ARGB32)
     painter = QPainter(img)
 
     # Should not crash

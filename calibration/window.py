@@ -202,7 +202,8 @@ class CalibrationWindow(QMainWindow):
         if evt == "prep_countdown":
             self._mic_active = False
             self.analyzer.pause()
-            self.status_panel.appendPlainText(f"Prepare: /{self.state.current_vowel}/ in {event['secs']}…")
+            self.status_panel.appendPlainText(
+                f"Prepare: /{self.state.current_vowel}/ in {event['secs']}…")
             self.status_panel.verticalScrollBar().setValue(
                 self.status_panel.verticalScrollBar().maximum()
             )
@@ -545,7 +546,8 @@ class CalibrationWindow(QMainWindow):
             # If max retries reached, handle it immediately
             if event["event"] == "max_retries":
                 self.status_panel.appendPlainText(
-                    f"[{ts}] Skipping /{vowel}/ after {self.state.MAX_RETRIES} failed attempts"
+                    f"[{ts}] Skipping /{vowel}/ after "
+                    f"{self.state.MAX_RETRIES} failed attempts"
                 )
                 # Advance to next vowel (already done inside state machine)
                 self.phase_timer.start(1000)

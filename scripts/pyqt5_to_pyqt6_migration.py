@@ -1,4 +1,3 @@
-import os
 import re
 import shutil
 from pathlib import Path
@@ -42,8 +41,10 @@ ENUM_REPLACEMENTS = {
     r"Qt\.NoFocus": "Qt.FocusPolicy.NoFocus",
 
     # Item selection
-    r"QAbstractItemView\.SingleSelection": "QAbstractItemView.SelectionMode.SingleSelection",
-    r"QAbstractItemView\.SelectItems": "QAbstractItemView.SelectionBehavior.SelectItems",
+    r"QAbstractItemView\.SingleSelection":
+        "QAbstractItemView.SelectionMode.SingleSelection",
+    r"QAbstractItemView\.SelectItems":
+        "QAbstractItemView.SelectionBehavior.SelectItems",
 }
 
 VALIDATOR_REPLACEMENTS = {
@@ -52,7 +53,8 @@ VALIDATOR_REPLACEMENTS = {
 
 MPL_REPLACEMENTS = {
     r"matplotlib\.use\([\"']Qt5Agg[\"']\)": "matplotlib.use('QtAgg')",
-    r"matplotlib\.use\([\"']Qt5Agg[\"'], force=True\)": "matplotlib.use('QtAgg', force=True)",
+    r"matplotlib\.use\([\"']Qt5Agg[\"'], force=True\)":
+        "matplotlib.use('QtAgg', force=True)",
 }
 
 
@@ -111,7 +113,6 @@ def main():
                 print(f"Skipping non-UTF8 file: {pyfile}")
 
     print("Migration complete.")
-
 
 
 if __name__ == "__main__":

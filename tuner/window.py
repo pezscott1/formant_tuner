@@ -165,20 +165,24 @@ class TunerWindow(QMainWindow):
 
         # Profile list container
         profile_container = QWidget()
-        profile_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        profile_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         profile_layout = QVBoxLayout(profile_container)
         profile_layout.setContentsMargins(0, 0, 0, 0)
         profile_layout.setSpacing(6)
 
         self.profile_list = ClearableListWidget()
-        self.profile_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.profile_list.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.profile_list.setStyleSheet(
             "QListWidget { font-size: 11pt; padding: 4px; border: 1px solid #ccc; "
             "border-radius: 4px; }"
         )
         profile_layout.addWidget(self.profile_list)
-        self.profile_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.profile_list.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.profile_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
+        self.profile_list.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectItems)
         self.profile_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.btn_view_profile = QPushButton("View Profile")
