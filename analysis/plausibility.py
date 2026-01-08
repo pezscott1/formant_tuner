@@ -3,10 +3,9 @@ import numpy as np
 from typing import Optional, Dict, Any
 from analysis.vowel_data import PITCH_RANGES, VOWEL_CENTERS
 
-
 # ---------------------------------------------------------
 # Adaptive vowel window
-# ---------------------------------------------------------
+# --------------------------------------------------------
 
 _DEFAULT_WINDOWS = {
     "tenor": {
@@ -84,14 +83,23 @@ def is_plausible_formants(
     # -----------------------------
     # Basic sanity
     # -----------------------------
+    # Basic sanity
     if f1 is None or f2 is None:
         return False, "missing"
     if np.isnan(f1) or np.isnan(f2):
         return False, "nan"
     if f1 > f2:
         return False, "swapped"
-    if f1 < 120 or f2 < 250:
-        return False, "too-low"
+
+    # Allow lower F2 for back vowels
+    if vowel in ("u", "ɔ"):
+        if f1 < 120:
+            return False, "too-low"
+        if f2 < 150:
+            return False, "too-low"
+    else:
+        if f1 < 120 or f2 < 250:
+            return False, "too-low"
 
     # If no vowel target → accept
     if vowel is None:

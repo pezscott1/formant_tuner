@@ -1,9 +1,9 @@
 # test_interpolation_pipeline.py
-from calibration.session import CalibrationSession
 from analysis.vowel_data import TRIANGLES, TRIANGLE_WEIGHTS, STANDARD_VOWELS
 from tuner.profile_controller import ProfileManager
 from pathlib import Path
 import json
+from calibration.session import CalibrationSession
 
 
 # ------------------------------------------------------------
@@ -353,9 +353,7 @@ def test_extract_formants_ignores_invalid_entries(tmp_path):
     assert "bad2" not in fmts
 
     # bad3 is normalized, so it *should* appear
-    assert "bad3" in fmts
-    assert fmts["bad3"]["f1"] == "not"
-    assert fmts["bad3"]["f2"] == "valid"
+    assert "bad3" not in fmts
 
 
 def test_round_trip_save_load(tmp_path):
@@ -381,3 +379,21 @@ def test_round_trip_save_load(tmp_path):
     assert "i" in fmts
     assert fmts["i"]["f1"] == 300
     assert fmts["i"]["f2"] == 2700
+
+
+def test_interpolation_still_correct_after_fixes():
+    sess = CalibrationSession(
+        profile_name="interp",
+        voice_type="baritone",
+        vowels=list({v for tri in TRIANGLES.values() for v in tri}),
+        profile_manager=None,
+    )
+
+    # Give predictable anchors
+    for idx, v in enumerate(sorted(sess.vowels)):
+        sess.data[v] = {"f1": 100 + idx, "f2": 200 + idx}
+        sess.calibrated_vowels.add(v)
+
+    interp = sess.compute_interpolated_vowels()
+
+    assert set(interp.keys()) == set(TRIANGLES.keys())

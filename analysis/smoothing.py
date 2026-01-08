@@ -284,8 +284,9 @@ class FormantStabilityTracker:
         f2_arr = np.asarray(self.f2_buf, dtype=float)
         f3_arr = np.asarray(self.f3_buf, dtype=float)
 
-        # Only frames where all 3 formants are finite
-        full_mask = np.isfinite(f1_arr) & np.isfinite(f2_arr) & np.isfinite(f3_arr)
+        # Require at least min_full_frames where F1 and F2 are finite.
+        # F3 is optional.
+        full_mask = np.isfinite(f1_arr) & np.isfinite(f2_arr)
         full_count = int(np.sum(full_mask))
 
         if full_count < self.min_full_frames:
@@ -293,13 +294,20 @@ class FormantStabilityTracker:
 
         f1_full = f1_arr[full_mask]
         f2_full = f2_arr[full_mask]
-        f3_full = f3_arr[full_mask]
+        f3_full = f3_arr[full_mask & np.isfinite(f3_arr)]
 
-        # Ridge collapse detection
+        # Ridge collapse detection (only if F3 present)
         def is_ridge_band(x):
             return np.all((2400 < x) & (x < 2800))
 
-        if is_ridge_band(f1_full) and is_ridge_band(f2_full) and is_ridge_band(f3_full):
+        if (
+                f1_full.size > 0
+                and f2_full.size > 0
+                and f3_full.size > 0
+                and is_ridge_band(f1_full)
+                and is_ridge_band(f2_full)
+                and is_ridge_band(f3_full)
+        ):
             return False, float("inf")
 
         # Robust trimming
@@ -313,12 +321,12 @@ class FormantStabilityTracker:
 
         f1_full = trim(f1_full)
         f2_full = trim(f2_full)
-        f3_full = trim(f3_full)
+        if f3_full.size > 0:
+            f3_full = trim(f3_full)
 
-        # Variance-based stability
         f1_var = float(np.var(f1_full)) if f1_full.size > 0 else float("inf")
         f2_var = float(np.var(f2_full)) if f2_full.size > 0 else float("inf")
-        f3_var = float(np.var(f3_full)) if f3_full.size > 0 else float("inf")
+        f3_var = float(np.var(f3_full)) if f3_full.size > 0 else 0.0
 
         stability_score = f1_var + f2_var + f3_var
         is_stable = stability_score <= self.var_threshold

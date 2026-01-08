@@ -255,6 +255,15 @@ class ProfileManager:
             f1 = norm.get("f1")
             f2 = norm.get("f2")
 
+            # Require numeric f1/f2
+            try:
+                if f1 is not None:
+                    f1 = float(f1)
+                if f2 is not None:
+                    f2 = float(f2)
+            except Exception:
+                continue
+
             f0 = norm.get("f0")
             if f0 is None:
                 f0 = norm.get("f3")

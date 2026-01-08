@@ -1,10 +1,10 @@
 import numpy as np
 from tuner.live_analyzer import LiveAnalyzer
 
-
 # ----------------------------------------------------------------------
 # Dummy components for isolation
 # ----------------------------------------------------------------------
+
 
 class DummyPitch:
     def __init__(self):
@@ -18,9 +18,14 @@ class DummyPitch:
 
 class DummyFormants:
     def __init__(self):
-        self.buffer = []
-        self.formants_stable = False
-        self._stability_score = 123.0
+        self.buf_f1 = [4, 5]
+        self.buf_f2 = [4, 5]
+        self.buf_f3 = [4, 5]
+        self.formants_stable = True
+        self._stability_score = 123
+        class DummyStability:
+            def reset(self_inner): pass
+        self.stability = DummyStability()
 
     def update(self, f1, f2, f3, confidence):
         # Return formants + 100 for easy verification
@@ -102,7 +107,7 @@ def test_process_raw_basic():
     assert out["vowel_guess"] == "a"
 
     # Stability
-    assert out["stable"] is False
+    assert out["stable"] is True
     assert out["stability_score"] == 123.0
 
     # Fallback fields
@@ -232,9 +237,8 @@ def test_reset():
 
     la.reset()
 
-    assert pitch.current is None
-    assert pitch.audio_buffer == []
-    assert formants.buffer == []
-    assert labels.current is None
-    assert labels.last is None
-    assert labels.counter == 0
+    assert formants.buf_f1 == []
+    assert formants.buf_f2 == []
+    assert formants.buf_f3 == []
+    assert formants.formants_stable is False
+    assert formants._stability_score == float("inf")

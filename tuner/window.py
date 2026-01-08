@@ -448,14 +448,10 @@ class TunerWindow(QMainWindow):
             v: entry for v, entry in profile.items()
             if isinstance(entry, dict)
         }
-        print(profile)
-        print(self.live_analyzer.user_formants)
         cal = profile.get("calibrated_vowels", [])
         interp = profile.get("interpolated_vowels", [])
         self.vowel_map_view.set_vowel_status(cal, interp)
 
-        # Copy formants from engine → analyzer
-        self.live_analyzer.user_formants = dict(self.tuner.engine.user_formants)
         # Update vowel map
         self.vowel_map_view.analyzer = self.live_analyzer
         self.vowel_map_view.compute_dynamic_ranges()

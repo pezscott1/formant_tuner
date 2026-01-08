@@ -6,6 +6,8 @@ from analysis.plausibility import (
     is_plausible_formants,
     is_plausible_pitch,
 )
+print("IMPORTED FROM MODULE:", is_plausible_formants.__module__)
+print("IMPORTED FROM FILE:", is_plausible_formants.__code__.co_filename)
 
 
 # ----------------------------------------------------------------------
@@ -123,3 +125,14 @@ def test_plausible_pitch_ok():
     ok, reason = is_plausible_pitch(200)
     assert ok
     assert reason == "ok"
+
+
+def test_non_back_vowel_low_f2_rejected():
+    ok, reason = is_plausible_formants(
+        f1=150,
+        f2=180,
+        vowel="e",
+        voice_type="baritone",
+    )
+    assert ok is False
+    assert reason == "too-low"

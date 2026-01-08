@@ -221,8 +221,8 @@ class CalibrationSession:
 
         # Shallow copy of self.data so we don't mutate the original
         profile_data = dict(self.data)
-        # Add interpolated vowels
-        # Add interpolated vowels (computed from final profile)
+
+        # Collect all vowels with f1 present
         all_vowels = {
             v for v, entry in profile_data.items()
             if isinstance(entry, dict) and "f1" in entry
@@ -230,11 +230,9 @@ class CalibrationSession:
         calibrated = set(self.calibrated_vowels)
         interpolated = sorted(all_vowels - calibrated)
         self.interpolated_vowels = set(interpolated)
-        profile_data["interpolated_vowels"] = interpolated
 
-        # store calibrated + interpolated lists
         profile_data["calibrated_vowels"] = list(self.calibrated_vowels)
-        profile_data["interpolated_vowels"] = list(self.interpolated_vowels)
+        profile_data["interpolated_vowels"] = sorted(self.interpolated_vowels)
         profile_data["voice_type"] = self.voice_type
 
         # Prevent double suffixing

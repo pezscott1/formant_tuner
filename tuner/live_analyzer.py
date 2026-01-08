@@ -256,14 +256,28 @@ class LiveAnalyzer:
 
     def reset(self):
         """Reset all smoothing state, e.g., between calibrations or sessions."""
+        # Pitch smoother
         if hasattr(self.pitch_smoother, "current"):
             self.pitch_smoother.current = None
         if hasattr(self.pitch_smoother, "audio_buffer"):
             self.pitch_smoother.audio_buffer.clear()
 
-        if hasattr(self.formant_smoother, "buffer"):
-            self.formant_smoother.buffer.clear()
+        # Formant smoother (MedianSmoother)
+        fs = self.formant_smoother
+        if hasattr(fs, "buf_f1"):
+            fs.buf_f1.clear()
+        if hasattr(fs, "buf_f2"):
+            fs.buf_f2.clear()
+        if hasattr(fs, "buf_f3"):
+            fs.buf_f3.clear()
+        if hasattr(fs, "stability") and hasattr(fs.stability, "reset"):
+            fs.stability.reset()
+        if hasattr(fs, "formants_stable"):
+            fs.formants_stable = False
+        if hasattr(fs, "_stability_score"):
+            fs._stability_score = float("inf")
 
+        # Label smoother
         if hasattr(self.label_smoother, "current"):
             self.label_smoother.current = None
         if hasattr(self.label_smoother, "last"):
