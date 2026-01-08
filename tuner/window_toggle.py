@@ -193,7 +193,8 @@ class VowelMapView(QWidget):
         ]
         print("CAL:", self.calibrated_vowels)
         print("INTERP:", self.interpolated_vowels)
-        print("ANALYZER KEYS:", list(self.analyzer.user_formants.keys()) if self.analyzer else None)
+        print("ANALYZER KEYS:", list(self.analyzer.user_formants.keys())
+              if self.analyzer else None)
 
         for vowel, entry in self.analyzer.user_formants.items():
             print("This is inside vowel, entry for loop.")

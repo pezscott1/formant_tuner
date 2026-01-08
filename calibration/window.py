@@ -99,8 +99,6 @@ class CalibrationWindow(QMainWindow):
 
         # Store durable vowel anchors
         self._interpolated_vowels = {}
-        all_vowels = self.vowels_to_calibrate
-
         # -----------------------------------------------------
         # UI Setup
         # -----------------------------------------------------

@@ -30,7 +30,8 @@ class ProfileViewerWindow(QMainWindow):
             profile_data.get("calibrated_vowels", default_calibrated))
 
         self.interpolated_vowels = set(
-            profile_data.get("interpolated_vowels", raw_vowels - self.calibrated_vowels))
+            profile_data.get("interpolated_vowels",
+                             raw_vowels - self.calibrated_vowels))
 
         self.show_interpolated = True
         # Colors
