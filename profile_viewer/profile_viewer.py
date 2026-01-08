@@ -1,11 +1,12 @@
 # profile_viewer.py
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QFrame, QTextEdit
+    QLabel, QFrame, QTextEdit, QCheckBox
 )
 from unittest.mock import MagicMock
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from .vowel_colors import vowel_color_for
 
 
 class ProfileViewerWindow(QMainWindow):
@@ -22,20 +23,17 @@ class ProfileViewerWindow(QMainWindow):
         # Store profile
         self.profile = profile_data or {}
 
-        # Identify calibrated vs interpolated vowels
-        self.calibrated_vowels = {"i", "ɛ", "ɑ", "ɔ", "u"}
-        self.interpolated_vowels = {
-            v for v in self.profile.keys() if v not in self.calibrated_vowels
-        }
+        raw_vowels = {v for v in profile_data if isinstance(profile_data[v], dict)}
 
+        default_calibrated = {"i", "ɛ", "ɑ", "ɔ", "u"}
+        self.calibrated_vowels = set(
+            profile_data.get("calibrated_vowels", default_calibrated))
+
+        self.interpolated_vowels = set(
+            profile_data.get("interpolated_vowels", raw_vowels - self.calibrated_vowels))
+
+        self.show_interpolated = True
         # Colors
-        self.colors = {
-            "i": "red",
-            "ɛ": "green",
-            "ɑ": "blue",
-            "ɔ": "purple",
-            "u": "orange",
-        }
         self.interp_color = "gray"
 
         if headless:
@@ -71,6 +69,10 @@ class ProfileViewerWindow(QMainWindow):
     # ---------------------------------------------------------
     # UI Construction
     # ---------------------------------------------------------
+    def _on_toggle_interpolated(self, state):
+        self.show_interpolated = bool(state)
+        self._plot_profile()
+
     def _resize_and_center(self):
         if self.headless:
             return
@@ -109,12 +111,18 @@ class ProfileViewerWindow(QMainWindow):
         legend_label = QLabel("Legend")
         legend_label.setStyleSheet("font-weight: bold; font-size: 10pt;")
 
+        self.chk_show_interpolated = QCheckBox("Show interpolated vowels")
+        self.chk_show_interpolated.setChecked(True)
+        self.chk_show_interpolated.stateChanged.connect(  # type: ignore
+            self._on_toggle_interpolated)
+        layout.addWidget(self.chk_show_interpolated)
+
         lines = []
         for vowel, data in self.profile.items():
             f1 = data.get("f1")
             f2 = data.get("f2")
             f0 = data.get("f0")
-            color = self.colors.get(vowel, self.interp_color)
+            color = vowel_color_for(vowel)
             f0_display = f"{f0:.1f}" if isinstance(f0, (int, float)) else "—"
             lines.append(
                 f"<span style='color:{color}; font-weight:bold'>/{vowel}/</span> "
@@ -130,13 +138,9 @@ class ProfileViewerWindow(QMainWindow):
 
         self.legend_panel.setHtml("""
         <b>Legend</b><br>
-        <span style='color:red'>/i/</span>, <span style='color:green'>/ɛ/</span>,
-        <span style='color:blue'>/ɑ/</span>,
-        etc. = calibrated vowels<br>
-        <span style='color:gray'>/e/</span>, <span style='color:gray'>/ɪ/</span>,
-        etc. = interpolated vowels<br>
-        X marker = calibrated<br>
-        Circle = interpolated
+        Colored <b>X</b> markers = calibrated vowels<br>
+        Gray <b>○</b> markers = interpolated vowels<br>
+        Each calibrated vowel has a unique color assigned automatically.
         """)
 
         layout.addWidget(self.legend_panel)
@@ -171,7 +175,7 @@ class ProfileViewerWindow(QMainWindow):
             f1 = data.get("f1")
             f2 = data.get("f2")
             f0 = data.get("f0")
-            color = self.colors.get(vowel, self.interp_color)
+            color = vowel_color_for(vowel)
             lines.append(
                 f"<span style='color:{color}; font-weight:bold'>/{vowel}/</span> "
                 f"F1={f1:.1f}  F2={f2:.1f}  F0={f0:.1f}"
@@ -201,8 +205,15 @@ class ProfileViewerWindow(QMainWindow):
                 continue
             f1 = self.profile[vowel]["f1"]
             f2 = self.profile[vowel]["f2"]
-            color = self.colors.get(vowel, "black")
-            ax.scatter(f2, f1, s=200, c=color, marker="x", linewidths=3)
+            color = vowel_color_for(vowel)
+            print(f"Plotting /{vowel}/ with color {color}")
+            ax.scatter(
+                f2, f1,
+                s=200,
+                color=color,
+                marker="x",
+                linewidths=3,
+            )
             ax.text(
                 f2 + 20,
                 f1 - 20,
@@ -215,30 +226,30 @@ class ProfileViewerWindow(QMainWindow):
                 va="center",
             )
 
-        # Plot interpolated vowels
-        for vowel in self.interpolated_vowels:
-            data = self.profile.get(vowel)
-            if not data:
-                continue
-            f1 = data.get("f1")
-            f2 = data.get("f2")
-            ax.scatter(
-                f2, f1,
-                s=160,
-                edgecolors=self.interp_color,
-                marker="o",
-                facecolors="none",
-                linewidths=2,
-            )
-            ax.text(
-                f2 + 20,
-                f1 - 20,
-                f"/{vowel}/",
-                fontsize=12,
-                color=self.interp_color,
-                bbox=dict(facecolor="white", alpha=0.4, edgecolor="none", pad=1.0),
-                ha="left",
-                va="center",
-            )
+        if self.show_interpolated:
+            for vowel in self.interpolated_vowels:
+                data = self.profile.get(vowel)
+                if not data:
+                    continue
+                f1 = data.get("f1")
+                f2 = data.get("f2")
+                ax.scatter(
+                    f2, f1,
+                    s=160,
+                    edgecolors=self.interp_color,
+                    marker="o",
+                    facecolors="none",
+                    linewidths=2,
+                )
+                ax.text(
+                    f2 + 20,
+                    f1 - 20,
+                    f"/{vowel}/",
+                    fontsize=12,
+                    color=self.interp_color,
+                    bbox=dict(facecolor="white", alpha=0.4, edgecolor="none", pad=1.0),
+                    ha="left",
+                    va="center",
+                )
 
         self.canvas.draw_idle()

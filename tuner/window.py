@@ -31,6 +31,7 @@ from calibration.dialog import ProfileDialog
 from calibration.window import CalibrationWindow
 from tuner.spectrogram_view import SpectrogramView
 from analysis.vowel_data import expanded_vowels_for_voice, STANDARD_VOWELS
+from profile_viewer.vowel_colors import vowel_color_for
 
 
 class ClearableListWidget(QListWidget):
@@ -442,17 +443,27 @@ class TunerWindow(QMainWindow):
 
         item = items[0]
         base = item.data(Qt.ItemDataRole.UserRole)
-        self.tuner.load_profile(base)
+        profile = self.tuner.profile_manager.load_profile_json(base)
+        self.live_analyzer.user_formants = {
+            v: entry for v, entry in profile.items()
+            if isinstance(entry, dict)
+        }
+        print(profile)
+        print(self.live_analyzer.user_formants)
+        cal = profile.get("calibrated_vowels", [])
+        interp = profile.get("interpolated_vowels", [])
+        self.vowel_map_view.set_vowel_status(cal, interp)
+
         # Copy formants from engine → analyzer
         self.live_analyzer.user_formants = dict(self.tuner.engine.user_formants)
         # Update vowel map
         self.vowel_map_view.analyzer = self.live_analyzer
         self.vowel_map_view.compute_dynamic_ranges()
         # Assign colors for all calibrated vowels immediately when profile loads
-        self.vowel_map_view.vowel_colors = {}
-        for vowel in self.analyzer.user_formants.keys():
-            self.vowel_map_view.vowel_colors[vowel] = (
-                next(self.vowel_map_view.color_cycle))
+        self.vowel_map_view.vowel_colors = {
+            vowel: vowel_color_for(vowel)
+            for vowel in self.analyzer.user_formants.keys()
+        }
         self.vowel_map_view.update()
 
     def _populate_profiles(self):
@@ -653,8 +664,6 @@ class TunerWindow(QMainWindow):
 
     def _start_mic_ui(self):
         def callback(indata, _frames, _time, status):
-            print("AUDIO CALLBACK ANALYZER ID:", id(self.live_analyzer))
-
             if status:
                 print("[AUDIO STATUS]", status)
             mono = indata[:, 0].astype(np.float64, copy=False)

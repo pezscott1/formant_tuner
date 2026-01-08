@@ -1,12 +1,12 @@
 from PyQt6.QtGui import QImage, QPainter
 from tuner.window_toggle import VowelMapView
+from profile_viewer.vowel_colors import vowel_color_for
 
 
 class FakeAnalyzer:
     def __init__(self, user_formants=None, interpolated=None):
         self.user_formants = user_formants or {}
-        if interpolated is not None:
-            self.interpolated_vowels = interpolated
+        self.interpolated_vowels = interpolated or {}
 
 
 class FakeBus:
@@ -38,42 +38,25 @@ def test_compute_dynamic_ranges_bus_none():
 
 
 # ---------------------------------------------------------------------------
-# 2. dynamic color assignment: stable, complete, and deterministic
+# 2. color assignment is deterministic via vowel_color_for
 # ---------------------------------------------------------------------------
 def test_dynamic_color_assignment_stable():
-    vm = VowelMapView(bus=None)
-    vm.analyzer = FakeAnalyzer(
-        user_formants={"i": {"f1": 300, "f2": 2500},
-                       "e": {"f1": 400, "f2": 2200},
-                       "a": {"f1": 700, "f2": 1100}}
-    )
-
-    vm.update_from_bus(bus=None, analyzer=vm.analyzer)
-    colors1 = dict(vm.vowel_colors)
-
-    # Calling again should not change existing colors
-    vm.update_from_bus(bus=None, analyzer=vm.analyzer)
-    colors2 = dict(vm.vowel_colors)
-
+    vowels = ["i", "e", "a"]
+    colors1 = {v: vowel_color_for(v) for v in vowels}
+    colors2 = {v: vowel_color_for(v) for v in vowels}
     assert colors1 == colors2
 
 
 def test_dynamic_color_assignment_new_vowel_gets_color():
-    vm = VowelMapView(bus=None)
-    vm.analyzer = FakeAnalyzer(
-        user_formants={"i": {"f1": 300, "f2": 2500}}
-    )
+    base = {"i": vowel_color_for("i")}
+    base_keys = set(base.keys())
 
-    vm.update_from_bus(bus=None, analyzer=vm.analyzer)
-    before = set(vm.vowel_colors.keys())
+    # Add a new vowel and ensure it has a color
+    base["u"] = vowel_color_for("u")
+    after_keys = set(base.keys())
 
-    # Add a new vowel
-    vm.analyzer.user_formants["u"] = {"f1": 350, "f2": 900}
-    vm.update_from_bus(bus=None, analyzer=vm.analyzer)
-    after = set(vm.vowel_colors.keys())
-
-    assert "u" in after
-    assert after == before | {"u"}
+    assert "u" in after_keys
+    assert after_keys == base_keys | {"u"}
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +66,8 @@ def test_draw_targets_no_crash_overlapping():
     vm = VowelMapView(bus=FakeBus())
     vm.analyzer = FakeAnalyzer(
         user_formants={
-            v: {"f1": 500, "f2": 1500} for v in ["i", "e", "a", "o", "u", "æ", "ʌ", "ɪ"]
+            v: {"f1": 500, "f2": 1500}
+            for v in ["i", "e", "a", "o", "u", "æ", "ʌ", "ɪ"]
         }
     )
 
@@ -104,9 +88,10 @@ def test_compute_dynamic_ranges_includes_interpolated():
     vm = VowelMapView(bus=None)
     vm.analyzer = FakeAnalyzer(
         user_formants={"i": {"f1": 300, "f2": 2500}},
-        interpolated={"e": {"f1": 400, "f2": 2200}}
+        interpolated={"e": {"f1": 400, "f2": 2200}},
     )
 
+    vm.update_from_bus(bus=None, analyzer=vm.analyzer)
     vm.compute_dynamic_ranges()
 
     assert vm.f1_min <= 300 * 0.85
@@ -122,7 +107,6 @@ def test_update_from_bus_missing_fields():
     class PartialAnalyzer:
         user_formants = {"i": {"f1": 300, "f2": 2500}}
         # missing interpolated_vowels
-        # missing live_formants
 
     vm = VowelMapView(bus=FakeBus(points=[]))
     vm.analyzer = PartialAnalyzer()

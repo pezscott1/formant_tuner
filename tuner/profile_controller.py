@@ -241,9 +241,8 @@ class ProfileManager:
         out = {}
         if not isinstance(raw_dict, dict):
             return out
-
         for vowel, entry in raw_dict.items():
-            if vowel == "voice_type":
+            if vowel in ("voice_type", "calibrated_vowels", "interpolated_vowels"):
                 continue
 
             if not isinstance(entry, (dict, list, tuple)):

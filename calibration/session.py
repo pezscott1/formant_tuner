@@ -17,7 +17,8 @@ class CalibrationSession:
         # Core data structures
         self.data = {}          # vowel → dict of f1,f2,f0,confidence,stability,weight
         self.retries_map = {}   # vowel → retry count
-
+        self.calibrated_vowels = set()
+        self.interpolated_vowels = set()
         # Load existing profile if present
         if isinstance(existing_profile, dict):
             for vowel, entry in existing_profile.items():
@@ -149,6 +150,7 @@ class CalibrationSession:
                 "weight": 1.0,
                 "saved_at": datetime.now(timezone.utc).isoformat(),
             }
+            self.calibrated_vowels.add(vowel)
             return True, False, f"Accepted first measurement for /{vowel}/"
 
         # -----------------------------
@@ -195,7 +197,7 @@ class CalibrationSession:
             "weight": new_weight,
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
-
+        self.calibrated_vowels.add(vowel)
         return True, False, f"Updated /{vowel}/ (weight={new_weight:.1f})"
 
     def _reject_capture(self, vowel: str, reason: str):
@@ -220,10 +222,19 @@ class CalibrationSession:
         # Shallow copy of self.data so we don't mutate the original
         profile_data = dict(self.data)
         # Add interpolated vowels
-        interpolated = self.compute_interpolated_vowels()
-        for v, vals in interpolated.items():
-            if v not in profile_data:
-                profile_data[v] = vals
+        # Add interpolated vowels (computed from final profile)
+        all_vowels = {
+            v for v, entry in profile_data.items()
+            if isinstance(entry, dict) and "f1" in entry
+        }
+        calibrated = set(self.calibrated_vowels)
+        interpolated = sorted(all_vowels - calibrated)
+        self.interpolated_vowels = set(interpolated)
+        profile_data["interpolated_vowels"] = interpolated
+
+        # store calibrated + interpolated lists
+        profile_data["calibrated_vowels"] = list(self.calibrated_vowels)
+        profile_data["interpolated_vowels"] = list(self.interpolated_vowels)
         profile_data["voice_type"] = self.voice_type
 
         # Prevent double suffixing

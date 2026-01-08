@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout,
 from PyQt6.QtGui import QPainter, QColor, QPen
 from PyQt6.QtCore import Qt, QRect
 import numpy as np
-import itertools
+from profile_viewer.vowel_colors import vowel_color_for
 
 
 class ModeToggleBar(QWidget):
@@ -103,6 +103,8 @@ class VowelMapView(QWidget):
         self.bus = bus
         self.setMinimumSize(300, 300)
         self.analyzer = None
+        self.calibrated_vowels = set()
+        self.interpolated_vowels = set()
 
         # Hold-buffer for dot persistence
         self.last_valid_f1 = None
@@ -131,23 +133,6 @@ class VowelMapView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.color_cycle = itertools.cycle([
-            QColor(0, 200, 255),
-            QColor(0, 150, 255),
-            QColor(255, 100, 100),
-            QColor(255, 80, 0),
-            QColor(255, 180, 0),
-            QColor(100, 255, 100),
-            QColor(80, 200, 80),
-            QColor(200, 80, 200),
-            QColor(150, 150, 255),
-            QColor(255, 150, 150),
-            QColor(150, 255, 150),
-            QColor(255, 255, 150),
-        ])
-
-        self.vowel_colors = {}
-
     def update_from_bus(self, bus, analyzer=None):
         self.bus = bus
         # Update analyzer if needed
@@ -155,6 +140,10 @@ class VowelMapView(QWidget):
             self.analyzer = analyzer
         self.compute_dynamic_ranges()
         self.update()
+
+    def set_vowel_status(self, calibrated, interpolated):
+        self.calibrated_vowels = set(calibrated)
+        self.interpolated_vowels = set(interpolated)
 
     # ------------------------------------------------------------
     # Drawing helpers
@@ -196,11 +185,18 @@ class VowelMapView(QWidget):
     def draw_targets(self, painter, w, h):
         if not self.analyzer or not hasattr(self.analyzer, "user_formants"):
             return
+        print("DRAW TARGETS CALLED, ANALYZER =", self.analyzer)
         occupied = []
-        # Use a neutral pen only for gridlines or fallback text
-        painter.setPen(QPen(QColor(230, 230, 230), 1))
+        offsets = [
+            (0, -20), (20, -20), (20, 0), (20, 20),
+            (0, 20), (-20, 20), (-20, 0), (-20, -20)
+        ]
+        print("CAL:", self.calibrated_vowels)
+        print("INTERP:", self.interpolated_vowels)
+        print("ANALYZER KEYS:", list(self.analyzer.user_formants.keys()) if self.analyzer else None)
 
         for vowel, entry in self.analyzer.user_formants.items():
+            print("This is inside vowel, entry for loop.")
             f1 = entry.get("f1")
             f2 = entry.get("f2")
             if not f1 or not f2:
@@ -208,32 +204,39 @@ class VowelMapView(QWidget):
 
             x = float(self.f2_to_x(f2, w))
             y = float(self.f1_to_y(f1, h))
-            label_x = x + (24 if x < w / 2 else -30)
-            label_y = y + (-10 if y < h / 2 else 20)
-            label_rect = QRect(int(label_x), int(label_y - 12), 30, 20)
-            # Try up to 8 offsets around the point
-            offsets = [
-                (0, -20), (20, -20), (20, 0), (20, 20),
-                (0, 20), (-20, 20), (-20, 0), (-20, -20)
-            ]
 
+            # -----------------------------
+            # Compute label placement FIRST
+            # -----------------------------
+            base_x = x + (24 if x < w / 2 else -30)
+            base_y = y + (-10 if y < h / 2 else 20)
+            label_rect = QRect(int(base_x), int(base_y - 12), 30, 20)
+
+            # Apply offsets to avoid collisions
             for dx, dy in offsets:
                 test_rect = label_rect.translated(dx, dy)
                 if not any(test_rect.intersects(r) for r in occupied):
                     label_rect = test_rect
                     break
-            painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
-            occupied.append(label_rect)
-            color = self.vowel_colors.get(vowel, QColor(180, 180, 180))
+            # -----------------------------
+            # Draw calibrated vs interpolated
+            # -----------------------------
+            if vowel in self.calibrated_vowels:
+                color = QColor(vowel_color_for(vowel))
+                painter.setPen(QPen(color, 2))
+                painter.drawEllipse(int(x - 20), int(y - 20), 40, 40)
 
-            # Draw the label in the vowel’s color
-            painter.setPen(QPen(color, 1))
-            painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
-            occupied.append(label_rect)
+                painter.setPen(QPen(color, 1))
+                painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
 
-            # Draw the vowel target ellipse
-            painter.setPen(QPen(color, 2))
-            painter.drawEllipse(int(x - 20), int(y - 20), 40, 40)
+            elif vowel in self.interpolated_vowels:
+                painter.setPen(QPen(QColor("gray"), 2))
+                painter.drawEllipse(int(x - 20), int(y - 20), 40, 40)
+
+                painter.setPen(QPen(QColor("gray"), 1))
+                painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
+            # Mark this label rect as occupied
+            occupied.append(label_rect)
 
     # ------------------------------------------------------------
     # Main paint event
@@ -291,7 +294,7 @@ class VowelMapView(QWidget):
                                     int(y - radius // 2), radius, radius)
 
             vowel = self.bus.vowels[-1] if self.bus.vowels else None
-            dot_color = self.vowel_colors.get(vowel, QColor(80, 255, 80))
+            dot_color = QColor(vowel_color_for(vowel)) if vowel else QColor(80, 255, 80)
 
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(dot_color)
@@ -332,7 +335,19 @@ class VowelMapView(QWidget):
             if f2:
                 f2_vals.append(f2)
 
-        # NEW: handle bus=None (tests expect this)
+        # Include interpolated vowels
+        interp = None
+        if hasattr(self.analyzer, "interpolated_vowels"):
+            interp = self.analyzer.interpolated_vowels
+        elif hasattr(self.analyzer, "interpolated"):
+            interp = self.analyzer.interpolated
+
+        if interp:
+            for v in interp.values():
+                f1_vals.append(v.get("f1"))
+                f2_vals.append(v.get("f2"))
+
+        # Include recent bus points
         if self.bus is not None and hasattr(self.bus, "get_recent_points"):
             for pt in self.bus.get_recent_points():
                 f1 = pt.get("f1")
@@ -341,19 +356,8 @@ class VowelMapView(QWidget):
                     f1_vals.append(f1)
                 if f2:
                     f2_vals.append(f2)
-        # Include interpolated vowels if available
-        if hasattr(self.analyzer, "interpolated_vowels"):
-            for v in self.analyzer.interpolated_vowels.values():
-                f1_vals.append(v["f1"])
-                f2_vals.append(v["f2"])
 
-        # Include interpolated vowels if available
-        if self.analyzer:
-            for vowel in self.analyzer.user_formants.keys():
-                if vowel not in self.vowel_colors:
-                    self.vowel_colors[vowel] = next(self.color_cycle)
-
-        # Compute axis limits with generous margins
+        # Compute axis limits
         if f1_vals:
             self.f1_min = min(f1_vals) * 0.85
             self.f1_max = max(f1_vals) * 1.15

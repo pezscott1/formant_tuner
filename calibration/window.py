@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QFrame, QPushButton,
-    QApplication,
+    QApplication, QCheckBox,
 )
 from PyQt6.QtCore import QTimer, pyqtSignal
 import matplotlib.pyplot as plt
@@ -22,7 +22,8 @@ from analysis.plausibility import is_plausible_formants
 from calibration.session import CalibrationSession
 from calibration.state_machine import CalibrationStateMachine
 from calibration.plotter import safe_spectrogram, update_spectrogram
-import itertools
+from matplotlib.lines import Line2D
+from profile_viewer.vowel_colors import vowel_color_for
 
 
 class CalibrationWindow(QMainWindow):
@@ -79,6 +80,7 @@ class CalibrationWindow(QMainWindow):
             for v, entry in self.session.data.items()
             if entry.get("f1") is not None and entry.get("f2") is not None
         }
+
         self.state = CalibrationStateMachine(self.vowels_to_calibrate)
         print("Calibrating vowels:", self.vowels_to_calibrate)
         # Smoothers
@@ -97,21 +99,12 @@ class CalibrationWindow(QMainWindow):
 
         # Store durable vowel anchors
         self._interpolated_vowels = {}
-        self._vowel_colors = {}
-        self._color_cycle = itertools.cycle([
-            "#e41a1c", "#377eb8", "#4daf4a", "#984ea3",
-            "#ff7f00", "#ffff33", "#a65628", "#f781bf",
-            "#999999", "#66c2a5", "#fc8d62", "#8da0cb"
-        ])
         all_vowels = self.vowels_to_calibrate
-        self._vowel_colors = {
-            v: next(self._color_cycle)
-            for v in all_vowels
-        }
 
         # -----------------------------------------------------
         # UI Setup
         # -----------------------------------------------------
+
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
@@ -121,7 +114,12 @@ class CalibrationWindow(QMainWindow):
 
         right = self._build_right_panel()
         layout.addWidget(right, stretch=1)
-
+        self.show_interpolated = True
+        self.chk_show_interpolated = QCheckBox("Show interpolated vowels")
+        self.chk_show_interpolated.setChecked(True)
+        self.chk_show_interpolated.stateChanged.connect(  # type: ignore
+            self._on_toggle_interpolated)
+        layout.addWidget(self.chk_show_interpolated)
         # -----------------------------------------------------
         # Timers
         # -----------------------------------------------------
@@ -148,10 +146,9 @@ class CalibrationWindow(QMainWindow):
 
         self.show()
 
-    def _color_for(self, vowel):
-        if vowel not in self._vowel_colors:
-            self._vowel_colors[vowel] = next(self._color_cycle)
-        return self._vowel_colors[vowel]
+    def _on_toggle_interpolated(self, state):
+        self.show_interpolated = bool(state)
+        self._redraw_vowel_anchors()
 
     def _compute_vowel_axis_limits(self):
         f1_vals = []
@@ -213,8 +210,6 @@ class CalibrationWindow(QMainWindow):
         # Vowel axes
         self.ax_vowel.set_xlabel("F2 (Hz)")
         self.ax_vowel.set_ylabel("F1 (Hz)")
-        self.ax_vowel.invert_xaxis()
-        self.ax_vowel.invert_yaxis()
 
         self._last_draw = 0.0
         self._min_draw_interval = 0.05
@@ -487,6 +482,12 @@ class CalibrationWindow(QMainWindow):
     # Vowel anchor redraw
     # ---------------------------------------------------------
     def _redraw_vowel_anchors(self):
+        # Ensure interpolated vowels never include calibrated ones
+        clean_interp = {
+            v: data for v, data in self._interpolated_vowels.items()
+            if v not in self._vowel_anchors
+        }
+
         ax = self.ax_vowel
         ax.cla()
         if hasattr(self, "f1_min"):
@@ -511,51 +512,91 @@ class CalibrationWindow(QMainWindow):
         for spine in ax.spines.values():
             spine.set_antialiased(True)
 
-        # Draw calibrated vowels
-        for vowel, (f1, f2) in self._vowel_anchors.items():
-            color = self._color_for(vowel)
-            ax.scatter(
-                f2, f1,
-                s=200,
-                c=color,
-                marker="x",
-                linewidths=3,
-                antialiased=True,
-            )
-            ax.text(
-                f2 + 20,
-                f1 - 20,
-                f"/{vowel}/",
-                fontsize=12,
-                fontweight="bold",
-                color=color,
-                bbox=dict(facecolor="white", alpha=0.6, edgecolor="none", pad=1.5),
-                ha="left",
-                va="center",
-            )
+        # ---------------------------------------------------------
+        # Draw vowels: calibrated take priority over interpolated
+        # ---------------------------------------------------------
 
-        # Draw interpolated vowels (once barycentric interpolation is added)
-        for vowel, data in self._interpolated_vowels.items():
-            f1, f2 = data["f1"], data["f2"]
-            ax.scatter(
-                f2, f1,
-                s=160,
-                edgecolors="gray",
-                facecolors="none",
-                marker="o",
-                linewidths=2,
-                antialiased=True,
-            )
-            ax.text(
-                f2 + 20,
-                f1 - 20,
-                f"/{vowel}/",
-                fontsize=11,
-                color="gray",
-                bbox=dict(facecolor="white", alpha=0.4, edgecolor="none", pad=1.0),
-                ha="left",
-                va="center",
-            )
+        # All vowels that might appear
+        all_vowels = set(self._vowel_anchors.keys()) | set(clean_interp.keys())
+
+        for vowel in all_vowels:
+            if vowel in self._vowel_anchors:
+                # --- Calibrated vowel (X marker) ---
+                f1, f2 = self._vowel_anchors[vowel]
+                color = vowel_color_for(vowel)
+
+                ax.scatter(
+                    f2, f1,
+                    s=200,
+                    c=color,
+                    marker="x",
+                    linewidths=3,
+                    antialiased=True,
+                )
+                ax.text(
+                    f2 + 20,
+                    f1 - 20,
+                    f"/{vowel}/",
+                    fontsize=12,
+                    fontweight="bold",
+                    color=color,
+                    bbox=dict(facecolor="white", alpha=0.6, edgecolor="none", pad=1.5),
+                    ha="left",
+                    va="center",
+                )
+            else:
+                if not self.show_interpolated:
+                    continue
+                # --- Interpolated vowel (circle) ---
+                data = clean_interp[vowel]
+                f1, f2 = data["f1"], data["f2"]
+
+                ax.scatter(
+                    f2, f1,
+                    s=160,
+                    edgecolors="gray",
+                    facecolors="none",
+                    marker="o",
+                    linewidths=2,
+                    antialiased=True,
+                )
+                ax.text(
+                    f2 + 20,
+                    f1 - 20,
+                    f"/{vowel}/",
+                    fontsize=11,
+                    color="gray",
+                    bbox=dict(facecolor="white", alpha=0.4, edgecolor="none", pad=1.0),
+                    ha="left",
+                    va="center",
+                )
+
+        legend_elements = [
+            Line2D(
+                [0], [0],
+                marker='x',
+                color='black',
+                markersize=12,
+                linewidth=0,
+                markeredgewidth=3
+            ),
+            Line2D(
+                [0], [0],
+                marker='o',
+                color='gray',
+                markersize=12,
+                fillstyle='none',
+                linewidth=2
+            ),
+        ]
+
+        ax.legend(
+            handles=legend_elements,
+            loc='upper center',
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=2,
+            framealpha=0.8
+        )
 
     # ---------------------------------------------------------
     # Capture processing
@@ -639,7 +680,7 @@ class CalibrationWindow(QMainWindow):
 
         # Status panel always gets the session message
         self.status_panel.appendPlainText(f"[{timestamp}] {msg}")
-        color = self._color_for(vowel)
+        color = vowel_color_for(vowel)
 
         # Format aligned monospace block
         html_line = (
