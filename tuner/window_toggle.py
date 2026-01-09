@@ -180,6 +180,9 @@ class VowelMapView(QWidget):
         self.calibrated_vowels = set(calibrated)
         self.interpolated_vowels = set(interpolated)
 
+    def paintEvent(self, event):
+        self.paint_canvas(event)
+
     # ------------------------------------------------------------
     # Drawing helpers
     # ------------------------------------------------------------
