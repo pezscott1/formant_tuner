@@ -69,7 +69,8 @@ class CalibrationSession:
                 continue
             f1 = entry.get("f1")
             f2 = entry.get("f2")
-            if f1 is not None and f2 is not None and np.isfinite(f1) and np.isfinite(f2):
+            if (f1 is not None and f2 is not None
+                    and np.isfinite(f1) and np.isfinite(f2)):
                 anchors[vn] = (float(f1), float(f2))
         return anchors
 
@@ -122,9 +123,11 @@ class CalibrationSession:
                 f0B = self._get_data_entry(B) and self._get_data_entry(B).get("f0")
                 f0C = self._get_data_entry(C) and self._get_data_entry(C).get("f0")
 
-                # Interpolate F0 using the same barycentric weights if all present and finite
+                # Interpolate F0 using the same barycentric
+                # weights if all present and finite
                 f0 = None
-                if all(isinstance(x, (int, float)) and np.isfinite(x) for x in (f0A, f0B, f0C)):
+                if all(isinstance(x, (int, float))
+                       and np.isfinite(x) for x in (f0A, f0B, f0C)):
                     f0 = w[0] * f0A + w[1] * f0B + w[2] * f0C
 
                 result = self.barycentric_interpolate(
@@ -133,7 +136,8 @@ class CalibrationSession:
                 )
                 f1, f2 = map(float, result)
 
-                # store under the original triangle key so tests comparing to TRIANGLES.keys() match
+                # store under the original triangle key
+                # so tests comparing to TRIANGLES.keys() match
                 out[v_key] = {
                     "f1": float(f1),
                     "f2": float(f2),
@@ -276,15 +280,18 @@ class CalibrationSession:
 
         interp = self.compute_interpolated_vowels()
 
-        # calibrated vowels are exactly the explicit set (use original keys from self.calibrated_vowels)
+        # calibrated vowels are exactly the explicit set (
+        # use original keys from self.calibrated_vowels)
         calibrated = sorted(self.calibrated_vowels)
 
         # interpolated vowels are exactly the computed ones (keys are normalized)
         interpolated = {v: interp[v] for v in sorted(interp.keys())}
 
-        # Backwards compatibility: if no calibrated_vowels, treat all data entries as calibrated
+        # Backwards compatibility: if no calibrated_vowels,
+        # treat all data entries as calibrated
         if not calibrated:
-            calibrated = sorted(v for v, e in self.data.items() if isinstance(e, dict))
+            calibrated = sorted(v for v, e in self.data.items()
+                                if isinstance(e, dict))
             interpolated = {}
 
         profile_data = {

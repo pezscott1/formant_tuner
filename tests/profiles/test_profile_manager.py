@@ -116,7 +116,8 @@ def test_apply_profile_sets_user_formants():
 
     pm.apply_profile("alpha")
 
-    pm.extract_formants.assert_called_once_with(raw["calibrated_vowels"] | raw["interpolated_vowels"])
+    pm.extract_formants.assert_called_once_with(
+        raw["calibrated_vowels"] | raw["interpolated_vowels"])
     mock_engine.set_user_formants.assert_called_once_with(
         {"a": {"f1": 500, "f2": 1500, "f0": 2500}}
     )

@@ -14,7 +14,10 @@ def make_pm(tmp_path):
 
 def test_compute_interpolated_vowels_is_pure(tmp_path):
     pm = make_pm(tmp_path)
-    sess = CalibrationSession("pure", "baritone", ["i", "e", "ɛ"], profile_manager=pm)
+    sess = CalibrationSession(
+        "pure",
+        "baritone",
+        ["i", "e", "ɛ"], profile_manager=pm)
 
     # set anchors and an extra non-calibrated entry
     sess.data["i"] = {"f1": 300, "f2": 2700, "f0": 120}
@@ -36,13 +39,17 @@ def test_compute_interpolated_vowels_is_pure(tmp_path):
 
 def test_save_profile_persists_only_computed_interpolation(tmp_path):
     pm = make_pm(tmp_path)
-    sess = CalibrationSession("save_only_interp", "baritone", ["i", "e", "ɛ"], profile_manager=pm)
+    sess = CalibrationSession(
+        "save_only_interp",
+        "baritone",
+        ["i", "e", "ɛ"], profile_manager=pm)
 
     # anchors
     sess.data["i"] = {"f1": 300, "f2": 2700, "f0": 120}
     sess.calibrated_vowels.add("i")
 
-    # non-calibrated data entries (should NOT be treated as interpolation unless triangles allow)
+    # non-calibrated data entries
+    # (should NOT be treated as interpolation unless triangles allow)
     sess.data["e"] = {"f1": 400, "f2": 2000}
     sess.data["ɛ"] = {"f1": 500, "f2": 1800}
 
@@ -63,7 +70,10 @@ def test_save_profile_persists_only_computed_interpolation(tmp_path):
 
 def test_compute_skips_explicitly_calibrated(tmp_path):
     pm = make_pm(tmp_path)
-    sess = CalibrationSession("skip_cal", "baritone", ["i", "e", "ɛ"], profile_manager=pm)
+    sess = CalibrationSession(
+        "skip_cal",
+        "baritone",
+        ["i", "e", "ɛ"], profile_manager=pm)
 
     # set up a triangle where 'e' would be interpolated from i, ɛ, ɑ
     sess.data["i"] = {"f1": 300, "f2": 2700}
@@ -82,7 +92,10 @@ def test_compute_skips_explicitly_calibrated(tmp_path):
 
 def test_f0_interpolation_none_if_any_vertex_missing(tmp_path):
     pm = make_pm(tmp_path)
-    sess = CalibrationSession("f0_none", "baritone", ["i", "e", "ɑ"], profile_manager=pm)
+    sess = CalibrationSession(
+        "f0_none",
+        "baritone",
+        ["i", "e", "ɑ"], profile_manager=pm)
 
     sess.data["i"] = {"f1": 300, "f2": 2700, "f0": 100}
     sess.data["e"] = {"f1": 400, "f2": 2000, "f0": 200}
@@ -90,7 +103,8 @@ def test_f0_interpolation_none_if_any_vertex_missing(tmp_path):
     sess.calibrated_vowels.update({"i", "e", "ɑ"})
 
     interp = sess.compute_interpolated_vowels()
-    # if 'e' is interpolated from i, ɛ, ɑ (or similar), its f0 must be None because one vertex lacks f0
+    # if 'e' is interpolated from i, ɛ, ɑ (or similar),
+    # its f0 must be None because one vertex lacks f0
     for v, vals in interp.items():
         assert ("f0" in vals)
         # f0 must be None when any vertex f0 is missing
@@ -99,7 +113,10 @@ def test_f0_interpolation_none_if_any_vertex_missing(tmp_path):
 
 def test_get_calibrated_anchors_uses_only_calibrated(tmp_path):
     pm = make_pm(tmp_path)
-    sess = CalibrationSession("anchors_only", "baritone", ["i", "e", "ɛ"], profile_manager=pm)
+    sess = CalibrationSession(
+        "anchors_only",
+        "baritone",
+        ["i", "e", "ɛ"], profile_manager=pm)
 
     # Put entries in data but mark only 'i' as calibrated
     sess.data["i"] = {"f1": 300, "f2": 2700}
@@ -113,7 +130,10 @@ def test_get_calibrated_anchors_uses_only_calibrated(tmp_path):
 
 def test_round_trip_saved_interpolation_matches_computed(tmp_path):
     pm = make_pm(tmp_path)
-    sess = CalibrationSession("round_interp", "baritone", ["i", "e", "ɛ"], profile_manager=pm)
+    sess = CalibrationSession(
+        "round_interp",
+        "baritone",
+        ["i", "e", "ɛ"], profile_manager=pm)
 
     # anchors that produce interpolation
     sess.data["i"] = {"f1": 300, "f2": 2700, "f0": 120}

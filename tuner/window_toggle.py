@@ -1,6 +1,7 @@
 # tuner/window_toggle.py
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout,
-                             QHBoxLayout, QPushButton, QLabel)
+                             QHBoxLayout, QPushButton, QLabel,
+                             QCheckBox)
 from PyQt6.QtGui import QPainter, QColor, QPen
 from PyQt6.QtCore import Qt, QRect
 import numpy as np
@@ -100,6 +101,7 @@ class AnalysisView(QWidget):
 class VowelMapView(QWidget):
     def __init__(self, bus, parent=None):
         super().__init__(parent)
+
         self.bus = bus
         self.setMinimumSize(300, 300)
         self.analyzer = None
@@ -118,18 +120,51 @@ class VowelMapView(QWidget):
         self.f2_min = None
         self.f2_max = None
 
+        self.show_interp = QCheckBox("Show interpolated vowels")
+        self.show_interp.setStyleSheet("""
+            color: black;
+            QCheckBox::indicator {
+                border: 1px solid black;
+                background: white;
+            }
+            QCheckBox::indicator:checked {
+                background: #4caf50;
+                border: 1px solid #4caf50;
+            }
+        """)
+        self.show_interp.setChecked(True)
+        self.show_interp.stateChanged.connect(self.update)  # type: ignore
+        self.canvas_area = QWidget()
+        self.canvas_area.setMinimumSize(300, 300)
+        self.canvas_area.paintEvent = self.paint_canvas  # redirect painter
+
+        legend = QLabel(" ○ Calibrated = colors  ○ Interpolated = grey ")
+        legend.setStyleSheet("color: black; font-size: 9pt; background: transparent;")
+
+        legend_bar = QHBoxLayout()
+        legend_bar.addWidget(legend)
+        legend_bar.addWidget(self.show_interp)
+        legend_bar.addStretch()
+        legend_bar.setContentsMargins(8, 4, 8, 4)
+
+        # Wrap legend bar in its own widget so it has its own background
+        legend_bar_widget = QWidget()
+        legend_bar_widget.setStyleSheet("background-color: #f0f0f0;")
+        legend_bar_widget.setLayout(legend_bar)
+
         title = QLabel("Vowel Map")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
             font-size: 16pt;
             font-weight: bold;
             color: black;
-            padding: 6px;
+            padding: 10px 6px 14px 6px;   /* extra bottom padding */
         """)
 
         layout = QVBoxLayout(self)
         layout.addWidget(title)
-        layout.addStretch()  # this ensures the painter area fills the rest
+        layout.addWidget(self.canvas_area, stretch=10)  # painter gets most space
+        layout.addWidget(legend_bar_widget)  # legend now BELOW canvas
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
@@ -139,7 +174,7 @@ class VowelMapView(QWidget):
         if analyzer and analyzer is not self.analyzer:
             self.analyzer = analyzer
         self.compute_dynamic_ranges()
-        self.update()
+        self.canvas_area.update()
 
     def set_vowel_status(self, calibrated, interpolated):
         self.calibrated_vowels = set(calibrated)
@@ -204,7 +239,7 @@ class VowelMapView(QWidget):
             # -----------------------------
             base_x = x + (24 if x < w / 2 else -30)
             base_y = y + (-10 if y < h / 2 else 20)
-            label_rect = QRect(int(base_x), int(base_y - 12), 30, 20)
+            label_rect = QRect(int(base_x), int(base_y - 12 - 6), 30, 20)
 
             # Apply offsets to avoid collisions
             for dx, dy in offsets:
@@ -223,7 +258,7 @@ class VowelMapView(QWidget):
                 painter.setPen(QPen(color, 1))
                 painter.drawText(label_rect.left(), label_rect.bottom(), vowel)
 
-            elif vowel in self.interpolated_vowels:
+            elif vowel in self.interpolated_vowels and self.show_interp.isChecked():
                 painter.setPen(QPen(QColor("gray"), 2))
                 painter.drawEllipse(int(x - 20), int(y - 20), 40, 40)
 
@@ -236,14 +271,17 @@ class VowelMapView(QWidget):
     # Main paint event
     # ------------------------------------------------------------
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor(35, 35, 35))
-        painter.setPen(QPen(QColor(80, 80, 80), 2))
-        painter.drawRect(self.rect().adjusted(1, 1, -2, -2))
+    def paint_canvas(self, event):
 
-        w = self.width()
-        h = self.height()
+        painter = QPainter(self.canvas_area)
+        rect = self.canvas_area.rect()
+
+        painter.fillRect(rect, QColor(35, 35, 35))
+        painter.setPen(QPen(QColor(80, 80, 80), 2))
+        painter.drawRect(rect.adjusted(1, 1, -2, -2))
+
+        w = self.canvas_area.width()
+        h = self.canvas_area.height()
 
         self.draw_grid(painter, w, h)
         self.draw_targets(painter, w, h)

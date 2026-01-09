@@ -191,7 +191,6 @@ def test_save_profile(monkeypatch):
     assert saved_data["voice_type"] == "bass"
 
 
-
 # -----------------------------
 # normalize_profile_for_save
 # -----------------------------

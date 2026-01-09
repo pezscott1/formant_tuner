@@ -1,5 +1,5 @@
 # tests/calibration/test_interpolation_pipeline.py
-from analysis.vowel_data import TRIANGLES, TRIANGLE_WEIGHTS, STANDARD_VOWELS
+from analysis.vowel_data import TRIANGLES, STANDARD_VOWELS
 from tuner.profile_controller import ProfileManager
 from pathlib import Path
 import json
@@ -167,7 +167,8 @@ def test_seeding_behavior_removed_and_interpolation_wins(tmp_path):
     base = sess.save_profile()
     saved = json.loads(Path(tmp_path, f"{base}_profile.json").read_text())
 
-    # The saved interpolation must match the computed interpolation (no special seeding preservation)
+    # The saved interpolation must match the
+    # computed interpolation (no special seeding preservation)
     assert "e" in interp
     assert saved["interpolated_vowels"]["e"]["f1"] == interp["e"]["f1"]
     assert saved["interpolated_vowels"]["e"]["f2"] == interp["e"]["f2"]
@@ -296,7 +297,7 @@ def test_full_expanded_interpolation(tmp_path):
         normalize("NFC", target)
         for target, (A, B, C) in TRIANGLES.items()
         if {normalize("NFC", A), normalize("NFC", B), normalize("NFC", C)} <= anchors
-           and normalize("NFC", target) not in anchors
+        and normalize("NFC", target) not in anchors
     }
 
     # normalize interp keys before comparing
@@ -343,7 +344,6 @@ def test_interpolation_still_correct_after_fixes():
         sess.data[v] = {"f1": 100 + idx, "f2": 200 + idx}
         sess.calibrated_vowels.add(v)
 
-
     interp = sess.compute_interpolated_vowels()
     from unicodedata import normalize
 
@@ -352,7 +352,7 @@ def test_interpolation_still_correct_after_fixes():
         normalize("NFC", target)
         for target, (A, B, C) in TRIANGLES.items()
         if {normalize("NFC", A), normalize("NFC", B), normalize("NFC", C)} <= anchors
-           and normalize("NFC", target) not in anchors
+        and normalize("NFC", target) not in anchors
     }
     interp_norm = {normalize("NFC", k) for k in interp.keys()}
     assert interp_norm == expected

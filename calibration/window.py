@@ -132,8 +132,7 @@ class CalibrationWindow(QMainWindow):
         screen = QApplication.primaryScreen().availableGeometry()
         w = int(screen.width() * 0.80)
         h = int(screen.height() * 0.80)
-        self.setMaximumHeight(h)
-        self.setMinimumHeight(h)
+        self.setMinimumHeight(int(screen.height() * 0.60))
         self.resize(w, h)
 
         # Center horizontally and vertically
@@ -489,9 +488,9 @@ class CalibrationWindow(QMainWindow):
         ax = self.ax_vowel
         ax.cla()
         if hasattr(self, "f1_min"):
-            ax.set_ylim(self.f1_max, self.f1_min)
+            ax.set_ylim(self.f1_min, self.f1_max)
         if hasattr(self, "f2_min"):
-            ax.set_xlim(self.f2_max, self.f2_min)
+            ax.set_xlim(self.f2_min, self.f2_max)
 
         ax.set_xlabel("F2 (Hz)")
         ax.set_ylabel("F1 (Hz)")

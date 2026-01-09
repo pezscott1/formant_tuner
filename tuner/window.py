@@ -438,7 +438,6 @@ class TunerWindow(QMainWindow):
             self.tuner.active_profile = None
             self.tuner.engine.vowel_hint = None
             self.active_label.setText("Active: None")
-            print("PROFILE DESELECTED → active_profile=None")
             return
 
         item = items[0]
@@ -464,7 +463,6 @@ class TunerWindow(QMainWindow):
 
         # Update UI label
         self._set_active_profile(base)
-        print("SELECTION CHANGED:", base, "active_profile:", self.tuner.active_profile)
 
         # Update vowel map
         self.vowel_map_view.set_vowel_status(cal, interp)
