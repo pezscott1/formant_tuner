@@ -80,8 +80,8 @@ def test_profile_manager_apply_profile_updates_engine(tmp_path):
 
     # Create a profile file
     data = {
-        "voice_type": "tenor",
-        "a": {"f1": 500, "f2": 1500, "f3": 2500},
+        "calibrated_vowels": {"a": {"f1": 500, "f2": 1500, "f0": 2500}},
+        "interpolated_vowels": {}
     }
     with open(prof_dir / "alpha_profile.json", "w") as f:
         json.dump(data, f)
@@ -107,7 +107,8 @@ def test_apply_profile_sets_user_formants():
     mock_engine = MagicMock()
     pm = ProfileManager("", mock_engine)
 
-    raw = {"a": {"f1": 500, "f2": 1500, "f3": 2500}}
+    raw = {"calibrated_vowels": {"a": {"f1": 500, "f2": 1500, "f0": 2500}},
+           "interpolated_vowels": {}}
     pm.load_profile_json = MagicMock(return_value=raw)
 
     pm.extract_formants = MagicMock(return_value={
@@ -115,7 +116,7 @@ def test_apply_profile_sets_user_formants():
 
     pm.apply_profile("alpha")
 
-    pm.extract_formants.assert_called_once_with(raw)
+    pm.extract_formants.assert_called_once_with(raw["calibrated_vowels"] | raw["interpolated_vowels"])
     mock_engine.set_user_formants.assert_called_once_with(
         {"a": {"f1": 500, "f2": 1500, "f0": 2500}}
     )

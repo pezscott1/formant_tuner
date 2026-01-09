@@ -2,7 +2,12 @@
 from datetime import datetime, timezone
 from analysis.plausibility import is_plausible_formants
 import numpy as np
+import unicodedata
 from analysis.vowel_data import TRIANGLES, TRIANGLE_WEIGHTS
+
+
+def _norm(v: str) -> str:
+    return unicodedata.normalize("NFC", v)
 
 
 class CalibrationSession:
@@ -15,30 +20,57 @@ class CalibrationSession:
         self.profile_manager = profile_manager
 
         # Core data structures
+        # Note: keys in self.data may be in any Unicode form; lookups normalize.
         self.data = {}          # vowel → dict of f1,f2,f0,confidence,stability,weight
         self.retries_map = {}   # vowel → retry count
         self.calibrated_vowels = set()
         self.interpolated_vowels = set()
-        # Load existing profile if present
+
+        # Load existing profile if present (backwards-compatible storage only)
         if isinstance(existing_profile, dict):
             for vowel, entry in existing_profile.items():
                 if vowel == "voice_type":
                     continue
                 if isinstance(entry, dict):
-                    # Make a shallow copy so we can enrich it
                     self.data[vowel] = entry.copy()
 
     def _weights_for(self, vowel):
         return TRIANGLE_WEIGHTS.get(vowel, (1 / 3, 1 / 3, 1 / 3))
 
+    def _get_data_entry(self, vowel):
+        """
+        Lookup a data entry by vowel key, trying exact key then normalized key.
+        Returns the dict or None.
+        """
+        if vowel in self.data:
+            return self.data[vowel]
+        n = _norm(vowel)
+        if n in self.data:
+            return self.data[n]
+        # also try decomposed form if original was normalized
+        # (this covers both directions)
+        for k in (vowel, n):
+            if k in self.data:
+                return self.data[k]
+        return None
+
     def get_calibrated_anchors(self):
-        """Return a dict of vowel → (f1, f2) for calibrated vowels only."""
+        """
+        Return a dict of normalized vowel → (f1, f2) for calibrated anchors.
+
+        Strict rule: only vowels explicitly present in self.calibrated_vowels
+        are considered anchors for interpolation. Keys are normalized to NFC.
+        """
         anchors = {}
-        for vowel, entry in self.data.items():
+        for v in self.calibrated_vowels:
+            vn = _norm(v)
+            entry = self._get_data_entry(v)
+            if not isinstance(entry, dict):
+                continue
             f1 = entry.get("f1")
             f2 = entry.get("f2")
-            if f1 is not None and f2 is not None:
-                anchors[vowel] = (float(f1), float(f2))
+            if f1 is not None and f2 is not None and np.isfinite(f1) and np.isfinite(f2):
+                anchors[vn] = (float(f1), float(f2))
         return anchors
 
     @staticmethod
@@ -55,29 +87,54 @@ class CalibrationSession:
         return wA * A + wB * B + wC * C
 
     def compute_interpolated_vowels(self):
-        anchors = self.get_calibrated_anchors()
+        """
+        Compute interpolated vowels based on TRIANGLES and TRIANGLE_WEIGHTS.
+
+        - Uses only self.calibrated_vowels as anchors (triangle-only).
+        - Normalizes keys (NFC) for matching/lookups.
+        - Returns a dict mapping the original TRIANGLES keys -> interpolated entry.
+        - Does NOT mutate self.data or self.calibrated_vowels.
+        """
+        anchors = self.get_calibrated_anchors()  # normalized keys
         out = {}
 
-        for vowel, (A, B, C) in TRIANGLES.items():
-            if {A, B, C} <= anchors.keys():
-                w = self._weights_for(vowel)
-                # Get F0 values for the triangle vertices
-                f0A = self.data[A].get("f0")
-                f0B = self.data[B].get("f0")
-                f0C = self.data[C].get("f0")
+        # Precompute normalized calibrated set for quick membership checks
+        calibrated_norm = {_norm(v) for v in self.calibrated_vowels}
 
-                # Interpolate F0 using the same barycentric weights
+        for vowel, (A, B, C) in TRIANGLES.items():
+            # keep the original triangle key for output
+            v_key = vowel
+
+            # normalized forms for matching
+            v_norm = _norm(vowel)
+            A_n, B_n, C_n = _norm(A), _norm(B), _norm(C)
+
+            # Skip if vowel explicitly calibrated (compare normalized forms)
+            if v_norm in calibrated_norm:
+                continue
+
+            # Only interpolate if the triangle's vertices are present in anchors
+            if {A_n, B_n, C_n} <= set(anchors.keys()):
+                w = self._weights_for(vowel)
+
+                # Get F0 values for the triangle vertices (may be None)
+                f0A = self._get_data_entry(A) and self._get_data_entry(A).get("f0")
+                f0B = self._get_data_entry(B) and self._get_data_entry(B).get("f0")
+                f0C = self._get_data_entry(C) and self._get_data_entry(C).get("f0")
+
+                # Interpolate F0 using the same barycentric weights if all present and finite
                 f0 = None
-                if all(isinstance(x, (int, float)) for x in (f0A, f0B, f0C)):
+                if all(isinstance(x, (int, float)) and np.isfinite(x) for x in (f0A, f0B, f0C)):
                     f0 = w[0] * f0A + w[1] * f0B + w[2] * f0C
 
                 result = self.barycentric_interpolate(
                     w,
-                    {"A": anchors[A], "B": anchors[B], "C": anchors[C]},
+                    {"A": anchors[A_n], "B": anchors[B_n], "C": anchors[C_n]},
                 )
                 f1, f2 = map(float, result)
 
-                out[vowel] = {
+                # store under the original triangle key so tests comparing to TRIANGLES.keys() match
+                out[v_key] = {
                     "f1": float(f1),
                     "f2": float(f2),
                     "f0": float(f0) if f0 is not None else None,
@@ -133,7 +190,6 @@ class CalibrationSession:
         # -----------------------------
         # 2. Confidence gating (relaxed)
         # -----------------------------
-        # Hybrid confidence is often 0.3–0.5 for back vowels.
         if confidence is not None and confidence < 0.25:
             return self._reject_capture(vowel, f"low confidence {confidence:.2f}")
 
@@ -171,17 +227,14 @@ class CalibrationSession:
 
         new_f1 = (old_f1 * old_weight + f1) / new_weight
         new_f2 = (old_f2 * old_weight + f2) / new_weight
-        old_f0: float
-        confidence: float
+
         # --- F0 update ---
         if f0 is not None and old_f0 is not None:
             f0_val = float(f0)
             old_f0_val = float(old_f0)
             new_f0 = (old_f0_val * old_weight + f0_val) / new_weight
-
         elif f0 is not None:
             new_f0 = float(f0)
-
         else:
             new_f0 = old_f0
 
@@ -209,40 +262,39 @@ class CalibrationSession:
     # ---------------------------------------------------------
     def save_profile(self):
         """
-        Save the current calibration data as a profile.
+        Save the profile using the profile_manager.
 
-        Tests expect:
-          - The per-vowel entries under their vowel keys (e.g. "a")
-          - All fields (f1,f2,f0,confidence,stability,weight,saved_at) preserved
-          - A top-level "voice_type" field
+        - Uses compute_interpolated_vowels() to determine interpolated entries.
+        - Does not mutate self.data.
+        - Saves calibrated_vowels exactly from self.calibrated_vowels.
+        - Saves interpolated_vowels exactly from the computed interpolation.
         """
-        if self.profile_manager is None:
-            raise RuntimeError("profile_manager is not set on CalibrationSession")
+        if not self.profile_manager:
+            raise RuntimeError("No profile manager")
 
-        # Shallow copy of self.data so we don't mutate the original
-        profile_data = dict(self.data)
+        base = f"{self.profile_name}_{self.voice_type}"
 
-        # Collect all vowels with f1 present
-        all_vowels = {
-            v for v, entry in profile_data.items()
-            if isinstance(entry, dict) and "f1" in entry
+        interp = self.compute_interpolated_vowels()
+
+        # calibrated vowels are exactly the explicit set (use original keys from self.calibrated_vowels)
+        calibrated = sorted(self.calibrated_vowels)
+
+        # interpolated vowels are exactly the computed ones (keys are normalized)
+        interpolated = {v: interp[v] for v in sorted(interp.keys())}
+
+        # Backwards compatibility: if no calibrated_vowels, treat all data entries as calibrated
+        if not calibrated:
+            calibrated = sorted(v for v, e in self.data.items() if isinstance(e, dict))
+            interpolated = {}
+
+        profile_data = {
+            "calibrated_vowels": {v: self._get_data_entry(v) for v in calibrated},
+            "interpolated_vowels": interpolated,
+            "voice_type": self.voice_type,
         }
-        calibrated = set(self.calibrated_vowels)
-        interpolated = sorted(all_vowels - calibrated)
-        self.interpolated_vowels = set(interpolated)
 
-        profile_data["calibrated_vowels"] = list(self.calibrated_vowels)
-        profile_data["interpolated_vowels"] = sorted(self.interpolated_vowels)
-        profile_data["voice_type"] = self.voice_type
-
-        # Prevent double suffixing
-        if self.profile_name.endswith(f"_{self.voice_type}"):
-            base_name = self.profile_name
-        else:
-            base_name = f"{self.profile_name}_{self.voice_type}"
-
-        self.profile_manager.save_profile(base_name, profile_data)
-        return base_name
+        self.profile_manager.save_profile(base, profile_data)
+        return base
 
     def retry_count(self, vowel: str) -> int:
         return self.retries_map.get(vowel, 0)

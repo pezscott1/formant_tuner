@@ -48,20 +48,13 @@ class Tuner:
     def load_profile(self, base_name):
         applied = self.profile_manager.apply_profile(base_name)
 
-        # If apply_profile returned an error string, bail out
         if isinstance(applied, str) and applied != base_name:
             self.engine.voice_type = self.voice_type
             return applied
 
-        # Load raw JSON (for our own use, e.g., classifier)
         raw = self.profile_manager.load_profile_json(base_name)
-
-        # Extract formants (dict of dicts)
         extracted = self.profile_manager.extract_formants(raw)
-
-        # Store active profile as the dict of centroids
         self.active_profile = extracted
-        print("ACTIVE PROFILE:", type(self.active_profile), self.active_profile)
 
         return applied
 

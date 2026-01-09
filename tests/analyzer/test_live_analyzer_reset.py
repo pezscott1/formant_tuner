@@ -1,5 +1,4 @@
 # tests/live_analyzer/test_reset.py
-import numpy as np
 from tuner.live_analyzer import LiveAnalyzer
 from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother
 

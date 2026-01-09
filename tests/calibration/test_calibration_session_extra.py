@@ -58,6 +58,8 @@ def test_get_calibrated_anchors():
         "a": {"f1": 500, "f2": 1500},
         "b": {"f1": None, "f2": 1200},
     }
+    sess.calibrated_vowels.add("a")
+
     anchors = sess.get_calibrated_anchors()
     assert anchors == {"a": (500.0, 1500.0)}
 
@@ -85,7 +87,7 @@ def test_compute_interpolated_vowels_basic(monkeypatch):
         "ɑ": {"f1": 600, "f2": 1100, "f0": 120},
         "i": {"f1": 300, "f2": 2500, "f0": 140},
     }
-
+    sess.calibrated_vowels.update({"ɛ", "ɑ", "i"})
     out = sess.compute_interpolated_vowels()
     assert "æ" in out
     assert "f1" in out["æ"]
@@ -182,8 +184,12 @@ def test_save_profile(monkeypatch):
     assert pm.saved is not None
     saved_name, saved_data = pm.saved
     assert saved_name == "myprof_bass"
-    assert "a" in saved_data
+
+    # NEW: vowel entries live inside calibrated_vowels
+    assert "a" in saved_data["calibrated_vowels"]
+
     assert saved_data["voice_type"] == "bass"
+
 
 
 # -----------------------------

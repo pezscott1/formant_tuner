@@ -20,7 +20,8 @@ def test_set_active_profile_updates_label(qtbot, tmp_path):
 
 def test_apply_profile_updates_engine(qtbot, tmp_path):
     f = tmp_path / "bass_profile.json"
-    f.write_text('{"voice_type": "bass", "i": {"f1": 300, "f2": 2500, "f3": 100}}')
+    f.write_text('{"voice_type": "bass", "calibrated_vowels": {"i": '
+                 '{"f1": 300, "f2": 2500, "f0": 100}},"interpolated_vowels": {}}')
 
     engine = FormantAnalysisEngine()
     tuner = Tuner(engine=engine, profiles_dir=str(tmp_path))
@@ -28,5 +29,4 @@ def test_apply_profile_updates_engine(qtbot, tmp_path):
     qtbot.addWidget(window)
 
     window._apply_profile_base("bass")
-    assert engine.user_formants is not None
     assert "i" in engine.user_formants

@@ -23,14 +23,21 @@ def test_save_profile_interpolated_sorted_and_separated(tmp_path):
         profile_manager=pm,
     )
 
+    # Provide raw formant entries but only mark "i" as explicitly calibrated.
     sess.data["i"] = {"f1": 300, "f2": 2700}
     sess.data["e"] = {"f1": 400, "f2": 2000}
     sess.data["ɛ"] = {"f1": 500, "f2": 1800}
 
     sess.calibrated_vowels.add("i")
 
+    # Compute interpolation explicitly and use it as the expected source.
+    interp = sess.compute_interpolated_vowels()
+
     base = sess.save_profile()
     saved = json.loads(Path(tmp_path, f"{base}_profile.json").read_text())
 
-    assert saved["calibrated_vowels"] == ["i"]
-    assert saved["interpolated_vowels"] == ["e", "ɛ"]  # sorted
+    # Calibrated vowels must be exactly the explicit set
+    assert list(saved["calibrated_vowels"].keys()) == ["i"]
+
+    # Interpolated vowels must match the triangle-based computation
+    assert list(saved["interpolated_vowels"].keys()) == sorted(interp.keys())

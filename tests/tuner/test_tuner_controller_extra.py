@@ -66,11 +66,16 @@ def test_load_profile_sets_user_formants():
         "a": {"f1": 500, "f2": 1500, "f3": 2500},
     }
 
+    # Simulate ProfileManager.apply_profile building engine.user_formants
+    engine.user_formants = profiles.extract_formants.return_value
+
     t.load_profile("alpha")
 
     profiles.apply_profile.assert_called_once_with("alpha")
     profiles.extract_formants.assert_called_once()
-    assert t.active_profile == profiles.extract_formants.return_value
+
+    # NEW: active_profile should mirror engine.user_formants
+    assert t.active_profile == engine.user_formants
 
 
 # ---------------------------------------------------------------------
@@ -93,7 +98,6 @@ def test_tuner_profile_switch_changes_classification(
     # Engine always returns a raw frame
     engine.get_latest_raw.return_value = {"dummy": True}
 
-    # Analyzer returns stable formants
     processed = {
         "f0": 200.0,
         "formants": (500, 1500, 2500),
@@ -105,24 +109,26 @@ def test_tuner_profile_switch_changes_classification(
 
     profiles.apply_profile.side_effect = ["profile_a", "profile_i"]
 
+    # These are the classifier centroids
     profiles.extract_formants.side_effect = [
         {"a": {"f1": 700, "f2": 1100}},
         {"i": {"f1": 300, "f2": 2500}},
     ]
 
     profiles.load_profile_json.side_effect = [
-        {"a": {"f1": 700, "f2": 1100}},
-        {"i": {"f1": 300, "f2": 2500}},
+        {"calibrated_vowels": {"a": {"f1": 700, "f2": 1100}}},
+        {"calibrated_vowels": {"i": {"f1": 300, "f2": 2500}}},
     ]
 
     t = Tuner()
 
-    # First profile
+    # Simulate ProfileManager.apply_profile populating engine.user_formants
+    engine.user_formants = {"a": {"f1": 700, "f2": 1100}}
     t.load_profile("profile_a")
     out1 = t.poll_latest_processed()
     vowel1 = out1["profile_vowel"]
 
-    # Second profile
+    engine.user_formants = {"i": {"f1": 300, "f2": 2500}}
     t.load_profile("profile_i")
     out2 = t.poll_latest_processed()
     vowel2 = out2["profile_vowel"]

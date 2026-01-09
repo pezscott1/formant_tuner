@@ -23,6 +23,7 @@ class DummyFormants:
         self.buf_f3 = [4, 5]
         self.formants_stable = True
         self._stability_score = 123
+
         class DummyStability:
             def reset(self_inner): pass
         self.stability = DummyStability()

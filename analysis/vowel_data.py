@@ -1,4 +1,5 @@
 # analysis/vowel_data.py
+import unicodedata as _unicodedata
 """
 Unified vowel data for calibration, interpolation, and plausibility.
 
@@ -186,4 +187,29 @@ VOWEL_CENTERS = {
         "o":  (480.0, 1050.0, 2400.0),
         "u":  (370.0, 1200.0, 2100.0),
     },
+}
+
+
+def _norm(s: str) -> str:
+    return _unicodedata.normalize("NFC", s)
+
+
+# Normalize STANDARD_VOWELS
+STANDARD_VOWELS = [_norm(v) for v in STANDARD_VOWELS]
+
+# Normalize TRIANGLES: both the target keys and the vertex names
+TRIANGLES = {
+    _norm(target): tuple(_norm(v) for v in verts)
+    for target, verts in TRIANGLES.items()
+}
+
+# Normalize TRIANGLE_WEIGHTS keys (weights are numeric tuples; values unchanged)
+TRIANGLE_WEIGHTS = {
+    _norm(k): v for k, v in TRIANGLE_WEIGHTS.items()
+}
+
+# Normalize VOWEL_CENTERS nested dict keys
+VOWEL_CENTERS = {
+    voice: {_norm(v): vals for v, vals in centers.items()}
+    for voice, centers in VOWEL_CENTERS.items()
 }

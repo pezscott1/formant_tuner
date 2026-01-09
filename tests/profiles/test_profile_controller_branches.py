@@ -179,8 +179,8 @@ def test_apply_profile(pm, tmpdir_profiles, analyzer):
     # Create profile JSON
     (tmpdir_profiles / "alpha_profile.json").write_text(
         json.dumps({
-            "voice_type": "tenor",
-            "a": {"f1": 500, "f2": 1500, "f3": 2500, "f0": 100}
+            "calibrated_vowels": {"a": {"f1": 500, "f2": 1500, "f0": 100}},
+            "interpolated_vowels": {}
         })
     )
 

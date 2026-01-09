@@ -443,22 +443,36 @@ class TunerWindow(QMainWindow):
 
         item = items[0]
         base = item.data(Qt.ItemDataRole.UserRole)
+
+        # Ignore the “New Profile” pseudo-item
+        if base is None:
+            self.btn_view_profile.setEnabled(False)
+            self.active_label.setText("Active: None")
+            return
+
+        # Load raw JSON
         profile = self.tuner.profile_manager.load_profile_json(base)
-        self.live_analyzer.user_formants = {
-            v: entry for v, entry in profile.items()
-            if isinstance(entry, dict)
-        }
-        cal = profile.get("calibrated_vowels", [])
-        interp = profile.get("interpolated_vowels", [])
-        self.vowel_map_view.set_vowel_status(cal, interp)
+
+        # Extract cal + interp for vowel map
+        cal = profile.get("calibrated_vowels", {})
+        interp = profile.get("interpolated_vowels", {})
+
+        # Update analyzer’s user_formants (merged cal+interp)
+        merged = {**cal, **interp}
+        user_formants = self.profile_manager.extract_formants(merged)
+        self.live_analyzer.user_formants = user_formants
+
+        # Update UI label
+        self._set_active_profile(base)
+        print("SELECTION CHANGED:", base, "active_profile:", self.tuner.active_profile)
 
         # Update vowel map
+        self.vowel_map_view.set_vowel_status(cal, interp)
         self.vowel_map_view.analyzer = self.live_analyzer
         self.vowel_map_view.compute_dynamic_ranges()
-        # Assign colors for all calibrated vowels immediately when profile loads
         self.vowel_map_view.vowel_colors = {
             vowel: vowel_color_for(vowel)
-            for vowel in self.analyzer.user_formants.keys()
+            for vowel in user_formants.keys()
         }
         self.vowel_map_view.update()
 
@@ -548,6 +562,9 @@ class TunerWindow(QMainWindow):
             QMessageBox.critical(self, "Profile error",
                                  f"Could not apply profile '{base}':\n{e}")
             return
+
+        # Store full profile for UI
+        self.tuner.active_profile = self.analyzer.active_profile
 
         self._set_active_profile(applied)
         self.voice_type = getattr(self.analyzer, "voice_type", self.voice_type)

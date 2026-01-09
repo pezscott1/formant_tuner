@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 from tuner.controller import Tuner
+from tuner.profile_controller import ProfileManager
 
 
 # ---------------------------------------------------------
@@ -145,3 +146,32 @@ def test_poll_latest_processed():
 
     out = t.poll_latest_processed()
     assert out["f0"] == 100
+
+
+def make_pm(tmp_path):
+    class DummyAnalyzer:
+        voice_type = "baritone"
+        def set_user_formants(self, fmts): pass
+
+    return ProfileManager(tmp_path, DummyAnalyzer())
+
+
+def test_extract_formants_ignores_invalid_entries(tmp_path):
+    pm = make_pm(tmp_path)
+
+    raw = {
+        "i": {"f1": 300, "f2": 2700, "confidence": 1.0, "stability": 0.0},
+        "bad1": "string",
+        "bad2": 123,
+        "bad3": ["not", "valid"],  # list → normalized, not ignored
+        "voice_type": "baritone",
+    }
+
+    fmts = pm.extract_formants(raw)
+
+    assert "i" in fmts
+    assert "bad1" not in fmts
+    assert "bad2" not in fmts
+
+    # bad3 is normalized, so it *should* appear
+    assert "bad3" not in fmts

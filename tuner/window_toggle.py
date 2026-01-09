@@ -185,19 +185,12 @@ class VowelMapView(QWidget):
     def draw_targets(self, painter, w, h):
         if not self.analyzer or not hasattr(self.analyzer, "user_formants"):
             return
-        print("DRAW TARGETS CALLED, ANALYZER =", self.analyzer)
         occupied = []
         offsets = [
             (0, -20), (20, -20), (20, 0), (20, 20),
             (0, 20), (-20, 20), (-20, 0), (-20, -20)
         ]
-        print("CAL:", self.calibrated_vowels)
-        print("INTERP:", self.interpolated_vowels)
-        print("ANALYZER KEYS:", list(self.analyzer.user_formants.keys())
-              if self.analyzer else None)
-
         for vowel, entry in self.analyzer.user_formants.items():
-            print("This is inside vowel, entry for loop.")
             f1 = entry.get("f1")
             f2 = entry.get("f2")
             if not f1 or not f2:

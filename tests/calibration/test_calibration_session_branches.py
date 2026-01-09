@@ -127,7 +127,11 @@ def test_save_profile_calls_manager():
     name = sess.save_profile()
     assert name == "profile_tenor"
     assert mgr.saved[0] == "profile_tenor"
-    assert "a" in mgr.saved[1]
+
+    saved = mgr.saved[1]
+
+    # NEW: vowel entries live inside calibrated_vowels
+    assert "a" in saved["calibrated_vowels"]
 
 
 # ----------------------------------------------------------------------

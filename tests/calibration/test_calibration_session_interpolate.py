@@ -33,7 +33,7 @@ def test_compute_interpolated_vowels_basic(simple_triangles):
         "e": {"f1": 500.0, "f2": 1500.0, "f0": 110.0},
         "i": {"f1": 700.0, "f2": 2100.0, "f0": 120.0},
     }
-
+    s.calibrated_vowels.update({"a", "e", "i"})
     out = s.compute_interpolated_vowels()
     assert "x" in out
 

@@ -1,4 +1,4 @@
-# profile_viewer.py
+# profile_viewer/profile_viewer.py
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QTextEdit, QCheckBox
@@ -120,6 +120,10 @@ class ProfileViewerWindow(QMainWindow):
 
         lines = []
         for vowel, data in self.profile.items():
+            if not isinstance(data, dict):
+                continue
+            if "f1" not in data or "f2" not in data:
+                continue
             f1 = data.get("f1")
             f2 = data.get("f2")
             f0 = data.get("f0")
@@ -207,7 +211,6 @@ class ProfileViewerWindow(QMainWindow):
             f1 = self.profile[vowel]["f1"]
             f2 = self.profile[vowel]["f2"]
             color = vowel_color_for(vowel)
-            print(f"Plotting /{vowel}/ with color {color}")
             ax.scatter(
                 f2, f1,
                 s=200,

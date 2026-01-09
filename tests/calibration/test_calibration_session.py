@@ -128,4 +128,6 @@ def test_calibration_session_save_profile_creates_new_file():
     call_base, call_data, call_model = dummy_pm.calls[0]
     assert call_base == base
     assert call_data["voice_type"] == "bass"
-    assert "a" in call_data
+
+    # NEW: vowel entries live inside calibrated_vowels
+    assert "a" in call_data["calibrated_vowels"]

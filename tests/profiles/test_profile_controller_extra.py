@@ -126,8 +126,12 @@ def test_load_active_profile_malformed(tmp_path):
 def test_apply_profile_calls_analyzer(tmp_path):
     profile_path = tmp_path / "bass_profile.json"
     profile_path.write_text(json.dumps({
-        "a": {"f1": 300, "f2": 2500, "f0": 120},
-        "e": {"f1": 400, "f2": 2300, "f0": 130},
+        "voice_type": "bass",
+        "calibrated_vowels": {
+            "a": {"f1": 300, "f2": 2500, "f0": 120},
+            "e": {"f1": 400, "f2": 2300, "f0": 130},
+        },
+        "interpolated_vowels": {}
     }))
 
     mock_analyzer = MagicMock()
@@ -152,6 +156,7 @@ def test_apply_profile_calls_analyzer(tmp_path):
             "stability": float("inf"),
         },
     })
+
 
 # ---------------------------------------------------------
 # delete_profile removes JSON, model, and clears active profile
