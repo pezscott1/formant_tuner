@@ -145,6 +145,7 @@ class CalibrationWindow(QMainWindow):
 
     def _on_toggle_interpolated(self, state):
         self.show_interpolated = bool(state)
+        self._interpolated_vowels = self.session.compute_interpolated_vowels()
         self._redraw_vowel_anchors()
 
     def _compute_vowel_axis_limits(self):
