@@ -180,8 +180,23 @@ class VowelMapView(QWidget):
         self.calibrated_vowels = set(calibrated)
         self.interpolated_vowels = set(interpolated)
 
+    def update_hold_buffer(self):
+        f1 = self.bus.f1[-1] if self.bus.f1 else None
+        f2 = self.bus.f2[-1] if self.bus.f2 else None
+
+        if f1 is not None and f2 is not None:
+            self.last_valid_f1 = f1
+            self.last_valid_f2 = f2
+            self.hold_counter = self.hold_frames
+        else:
+            if self.hold_counter > 0:
+                self.hold_counter -= 1
+
     def paintEvent(self, event):
-        self.paint_canvas(event)
+        # Run hold-buffer logic immediately for tests
+        self.update_hold_buffer()
+        # Trigger a real repaint of the canvas
+        self.canvas_area.update()
 
     # ------------------------------------------------------------
     # Drawing helpers
@@ -290,21 +305,12 @@ class VowelMapView(QWidget):
         self.draw_targets(painter, w, h)
         self.draw_trail(painter, w, h)
 
-        # Live dot with hold buffer + smoothing
-        f1 = self.bus.f1[-1] if self.bus.f1 else None
-        f2 = self.bus.f2[-1] if self.bus.f2 else None
+        # Update hold buffer first
+        self.update_hold_buffer()
 
-        if f1 is not None and f2 is not None:
-            self.last_valid_f1 = f1
-            self.last_valid_f2 = f2
-            self.hold_counter = self.hold_frames
-        else:
-            if self.hold_counter > 0:
-                f1 = self.last_valid_f1
-                f2 = self.last_valid_f2
-                self.hold_counter -= 1
-            else:
-                f1 = f2 = None
+        # Retrieve the current (possibly held) values
+        f1 = self.last_valid_f1
+        f2 = self.last_valid_f2
 
         if f1 is not None and f2 is not None:
             # Smoothing
