@@ -11,7 +11,6 @@ _DEFAULT_WINDOWS = {
     "tenor": {
         "a": (450.0, 950.0, 500.0, 2300.0),
         "ɑ": (450.0, 950.0, 500.0, 2300.0),
-        # add other vowels as needed
     }
 }
 
@@ -34,9 +33,6 @@ def vowel_window(voice_type: str, vowel: str, calibrated: dict | None = None):
                 hi2 = f2 * 1.20
                 return lo1, hi1, lo2, hi2
 
-        # 🔥 KEY CHANGE:
-        # When calibrated dict is provided but vowel is not yet calibrated,
-        # do NOT fall back to VOWEL_CENTERS. Let callers see "no window".
         return None
 
     # 2. Fallback to table-based centers (runtime classification only)
@@ -77,7 +73,7 @@ def is_plausible_formants(
     - Wide windows during calibration
     - Tight adaptive windows after acceptance
     - Never trusts bad calibration entries
-    - Special handling for fronted baritone vowels
+    - Special handling for fronted vowels
     """
 
     # -----------------------------
@@ -117,14 +113,12 @@ def is_plausible_formants(
     # -----------------------------
     # Special handling for fronted vowels
     # -----------------------------
-    # Scott's /ɔ/ and /u/ are fronted (high F2)
     if vowel in ("ɔ", "u"):
         # F2 is the anchor
         if not (f2_low <= f2 <= f2_high):
             return False, f"f2-out ({f2:.0f})"
         # Allow wide F1 drift
         return True, "ok"
-
     # /i/ also uses F2 anchor
     if vowel == "i":
         if not (f2_low <= f2 <= f2_high):

@@ -19,7 +19,7 @@ class FormantAnalysisEngine:
             use_hybrid=False,
             vowel_hint=None,
     ):
-        self.profile_classifier = None  # NEW: tuner will attach a calibrated classifier
+        self.profile_classifier = None
         self.voice_type = voice_type
         self.debug = debug
         self.calibrating = False
@@ -27,11 +27,10 @@ class FormantAnalysisEngine:
         self.pitch_tracker = pitch_tracker or estimate_pitch
         self.vowel_classifier = vowel_classifier
 
-        # Hybrid toggle (tests assume attribute exists)
+        # Hybrid toggle
         self.use_hybrid = use_hybrid
         self.vowel_hint = vowel_hint
 
-        # Always exists
         self.user_formants = {}
         self._latest_raw = None
 
@@ -84,7 +83,7 @@ class FormantAnalysisEngine:
             return None, None, 0.0, 0.0, 0.0
 
         # ---------------------------------------------------------
-        # NEW unified vowel classification
+        # Unified vowel classification
         # ---------------------------------------------------------
 
         vowel = None
@@ -164,7 +163,7 @@ class FormantAnalysisEngine:
             f3 = hres.f3
             conf = hres.confidence
             method = hres.method  # "lpc", "te", or "hybrid_front"
-            hybrid = (f1, f2, f3)  # or hres.lpc / hres.te if you prefer
+            hybrid = (f1, f2, f3)
         else:
             print("[ENGINE] else loop, not hybrid, vowel_hint=", self.vowel_hint)
             lres = lpc_mod.estimate_formants(frame, sr, debug=True)
@@ -183,14 +182,14 @@ class FormantAnalysisEngine:
             vowel, vowel_guess, vowel_confidence,
             vowel_score, resonance_score, overall,
             voiced, segment,
-            hybrid_formants=None,  # NEW
+            hybrid_formants=None,
     ) -> dict:
         return {
             "f1": f1,
             "f2": f2,
             "f3": f3,
             "formants": (f1, f2, f3),
-            "hybrid_formants": hybrid_formants,  # NEW
+            "hybrid_formants": hybrid_formants,
             "f0": f0,
             "confidence": conf,
             "method": method,

@@ -242,55 +242,38 @@ def update_vowel_chart(
     overall,
 ):
     """
-    Draws a single measured point and (optionally) a line to target.
-    Tests require:
-      - First success: artists stored
-      - Second success: old artists removed and NOT replaced
-      - Low confidence / instability / invalid → no artists, title only
+    Draws a single measured point and a line to target.
     """
 
-    # Normalize formants immediately (tests sometimes pass tuples)
+    # Normalize formants immediately
     target_formants = _normalize_formants(target_formants)
     measured_formants = _normalize_formants(measured_formants)
 
     ax = window.ax_vowel
-
-    # Was there a previous measured artist? (before removal)
+    # Was there a previous measured artist?
     had_previous = getattr(window, "vowel_measured_artist", None) is not None
-
     # Remove old artists (sets DummyArtist.removed = True)
     _remove_old_artists(window)
-
     # Extract stability + confidence
     conf, stable = _extract_confidence_and_stability(window)
 
     tf1, tf2 = target_formants.get("f1"), target_formants.get("f2")
     mf1, mf2 = measured_formants.get("f1"), measured_formants.get("f2")
-
     measured_valid, target_valid = _validate_formants(mf1, mf2, tf2)
-
     # Gating: if invalid / unstable / low confidence → no artists, just text
     if (not measured_valid) or (not stable) or (conf < 0.25):
         _set_title(window, ax, vowel, vowel_score, resonance_score, overall)
         if hasattr(window.canvas, "draw_idle"):
             window.canvas.draw_idle()
         return
-
     # Draw measured point
     point = _draw_measured_point(ax, mf1, mf2)
-
-    # Tests require:
-    #   first success: store artists
-    #   second success: DO NOT store new ones
     if not had_previous:
         window.vowel_measured_artist = point
-
     # Draw line to target if valid
     line = _draw_target_line(ax, tf1, tf2, mf1, mf2) if target_valid else None
     if not had_previous:
         window.vowel_line_artist = line
-
     _set_title(window, ax, vowel, vowel_score, resonance_score, overall)
-
     if hasattr(window.canvas, "draw_idle"):
         window.canvas.draw_idle()

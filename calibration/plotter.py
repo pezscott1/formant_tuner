@@ -86,8 +86,6 @@ def update_spectrogram(self, freqs, times, s):
     Calibration spectrogram tuned to match PyQt:
     - log-frequency resampling
     - per-column dB normalization
-    - proper bin edges for pcolormesh
-    - no double log-scaling
     - crisp harmonics across full range
     """
 
@@ -147,7 +145,7 @@ def update_spectrogram(self, freqs, times, s):
     # Clean labels
     self.ax_spec.yaxis.set_major_formatter(ScalarFormatter())
     self.ax_spec.yaxis.set_minor_formatter(NullFormatter())
-    # Explicit ticks (optional but recommended)
+    # Explicit ticks
     self.ax_spec.set_yticks([150, 300, 600, 1200, 2400, 4000])
     self.ax_spec.set_ylabel("Frequency (Hz)")
     self.ax_spec.set_xlabel("Time (s)")

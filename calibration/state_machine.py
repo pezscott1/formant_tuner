@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 class CalibrationStateMachine:
     """
     Simple phase state machine for calibration:
-
       phases: "prep" → "sing" → "capture" → next vowel → ... → "finished"
     """
 

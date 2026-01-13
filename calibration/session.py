@@ -280,8 +280,8 @@ class CalibrationSession:
 
         interp = self.compute_interpolated_vowels()
 
-        # calibrated vowels are exactly the explicit set (
-        # use original keys from self.calibrated_vowels)
+        # calibrated vowels are exactly the explicit set
+        # (use original keys from self.calibrated_vowels)
         calibrated = sorted(self.calibrated_vowels)
 
         # interpolated vowels are exactly the computed ones (keys are normalized)
@@ -339,7 +339,6 @@ def normalize_profile_for_save(user_formants, retries_map):
             "f0": f0,
             "confidence": conf,
             "stability": stab,
-            # tests expect NO weight field
             "retries": retries,
             "reason": reason_text,
             "saved_at": vals.get("saved_at", datetime.now(timezone.utc).isoformat()),

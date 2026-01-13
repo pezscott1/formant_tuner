@@ -464,7 +464,7 @@ class CalibrationWindow(QMainWindow):
         f0_cal = self._apply_pitch_plausibility(pitch_val)
 
         if f0_cal is not None:
-            float(f0_cal)  # explicit narrowing
+            float(f0_cal)
         else:
             f0_cal = None
 
@@ -498,7 +498,6 @@ class CalibrationWindow(QMainWindow):
         ax.invert_xaxis()
         ax.invert_yaxis()
 
-        # Softer, thicker grid like Profile Viewer
         ax.grid(
             True,
             linewidth=1.5,
@@ -695,14 +694,13 @@ class CalibrationWindow(QMainWindow):
 
             # Store durable anchor
             self._vowel_anchors[vowel] = (f1, f2)
-            # NEW: recompute limits dynamically
+            # recompute limits dynamically
             self._compute_vowel_axis_limits()
             self._redraw_vowel_anchors()
             self.canvas.draw_idle()
 
             self.canvas.draw_idle()
 
-            # Reset F0 lock and advance
             self.state.advance()
             return True
 

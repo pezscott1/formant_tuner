@@ -163,8 +163,8 @@ class VowelMapView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(title)
-        layout.addWidget(self.canvas_area, stretch=10)  # painter gets most space
-        layout.addWidget(legend_bar_widget)  # legend now BELOW canvas
+        layout.addWidget(self.canvas_area, stretch=10)
+        layout.addWidget(legend_bar_widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
@@ -193,7 +193,7 @@ class VowelMapView(QWidget):
                 self.hold_counter -= 1
 
     def paintEvent(self, event):
-        # Run hold-buffer logic immediately for tests
+        # Run hold-buffer logic immediately
         self.update_hold_buffer()
         # Trigger a real repaint of the canvas
         self.canvas_area.update()
@@ -253,7 +253,7 @@ class VowelMapView(QWidget):
             y = float(self.f1_to_y(f1, h))
 
             # -----------------------------
-            # Compute label placement FIRST
+            # Compute label placement
             # -----------------------------
             base_x = x + (24 if x < w / 2 else -30)
             base_y = y + (-10 if y < h / 2 else 20)

@@ -159,8 +159,7 @@ class TunerWindow(QMainWindow):
             this.active_label.setText(f"Active profile: {name}")
 
         self._apply_selected_profile_item = _fake_apply.__get__(self)
-
-        # Window size (tests expect >600x500)
+        # Window size
         self.resize(800, 600)
 
     def _build_ui(self):
@@ -349,36 +348,28 @@ class TunerWindow(QMainWindow):
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setStyleSheet("background-color: #f0f0f0;")
         plot_layout.addWidget(self.canvas)
-
         # Add widgets to splitter
         right_splitter.addWidget(plot_frame)
         right_splitter.addWidget(self.spectrogram_view)
         right_splitter.setSizes([800, 500])
-
         # Wrap splitter in AnalysisView
         self.analysis_view = AnalysisView(right_splitter)
-
         # Create vowel map view
         self.vowel_map_view = VowelMapView(self.bus)
-
         # Stacked widget
         self.stack = QStackedWidget()
         self.stack.addWidget(self.analysis_view)  # index 0
         self.stack.addWidget(self.vowel_map_view)  # index 1
-
         # Toggle bar
         self.toggle_bar = ModeToggleBar(self.stack)
-
         # Right container
         right_container = QWidget()
         right_layout = QVBoxLayout(right_container)
         right_layout.addWidget(self.toggle_bar)
         right_layout.addWidget(self.stack)
         right_container.setStyleSheet("background-color: #e6f0ff;")
-
         # Add to main layout
         main_layout.addWidget(right_container, stretch=1)
-
         # Pre-populate right panel with idle plots
         update_spectrum(
             window=self,
@@ -388,7 +379,6 @@ class TunerWindow(QMainWindow):
             pitch=None,
             _tolerance=self.current_tolerance,
         )
-
         update_vowel_chart(
             window=self,
             vowel=None,
@@ -398,7 +388,6 @@ class TunerWindow(QMainWindow):
             resonance_score=None,
             overall=None,
         )
-
         self.canvas.draw_idle()
 
         # Signals
@@ -420,7 +409,7 @@ class TunerWindow(QMainWindow):
             return
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self._update_display)  # type: ignore
-        self.update_timer.start(60)  # ~16 fps
+        self.update_timer.start(60)
     # ---------------------------------------------------------
     # Profiles
     # ---------------------------------------------------------
@@ -443,7 +432,6 @@ class TunerWindow(QMainWindow):
         item = items[0]
         base = item.data(Qt.ItemDataRole.UserRole)
 
-        # Ignore the “New Profile” pseudo-item
         if base is None:
             self.btn_view_profile.setEnabled(False)
             self.active_label.setText("Active: None")
@@ -456,14 +444,12 @@ class TunerWindow(QMainWindow):
         cal = profile.get("calibrated_vowels", {})
         interp = profile.get("interpolated_vowels", {})
 
-        # Update analyzer’s user_formants (merged cal+interp)
+        # Update analyzer’s user_formants
         merged = {**cal, **interp}
         user_formants = self.profile_manager.extract_formants(merged)
         self.live_analyzer.user_formants = user_formants
-
         # Update UI label
         self._set_active_profile(base)
-
         # Update vowel map
         self.vowel_map_view.set_vowel_status(cal, interp)
         self.vowel_map_view.analyzer = self.live_analyzer
@@ -478,11 +464,9 @@ class TunerWindow(QMainWindow):
         if self.headless:
             return
         self.profile_list.clear()
-
         # Set list font BEFORE adding items
         font = QFont("Arial", 12)
         self.profile_list.setFont(font)
-
         # New profile pseudo-item
         new_item = QListWidgetItem("➕ New Profile")
         new_item.setForeground(QColor("darkgreen"))
@@ -730,7 +714,6 @@ class TunerWindow(QMainWindow):
         processed = self.tuner.poll_latest_processed()
         if not processed:
             return
-
         # Use the same smoothed formants the classifier uses
         smoothed = processed.get("smoothed_formants")
         conf = processed.get("confidence", 0.0)
@@ -748,7 +731,7 @@ class TunerWindow(QMainWindow):
         stability_score = processed.get("stability_score")
         confidence = processed.get("confidence")
 
-        # Push into visualization bus (no more spec_col)
+        # Push into visualization bus
         self.bus.push(
             f1=f1,
             f2=f2,
@@ -769,7 +752,6 @@ class TunerWindow(QMainWindow):
         else:
             raw_f1 = raw_f2 = raw_f3 = None
 
-        # --- ADD DELTA BLOCK HERE ---
         if smoothed:
             smooth_f1 = smoothed.get("f1")
             smooth_f2 = smoothed.get("f2")
@@ -781,7 +763,6 @@ class TunerWindow(QMainWindow):
             if raw_f2 is not None and smooth_f2 is not None:
                 print(f"[F2 Δ] hybrid={raw_f2:.1f}  "
                       f"smoothed={smooth_f2:.1f}  Δ={abs(raw_f2 - smooth_f2):.1f}")
-
         print(
             f"[TUNER] f0_raw={processed.get('f0_raw')}  "
             f"f0_smooth={processed.get('f0')}  "
@@ -809,7 +790,6 @@ class TunerWindow(QMainWindow):
         vowel_score = processed["vowel_score"]
         resonance_score = processed["resonance_score"]
         overall = processed["overall"]
-
         # Pull active profile targets
         if vowel_smooth in self.analyzer.user_formants:
             entry = self.analyzer.user_formants[vowel_smooth]
@@ -863,7 +843,7 @@ class TunerWindow(QMainWindow):
 
 class VisualizationBus:
     def __init__(self, max_frames=200):
-        self.audio = deque(maxlen=max_frames)     # raw audio segments
+        self.audio = deque(maxlen=max_frames)
         self.f1 = deque(maxlen=max_frames)
         self.f2 = deque(maxlen=max_frames)
         self.f3 = deque(maxlen=max_frames)

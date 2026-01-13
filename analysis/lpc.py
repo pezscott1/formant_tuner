@@ -60,7 +60,7 @@ def estimate_formants(
         return _empty("empty_frame")
 
     # ---------------------------------------------------------
-    # 1. Pre-emphasis (gentle)
+    # 1. Pre-emphasis
     # ---------------------------------------------------------
     pre = 0.97 if sr >= 44100 else 0.95
     y = np.append(y[0], y[1:] - pre * y[:-1])
@@ -72,9 +72,9 @@ def estimate_formants(
     sr_eff = 16000
 
     # ---------------------------------------------------------
-    # 3. Windowing (40 ms)
+    # 3. Windowing (50 ms)
     # ---------------------------------------------------------
-    win_len = int(sr_eff * 0.050)  # or 0.060
+    win_len = int(sr_eff * 0.050)
     if win_len < 256:
         return _empty("window_too_short")
 
@@ -120,7 +120,7 @@ def estimate_formants(
     # 3) Normal formant extraction
     f1, f2, f3 = _extract_formants(freqs_sorted)
 
-    # Tests expect: if LPC extracted no formants, keep method="lpc", not fallback
+    # If LPC extracted no formants, keep method="lpc", not fallback
     if f1 is None and f2 is None:
         return FormantResult(
             f1=None,
@@ -334,12 +334,12 @@ def _smooth_peaks(frame, sr, lifter_cut=20, nfft=4096):
 
     base = np.max(env_m)
 
-    # 🔥 LOWER THRESHOLD: catch weak F1
+    # Catch weak F1
     thresh = base * 0.005   # was 0.02
     peaks: np.ndarray
     peaks, _ = find_peaks(env_m, height=thresh)
 
-    # 🔥 If still nothing, relax again
+    # If still nothing, relax again
     if peaks.size == 0:
         peaks, _ = find_peaks(env_m, height=base * 0.002)
 

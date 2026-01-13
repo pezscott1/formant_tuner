@@ -16,16 +16,16 @@ def vowel_color_for(vowel: str) -> str:
 
 
 VOWEL_COLORS = {
-    "i":  "#FF1744",  # neon red
-    "ɪ":  "#00E5FF",  # electric cyan
-    "e":  "#D500F9",  # ultraviolet magenta
-    "ɛ":  "#76FF03",  # radioactive green
-    "æ":  "#FF6D00",  # molten orange
-    "a":  "#651FFF",  # deep indigo
-    "ɑ":  "#00E676",  # mint neon
-    "ʌ":  "#FFEA00",  # laser yellow
-    "ɔ":  "#00BFA5",  # teal-green
-    "o":  "#F50057",  # hot pink
-    "ʊ":  "#AEEA00",  # chartreuse
-    "u":  "#AA00FF",  # electric purple
+    "i":  "#FF1744",
+    "ɪ":  "#00E5FF",
+    "e":  "#D500F9",
+    "ɛ":  "#76FF03",
+    "æ":  "#FF6D00",
+    "a":  "#651FFF",
+    "ɑ":  "#00E676",
+    "ʌ":  "#FFEA00",
+    "ɔ":  "#00BFA5",
+    "o":  "#F50057",
+    "ʊ":  "#AEEA00",
+    "u":  "#AA00FF",
 }

@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 import matplotlib
 import gc
 os.environ.setdefault("COVERAGE_DISABLE_C_EXTENSION", "1")
-# Prevent Qt from creating real windows (critical on Windows)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
@@ -22,15 +21,11 @@ def disable_gc_for_pytest():
 
 
 def pytest_sessionstart(session):
-    # Force a pure headless backend (belt-and-suspenders with MPLBACKEND=Agg)
     matplotlib.use("Agg")
-
-    # Disable cyclic GC to avoid Windows 3.12 + coverage access violations
     gc.disable()
 
 
 def pytest_sessionfinish(session, exitstatus):
-    # Re-enable GC after tests; not strictly needed, but explicit.
     gc.enable()
 
 # ---------------------------------------------------------
@@ -50,7 +45,7 @@ def qapp():
 
 
 # ---------------------------------------------------------
-# Optional: allow tests to skip Qt entirely
+# Allow tests to skip Qt entirely
 # ---------------------------------------------------------
 def pytest_runtest_call(item):
     if item.get_closest_marker("noqt"):

@@ -196,12 +196,11 @@ class ProfileViewerWindow(QMainWindow):
         ax.invert_xaxis()
         ax.invert_yaxis()
 
-        # Thicker, softer grid lines
         ax.grid(
             True,
-            linewidth=1.5,  # increase thickness
-            color="#cccccc",  # light gray so labels pop
-            alpha=0.8,  # slightly transparent
+            linewidth=1.5,
+            color="#cccccc",
+            alpha=0.8,
         )
 
         # Plot calibrated vowels

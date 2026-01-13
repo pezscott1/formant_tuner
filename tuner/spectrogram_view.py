@@ -12,8 +12,6 @@ class SpectrogramView(QWidget):
         self.bus = bus
         self.setMinimumHeight(200)
         self.setAutoFillBackground(True)
-
-        # EXACT same colormap as calibration
         self.cmap = cm.get_cmap("magma")
 
         # Fixed analysis parameters
@@ -33,8 +31,6 @@ class SpectrogramView(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-
-        # Always paint a full background so the widget keeps its full visual size
         painter.fillRect(self.rect(), QColor("black"))
 
         # ---------------------------------------------------------------------
@@ -44,7 +40,6 @@ class SpectrogramView(QWidget):
                   if a is not None and len(a) > 0]
         if not chunks:
             return
-
         audio = np.concatenate(chunks)
         if audio.size < 1024:
             return
@@ -73,7 +68,6 @@ class SpectrogramView(QWidget):
             hop_length=hop_length,
             window_seconds=self.window_seconds,
         )
-
         if S is None or S.size == 0:
             painter.fillRect(self.rect(), QColor("black"))
             return
@@ -84,20 +78,16 @@ class SpectrogramView(QWidget):
         mask = freqs <= self.fmax
         S = S[mask, :]
         _freqs = freqs[mask]
-
         if S.size == 0:
             return
-
         log_freqs = np.logspace(
             np.log10(self.fmin),
             np.log10(self.fmax),
             num_bins,
         )
-
         S_log = np.zeros((num_bins, S.shape[1]), dtype=float)
         for i in range(S.shape[1]):
             S_log[:, i] = np.interp(log_freqs, _freqs, S[:, i])
-
         S = S_log
         _freqs = log_freqs
 
@@ -105,27 +95,22 @@ class SpectrogramView(QWidget):
         # 5) Per-column dB normalization (high contrast, speech-friendly)
         # ---------------------------------------------------------------------
         arr_db = 10.0 * np.log10(S + 1e-12)
-
         # Per-column max normalization: brightest bin = 0 dB in each frame
         col_max = np.max(arr_db, axis=0, keepdims=True)
         arr_db = arr_db - col_max
-
         # Clip to fixed dynamic range
         arr_db = np.clip(arr_db, -self.db_range, 0.0)
-
         # Normalize to [0, 1] for colormap
         norm = (arr_db + self.db_range) / self.db_range
 
         # ---------------------------------------------------------------------
         # 6) Map to RGB and create QImage
         # ---------------------------------------------------------------------
-        rgba = self.cmap(norm)[:, :, :3]  # drop alpha
+        rgba = self.cmap(norm)[:, :, :3]
         img_rgb = (rgba * 255).astype(np.uint8)
-
         h_img, w_img, _ = img_rgb.shape
         if h_img <= 0 or w_img <= 0:
             return
-
         qimg = QImage(
             img_rgb.data,
             w_img,
@@ -135,10 +120,7 @@ class SpectrogramView(QWidget):
         )
 
         # ---------------------------------------------------------------------
-        # 7) Scale to widget using KeepAspectRatioByExpanding (B behavior)
-        #    - preserves aspect ratio
-        #    - fills both dimensions
-        #    - crops overflow
+        # 7) Scale to widget using IgnoreAspectRatio
         # ---------------------------------------------------------------------
         scaled = qimg.scaled(
             self.width(),
@@ -146,14 +128,11 @@ class SpectrogramView(QWidget):
             Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.FastTransformation,
         )
-
         w_scaled = scaled.width()
         h_scaled = scaled.height()
-
         # Center the expanded image; may be negative if cropping occurs
         x0 = (self.width() - w_scaled) // 2
         y0 = (self.height() - h_scaled) // 2
-
         # Draw spectrogram with transparency
         painter.setOpacity(0.6)
         painter.drawImage(x0, y0, scaled)

@@ -294,9 +294,6 @@ def estimate_formants_hybrid(
 ) -> HybridFormantResult:
     """
     Run LPC + TE on the same frame and choose a hybrid estimate.
-
-    This is designed to be a drop-in replacement for the existing
-    estimate_formants(signal, sr, debug=...) call in the engine.
     """
 
     lpc_res = estimate_formants(signal, sr, debug=debug)

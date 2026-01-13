@@ -141,7 +141,7 @@ def estimate_formants_te(
     peaks_idx: np.ndarray
     peaks_idx, props = find_peaks(env_m, height=np.max(env_m) * 0.05)
     if len(peaks_idx) == 0:
-        # Short, flat zero frame → tests expect numeric 0.0 formants
+        # Short, flat zero frame
         if np.allclose(x, 0.0) and x.size <= 256:
             return TEFormantResult(
                 f1=0.0,

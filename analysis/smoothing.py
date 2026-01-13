@@ -41,7 +41,7 @@ class PitchSmoother:
         self._sr = sr
 
     # -------------------------
-    # Octave correction (test‑expected)
+    # Octave correction
     # -------------------------
     def _octave_correct(self, new):
         if self.current is None or new is None:
@@ -65,7 +65,7 @@ class PitchSmoother:
         self.current = None
 
     # -------------------------
-    # Update logic (test‑expected)
+    # Update logic
     # -------------------------
     def update(self, new, confidence=1.0):
         # --- unwrap PitchResult objects ---
@@ -83,7 +83,7 @@ class PitchSmoother:
         except Exception:
             return self.current
 
-        # first frame: no normalization, tests expect identity
+        # first frame: no normalization
         if self.current is None:
             self.current = new
             return self.current
@@ -204,7 +204,7 @@ class MedianSmoother:
 class LabelSmoother:
     """
     Stabilizes vowel labels using hysteresis + confidence threshold.
-    Now uses LPC confidence as well.
+    Uses LPC confidence as well.
     """
 
     def __init__(self, hold_frames=4, min_confidence=0.2):

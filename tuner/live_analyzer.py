@@ -39,7 +39,7 @@ class LiveAnalyzer:
         self._latest_processed = None
         self._lock = threading.Lock()
     # ------------------------------------------------------------------
-    # CORE: process_raw (unchanged)
+    # CORE: process_raw
     # ------------------------------------------------------------------
 
     def get_latest_raw(self):
@@ -107,7 +107,7 @@ class LiveAnalyzer:
         vowel_s = self.label_smoother.update(vowel_raw, confidence=lpc_conf)
 
         # =========================================================
-        # 5. Scoring (optional but recommended)
+        # 5. Scoring
         # =========================================================
         vowel_score = raw_dict.get("vowel_score")
         resonance_score = raw_dict.get("resonance_score")
@@ -233,10 +233,8 @@ class LiveAnalyzer:
         """Start the background analyzer worker."""
         if self._worker_thread is not None:
             return
-
         # Reset smoothing state at start
         self.reset()
-
         self._stop_flag.clear()
         self._worker_thread = threading.Thread(
             target=self._worker_loop,

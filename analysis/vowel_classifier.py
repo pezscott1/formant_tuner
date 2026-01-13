@@ -1,15 +1,10 @@
 # analysis.vowel_classifier.py
 """
-Modern vowel classifier for Scott’s baritone vowel space.
-
 Uses:
   - hybrid formants when available
-  - updated VOWEL_CENTERS tuned to Scott’s real calibration
   - distance-based scoring
   - confidence metric
   - fallback to LPC if hybrid unavailable
-
-This replaces the old robust_guess().
 """
 
 import numpy as np
@@ -23,7 +18,7 @@ def classify_vowel(f1, f2, centers=None, voice_type=None):
     if centers is None:
         return None, 0.0, None
 
-    # Missing or invalid F1 → tests expect missing_f1
+    # Missing or invalid F1
     if f1 is None or not np.isfinite(f1):
         return None, 0.0, {"reason": "missing_f1"}
 

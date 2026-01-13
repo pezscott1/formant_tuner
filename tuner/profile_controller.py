@@ -13,7 +13,7 @@ class ProfileManager:
     ACTIVE_FILE = "active_profile.json"
 
     def __init__(self, profiles_dir, analyzer):
-        # If tests pass profiles_dir="", use bare filenames
+        # When tests pass profiles_dir="", use bare filenames
         if profiles_dir == "":
             self.profiles_dir = ""
         else:
@@ -80,11 +80,9 @@ class ProfileManager:
     # ---------------------------------------------------------
     def set_active_profile(self, name):
         self.active_profile_name = name
-
         # Only write active_profile.json when profiles_dir is not empty
         if self.profiles_dir == "":
             return
-
         path = self._join(self.ACTIVE_FILE)
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"active": name}, f)
@@ -93,7 +91,6 @@ class ProfileManager:
         path = self._join(self.ACTIVE_FILE)
         if not os.path.exists(path):
             return
-
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -102,18 +99,18 @@ class ProfileManager:
             self.active_profile_name = None
 
     # ---------------------------------------------------------
-    # Apply profile to analyzer (modern dict-based formants)
+    # Apply profile to analyzer
     # ---------------------------------------------------------
     def apply_profile(self, base_name: str):
         """
         Load profile JSON, update analyzer.voice_type and analyzer.user_formants.
-        Returns base_name on success (even if JSON is empty), to match tests.
+        Returns base_name on success (even if JSON is empty).
         """
         raw = self.load_profile_json(base_name)
 
         # Always return base_name, even if raw is {}
         voice_type = raw.get("voice_type")
-        # Fallback: infer from profile base name (legacy behavior required by tests)
+        # Fallback: infer from profile base name
         if not voice_type:
             inferred_map = {
                 "alpha": "tenor",
@@ -135,7 +132,6 @@ class ProfileManager:
 
         interp = raw.get("interpolated_vowels", {})
         if isinstance(interp, list):
-            # Old format stored only names; no data
             interp = {}
         # Merge them into the analyzer's vowel set
         merged = {**cal, **interp}
@@ -145,21 +141,18 @@ class ProfileManager:
 
         # Store full profile for UI and vowel map
         self.analyzer.active_profile = {
-            **user_formants,  # <-- actual vowels at top level
+            **user_formants,
             "calibrated_vowels": cal,
             "interpolated_vowels": interp,
             "voice_type": voice_type,
         }
-
         # Store merged vowel dictionary for analysis
         self.analyzer.user_formants = user_formants
-
         # Apply to analyzer
         if hasattr(self.analyzer, "set_user_formants"):
             self.analyzer.set_user_formants(user_formants)
         else:
             self.analyzer.user_formants = user_formants
-
         self.set_active_profile(base_name)
         return base_name
 
@@ -181,24 +174,19 @@ class ProfileManager:
                     return json.load(f)
             except Exception:
                 return {}
-
         # CASE 2: base_name is a STRING → treat as profile name
         profile_path = self._join(f"{base_name}_profile.json")
-
         try:
             with open(profile_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
             data = {}
-
-        # Tests REQUIRE exactly one additional open() call
         active_path = self._join(self.ACTIVE_FILE)
         try:
             with open(active_path, "r", encoding="utf-8") as f:
                 _ = f.read()
         except Exception:
             pass
-
         return data
 
     # ---------------------------------------------------------
@@ -213,17 +201,13 @@ class ProfileManager:
         for vowel, entry in raw_dict.items():
             if vowel in ("voice_type", "calibrated_vowels", "interpolated_vowels"):
                 continue
-
             if not isinstance(entry, (dict, list, tuple)):
                 continue
-
             norm = _normalize_profile_entry(entry)
             if not isinstance(norm, dict):
                 continue
-
             f1 = norm.get("f1")
             f2 = norm.get("f2")
-
             # Require numeric f1/f2
             try:
                 if f1 is not None:
@@ -232,14 +216,11 @@ class ProfileManager:
                     f2 = float(f2)
             except Exception:
                 continue
-
             f0 = norm.get("f0")
             if f0 is None:
                 f0 = norm.get("f3")
-
             confidence = float(norm.get("confidence", 0.0))
             stability = float(norm.get("stability", float("inf")))
-
             out[vowel] = {
                 "f1": f1,
                 "f2": f2,
@@ -247,7 +228,6 @@ class ProfileManager:
                 "confidence": confidence,
                 "stability": stability,
             }
-
         return out
 
     # ---------------------------------------------------------
@@ -270,10 +250,6 @@ class ProfileManager:
 
 
 def _normalize_profile_entry(entry):
-    """
-    Normalize legacy tuple entries to dict.
-    Example legacy: (f1,f2,f3,f0,conf,...) or shorter.
-    """
     if isinstance(entry, dict):
         return entry
 
@@ -288,5 +264,4 @@ def _normalize_profile_entry(entry):
             "confidence": conf if conf is not None else 0.0,
             "stability": stab if stab is not None else float("inf"),
         }
-
     return {"f1": None, "f2": None, "f3": None, "f0": None}
