@@ -25,6 +25,10 @@ class SpectrogramView(QWidget):
         self.fmax = 4000.0
         self.db_range = 60.0  # dB dynamic range
 
+        # Spectrogram cache: avoid recomputing when audio and size haven't changed
+        self._spec_cache_key = None
+        self._spec_cache = None  # (log_freqs, S_log)
+
     def update_from_bus(self, bus):
         self.bus = bus
         self.update()
@@ -59,37 +63,37 @@ class SpectrogramView(QWidget):
         hop_length = int(np.clip(hop_length, self.min_hop, self.max_hop))
 
         # ---------------------------------------------------------------------
-        # 3) Compute spectrogram (linear frequency)
+        # 3) Compute spectrogram (cached by audio length + widget size)
         # ---------------------------------------------------------------------
-        freqs, times, S = safe_spectrogram(
-            y=audio,
-            sr=self.sr,
-            n_fft=1024,
-            hop_length=hop_length,
-            window_seconds=self.window_seconds,
-        )
-        if S is None or S.size == 0:
-            painter.fillRect(self.rect(), QColor("black"))
-            return
+        cache_key = (audio.size, target_h, target_w)
+        if cache_key == self._spec_cache_key and self._spec_cache is not None:
+            _freqs, S = self._spec_cache
+        else:
+            freqs, _times, S_raw = safe_spectrogram(
+                y=audio,
+                sr=self.sr,
+                n_fft=1024,
+                hop_length=hop_length,
+                window_seconds=self.window_seconds,
+            )
+            if S_raw is None or S_raw.size == 0:
+                painter.fillRect(self.rect(), QColor("black"))
+                return
 
-        # ---------------------------------------------------------------------
-        # 4) Limit to analysis band and remap to log-frequency
-        # ---------------------------------------------------------------------
-        mask = freqs <= self.fmax
-        S = S[mask, :]
-        _freqs = freqs[mask]
-        if S.size == 0:
-            return
-        log_freqs = np.logspace(
-            np.log10(self.fmin),
-            np.log10(self.fmax),
-            num_bins,
-        )
-        S_log = np.zeros((num_bins, S.shape[1]), dtype=float)
-        for i in range(S.shape[1]):
-            S_log[:, i] = np.interp(log_freqs, _freqs, S[:, i])
-        S = S_log
-        _freqs = log_freqs
+            # Limit to analysis band and remap to log-frequency
+            mask = freqs <= self.fmax
+            S_band = S_raw[mask, :]
+            freqs_band = freqs[mask]
+            if S_band.size == 0:
+                return
+            log_freqs = np.logspace(np.log10(self.fmin), np.log10(self.fmax), num_bins)
+            S_log = np.zeros((num_bins, S_band.shape[1]), dtype=float)
+            for i in range(S_band.shape[1]):
+                S_log[:, i] = np.interp(log_freqs, freqs_band, S_band[:, i])
+
+            _freqs, S = log_freqs, S_log
+            self._spec_cache_key = cache_key
+            self._spec_cache = (_freqs, S)
 
         # ---------------------------------------------------------------------
         # 5) Per-column dB normalization (high contrast, speech-friendly)

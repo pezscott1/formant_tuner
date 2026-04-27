@@ -33,7 +33,7 @@ class DummyAxis:
     def clear(self):
         self.cleared = True
 
-    def plot(self, x, y, **kwargs):
+    def plot(self, x, y, *args, **kwargs):
         self.lines.append(("plot", x, y, kwargs))
         return [DummyArtist()]
 

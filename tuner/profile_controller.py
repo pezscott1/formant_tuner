@@ -1,8 +1,21 @@
 # tuner/profile_controller.py
+import logging
 import os
 import json
 from pathlib import Path
 from datetime import datetime, UTC
+import platform
+
+logger = logging.getLogger(__name__)
+
+KNOWN_VOICE_TYPES = frozenset({
+    "bass", "baritone", "tenor", "alto",
+    "mezzo", "mezzo-soprano", "contralto", "soprano",
+})
+
+# Generous plausible bounds for classical/operatic voice formants
+_F1_MIN, _F1_MAX = 50.0, 2000.0
+_F2_MIN, _F2_MAX = 200.0, 4000.0
 
 
 def utc_now_iso() -> str:
@@ -12,16 +25,16 @@ def utc_now_iso() -> str:
 class ProfileManager:
     ACTIVE_FILE = "active_profile.json"
 
-    def __init__(self, profiles_dir, analyzer):
-        # When tests pass profiles_dir="", use bare filenames
-        if profiles_dir == "":
-            self.profiles_dir = ""
+    def __init__(self, profiles_dir=None, analyzer=None):
+        if profiles_dir is None:
+            # Production default
+            self.profiles_dir = str(self.get_profile_dir())
         else:
+            # Tests and custom paths
             self.profiles_dir = str(profiles_dir)
 
         self.analyzer = analyzer
 
-        # Only create directory if non-empty
         if self.profiles_dir != "":
             os.makedirs(self.profiles_dir, exist_ok=True)
 
@@ -36,6 +49,20 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Listing + name conversion
     # ---------------------------------------------------------
+    @staticmethod
+    def get_profile_dir():
+        system = platform.system()
+
+        if system == "Windows":
+            base = Path(os.getenv("APPDATA")) / "Tuner" / "profiles"
+        elif system == "Darwin":  # macOS
+            base = Path.home() / "Library" / "Application Support" / "Tuner" / "profiles"
+        else:  # Linux and others
+            base = Path.home() / ".config" / "tuner" / "profiles"
+
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+
     def list_profiles(self):
         """Return a sorted list of base profile names."""
         return sorted(
@@ -72,7 +99,7 @@ class ProfileManager:
             with open(model_path, "wb") as f:
                 f.write(model_bytes)
 
-        print("[CALIBRATION] Saving profile to:", base)
+        logger.info("Profile saved: %s", base)
         self.set_active_profile(base)
 
     # ---------------------------------------------------------
@@ -95,7 +122,8 @@ class ProfileManager:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.active_profile_name = data.get("active")
-        except Exception:
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("Could not load active profile record: %s", e)
             self.active_profile_name = None
 
     # ---------------------------------------------------------
@@ -121,6 +149,13 @@ class ProfileManager:
                 "soprano": "soprano",
             }
             voice_type = inferred_map.get(base_name, None)
+
+        if voice_type and voice_type not in KNOWN_VOICE_TYPES:
+            logger.warning(
+                "Profile '%s' has unknown voice_type '%s'; keeping current",
+                base_name, voice_type,
+            )
+            voice_type = None
 
         if voice_type:
             self.analyzer.voice_type = voice_type
@@ -166,27 +201,37 @@ class ProfileManager:
     # ---------------------------------------------------------
     # Internal JSON loader
     # ---------------------------------------------------------
+
     def load_profile_json(self, base_name):
-        # CASE 1: base_name is a Path object → load directly
+        # CASE 1: Path object
         if isinstance(base_name, Path):
             try:
                 with open(base_name, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError) as e:
+                logger.warning("Could not load profile from path %s: %s", base_name, e)
                 return {}
-        # CASE 2: base_name is a STRING → treat as profile name
+            if not isinstance(data, dict):
+                logger.warning("Profile at %s is not a JSON object; ignoring", base_name)
+                return {}
+            return data
+
+        # CASE 2: string profile name
         profile_path = self._join(f"{base_name}_profile.json")
+
         try:
             with open(profile_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception:
+        except FileNotFoundError:
             data = {}
-        active_path = self._join(self.ACTIVE_FILE)
-        try:
-            with open(active_path, "r", encoding="utf-8") as f:
-                _ = f.read()
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("Could not load profile '%s': %s", base_name, e)
+            data = {}
+
+        if not isinstance(data, dict):
+            logger.warning("Profile '%s' is not a JSON object; ignoring", base_name)
+            return {}
+
         return data
 
     # ---------------------------------------------------------
@@ -214,7 +259,13 @@ class ProfileManager:
                     f1 = float(f1)
                 if f2 is not None:
                     f2 = float(f2)
-            except Exception:
+            except (ValueError, TypeError):
+                continue
+            if f1 is not None and not (_F1_MIN <= f1 <= _F1_MAX):
+                logger.warning("Skipping vowel '%s': F1=%.1f outside plausible range", vowel, f1)
+                continue
+            if f2 is not None and not (_F2_MIN <= f2 <= _F2_MAX):
+                logger.warning("Skipping vowel '%s': F2=%.1f outside plausible range", vowel, f2)
                 continue
             f0 = norm.get("f0")
             if f0 is None:

@@ -4,10 +4,6 @@ import numpy as np
 import librosa
 import logging
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
-    )
 
 
 def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=1.0):
@@ -29,7 +25,7 @@ def safe_spectrogram(y, sr, n_fft=1024, hop_length=256, window_seconds=1.0):
         y = np.asarray(y, dtype=float)
         if len(y) > 1:
             y = np.append(y[0], y[1:] - 0.95 * y[:-1])
-    except Exception:
+    except (ValueError, TypeError):
         pass
 
     # Try librosa STFT

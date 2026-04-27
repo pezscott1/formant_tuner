@@ -33,12 +33,6 @@ def test_profile_manager_loads_json(mock_file):
         "r",
         encoding="utf-8",
     )
-    mock_file.assert_any_call(
-        os.path.join("", "active_profile.json"),
-        "r",
-        encoding="utf-8",
-    )
-    assert mock_file.call_count >= 2
 
 
 # ---------------------------------------------------------

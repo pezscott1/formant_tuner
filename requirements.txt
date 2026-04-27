@@ -1,4 +1,4 @@
-audioop-lts==0.2.2
+altgraph==0.17.5
 audioread==3.1.0
 certifi==2026.1.4
 cffi==2.0.0
@@ -22,12 +22,15 @@ msgpack==1.1.2
 numba==0.63.1
 numpy==2.3.5
 packaging==25.0
+pefile==2024.8.26
 pillow==12.0.0
 platformdirs==4.5.1
 pluggy==1.6.0
 pooch==1.8.2
 pycparser==2.23
 Pygments==2.19.2
+pyinstaller==6.18.0
+pyinstaller-hooks-contrib==2025.11
 pyparsing==3.2.5
 PyQt6==6.10.1
 PyQt6-Qt6==6.10.1
@@ -36,6 +39,7 @@ pytest==9.0.2
 pytest-cov==7.0.0
 pytest-qt==4.5.0
 python-dateutil==2.9.0.post0
+pywin32-ctypes==0.2.3
 requests==2.32.5
 scikit-learn==1.8.0
 scipy==1.16.3

@@ -85,4 +85,4 @@ def test_window_resizes_to_expected_dimensions(app, sample_profile):
     assert win.width() == 800
     assert win.height() == 600
 
-    win.close()   # <-- critical
+    win.close()

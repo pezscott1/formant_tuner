@@ -11,10 +11,13 @@ Design:
 - Returns f1, f2, f3, confidence, method
 """
 from __future__ import annotations
+import logging
 from typing import Optional
 
 import librosa
 import numpy as np
+
+logger = logging.getLogger(__name__)
 from numpy.typing import NDArray
 from dataclasses import dataclass
 from scipy.signal import find_peaks
@@ -99,7 +102,7 @@ def estimate_formants(
     # ---------------------------------------------------------
     try:
         roots = np.roots(A)
-    except Exception:
+    except (np.linalg.LinAlgError, ValueError):
         return _fallback(frame, sr_eff, "root_fail", order)
 
     ang = np.angle(roots)
@@ -175,10 +178,9 @@ def _fallback(frame, sr, reason: str, order: Optional[int]) -> FormantResult:
     peak_freqs, peak_heights = _smooth_peaks(
         frame, sr, lifter_cut=20, nfft=4096
     )
-    print(
-        f"DEBUG _fallback: reason={reason} "
-        f"n_peaks={peak_freqs.size} "
-        f"first_peaks={peak_freqs[:5] if peak_freqs.size > 0 else []}"
+    logger.debug(
+        "LPC fallback: reason=%s n_peaks=%d first_peaks=%s",
+        reason, peak_freqs.size, peak_freqs[:5].tolist() if peak_freqs.size > 0 else [],
     )
 
     # No peaks at all → empty fallback
@@ -245,7 +247,7 @@ def _compute_lpc(frame, order):
         mid = len(R) // 2
         r = R[mid: mid + order + 1]
         return _levinson(r, order)
-    except Exception:
+    except (ValueError, MemoryError):
         return None
 
 

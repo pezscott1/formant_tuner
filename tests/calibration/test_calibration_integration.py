@@ -8,21 +8,18 @@ from tuner.controller import Tuner
 def test_profile_application_uses_dict_formants(
     mock_engine_cls, mock_profiles_cls, mock_analyzer_cls
 ):
-    # Mock engine
+    expected_profile = {
+        "i": {"f1": 300, "f2": 2200, "f3": 2800},
+        "a": {"f1": 700, "f2": 1100, "f3": 2500},
+    }
+
+    # Mock engine with active_profile set by apply_profile
     mock_engine = MagicMock()
+    mock_engine.active_profile = expected_profile
     mock_engine_cls.return_value = mock_engine
 
     # Mock profile manager
     mock_profiles = MagicMock()
-    mock_profiles.load_profile_json.return_value = {
-        "i": {"f1": 300, "f2": 2200, "f3": 2800},
-        "a": {"f1": 700, "f2": 1100, "f3": 2500},
-        "voice_type": "bass",
-    }
-    mock_profiles.extract_formants.return_value = {
-        "i": {"f1": 300, "f2": 2200, "f3": 2800},
-        "a": {"f1": 700, "f2": 1100, "f3": 2500},
-    }
     mock_profiles.apply_profile.return_value = "my_profile"
     mock_profiles_cls.return_value = mock_profiles
 
@@ -39,11 +36,8 @@ def test_profile_application_uses_dict_formants(
     # ProfileManager.apply_profile should be called
     mock_profiles.apply_profile.assert_called_once_with("my_profile")
 
-    # Controller should store dict-based active profile
-    assert t.active_profile == {
-        "i": {"f1": 300, "f2": 2200, "f3": 2800},
-        "a": {"f1": 700, "f2": 1100, "f3": 2500},
-    }
+    # Controller should mirror the full profile set by apply_profile on the engine
+    assert t.active_profile == expected_profile
 
 
 @patch("tuner.controller.LiveAnalyzer")
@@ -69,8 +63,6 @@ def test_tuner_does_not_mutate_engine_formants(
 
     t.load_profile("my_profile")
 
-    # Old path used to mutate engine.user_formants and set t.cleaned
     assert not hasattr(t, "cleaned")
 
-    # Modern controller should NOT call engine.set_user_formants
     mock_engine.set_user_formants.assert_not_called()

@@ -70,7 +70,6 @@ def test_lpc_no_roots(monkeypatch):
 
     y = np.random.randn(2048)
     result = estimate_formants(y, sr=48000)
-    # New behavior: no 'reason' field
     assert result.method in ("lpc", "fallback")
 
 
@@ -105,7 +104,7 @@ def test_lpc_f1_too_high():
 
 def test_lpc_no_valid_poles():
     sr = 48000
-    root = np.exp(1j * 2 * np.pi * 6000 / sr)  # > f_high
+    root = np.exp(1j * 2 * np.pi * 6000 / sr)
     A = np.poly([root, np.conj(root)])
 
     y = np.random.randn(4096)

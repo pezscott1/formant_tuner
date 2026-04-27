@@ -79,7 +79,6 @@ def test_pitch_smoother_confidence_gate():
     ps = PitchSmoother(min_confidence=0.8)
     ps.current = 100
     out = ps.update(120, confidence=0.5)
-    # New semantics: low confidence resets the smoother
     assert out is None
     assert ps.current is None
 
@@ -88,7 +87,6 @@ def test_pitch_smoother_jump_suppression():
     ps = PitchSmoother(jump_limit=10)
     ps.current = 100
     out = ps.update(200)
-    # New semantics: large jumps are accepted, not clamped
     assert out == 200
 
 

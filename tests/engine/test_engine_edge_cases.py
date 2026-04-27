@@ -8,8 +8,11 @@ import librosa
 def test_engine_handles_nan_frame():
     eng = FormantAnalysisEngine()
     frame = np.array([np.nan, np.nan, np.nan])
-    with pytest.raises(librosa.util.exceptions.ParameterError):
-        eng.process_frame(frame, sr=48000)
+    # Too short (< MIN_FRAME_SIZE) and all-NaN; engine should return null result, not raise
+    result = eng.process_frame(frame, sr=48000)
+    assert result["f0"] is None
+    assert result["formants"] == (None, None, None)
+    assert result["confidence"] == 0.0
 
 
 @patch("analysis.pitch.estimate_pitch")

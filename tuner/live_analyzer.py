@@ -1,7 +1,10 @@
 # tuner/live_analyzer.py
+import logging
 import queue
 import threading
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class LiveAnalyzer:
@@ -27,7 +30,7 @@ class LiveAnalyzer:
         self.formant_smoother = formant_smoother
         self.label_smoother = label_smoother
         self.sample_rate = sample_rate
-        self.paused = False
+        self._paused = threading.Event()
         # Audio → engine queue (raw segments)
         self._audio_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=8)
         # Engine → UI queue (processed dicts)
@@ -54,155 +57,97 @@ class LiveAnalyzer:
 
     def process_raw(self, raw_dict):
         """
-        Take a raw engine frame and return a fully processed frame:
-          - smoothed pitch
-          - smoothed formants
-          - smoothed vowel
-          - stability info
-          - confidence + scoring
-          - raw vowel guess
-          - fallback formants + LPC debug
+        Take a raw engine frame and return a fully processed frame with
+        smoothed pitch/formants/vowel, stability info, scores, and debug data.
         """
-
-        # =========================================================
-        # 1. Store RAW frame for calibration / spectrogram
-        # =========================================================
         with self._lock:
             self._latest_raw = raw_dict
 
-        # Extract raw values
         f0_raw = raw_dict.get("f0")
         f1_raw, f2_raw, f3_raw = raw_dict.get("formants", (None, None, None))
-        hybrid = raw_dict.get("hybrid_formants")
         vowel_raw = raw_dict.get("vowel") or raw_dict.get("vowel_guess")
         lpc_conf = float(raw_dict.get("confidence", 0.0))
 
-        # =========================================================
-        # 2. Pitch smoothing
-        # =========================================================
-        f0_s = self.pitch_smoother.update(f0_raw, confidence=lpc_conf)
-
-        # =========================================================
-        # 3. Formant smoothing
-        # =========================================================
-
-        # Prefer hybrid formants if present
-        hf = raw_dict.get("hybrid_formants")
-        if isinstance(hf, (list, tuple)) and len(hf) == 3:
-            f1_in, f2_in, f3_in = hf
-        else:
-            # Fall back to raw formants
-            f1_in, f2_in, f3_in = f1_raw, f2_raw, f3_raw
-
-        f1_s, f2_s, f3_s = self.formant_smoother.update(
-            f1=f1_in,
-            f2=f2_in,
-            f3=f3_in,
-            confidence=lpc_conf,
-        )
-
-        # =========================================================
-        # 4. Vowel smoothing
-        # =========================================================
+        f0_s = self._smooth_pitch(f0_raw, lpc_conf)
+        f1_s, f2_s, f3_s = self._smooth_formants(raw_dict, f1_raw, f2_raw, f3_raw, lpc_conf)
         vowel_s = self.label_smoother.update(vowel_raw, confidence=lpc_conf)
+        stable, stability_score = self._read_stability()
 
-        # =========================================================
-        # 5. Scoring
-        # =========================================================
-        vowel_score = raw_dict.get("vowel_score")
-        resonance_score = raw_dict.get("resonance_score")
-        overall = raw_dict.get("overall")
-
-        # =========================================================
-        # 6. Stability
-        # =========================================================
-        stable = getattr(self.formant_smoother, "formants_stable", False)
-        stability_score = getattr(
-            self.formant_smoother, "_stability_score", float("inf")
+        processed = self._build_processed_frame(
+            raw_dict, f0_raw, f0_s, f1_s, f2_s, f3_s,
+            vowel_raw, vowel_s, lpc_conf, stable, stability_score,
         )
 
-        # =========================================================
-        # 7. Build processed frame
-        # =========================================================
-        processed = {
-            # Pitch
-            "f0_raw": f0_raw,
-            "f0": f0_s,
-
-            # Formants
-            "formants": (f1_s, f2_s, f3_s),
-            "hybrid_formants": hybrid,
-
-            "smoothed_formants": {
-                "f1": f1_s,
-                "f2": f2_s,
-                "f3": f3_s,
-            },
-
-            # Smoothed vowel
-            "vowel": vowel_s,
-
-            # Raw vowel guess
-            "vowel_guess": vowel_raw,
-
-            # Confidence from LPC
-            "confidence": lpc_conf,
-            # Scores
-            "vowel_score": vowel_score,
-            "resonance_score": resonance_score,
-            "overall": overall,
-
-            # Stability
-            "stable": stable,
-            "stability_score": stability_score,
-
-            # Fallback formants
-            "fb_f1": raw_dict.get("fb_f1"),
-            "fb_f2": raw_dict.get("fb_f2"),
-
-            # LPC / debug info
-            "method": raw_dict.get("method"),
-            "roots": raw_dict.get("roots"),
-            "peaks": raw_dict.get("peaks"),
-            "lpc_order": raw_dict.get("lpc_order"),
-            "lpc_debug": raw_dict.get("lpc_debug"),
-
-            # Raw segment for spectrogram
-            "segment": raw_dict.get("segment"),
-        }
-
-        # =========================================================
-        # 8. Store processed frame for tuner UI
-        # =========================================================
         with self._lock:
             self._latest_processed = processed
 
         return processed
+
+    def _smooth_pitch(self, f0_raw, lpc_conf):
+        return self.pitch_smoother.update(f0_raw, confidence=lpc_conf)
+
+    def _smooth_formants(self, raw_dict, f1_raw, f2_raw, f3_raw, lpc_conf):
+        hf = raw_dict.get("hybrid_formants")
+        if isinstance(hf, (list, tuple)) and len(hf) == 3:
+            f1_in, f2_in, f3_in = hf
+        else:
+            f1_in, f2_in, f3_in = f1_raw, f2_raw, f3_raw
+        return self.formant_smoother.update(f1=f1_in, f2=f2_in, f3=f3_in, confidence=lpc_conf)
+
+    def _read_stability(self):
+        stable = getattr(self.formant_smoother, "formants_stable", False)
+        stability_score = getattr(self.formant_smoother, "_stability_score", float("inf"))
+        return stable, stability_score
+
+    def _build_processed_frame(self, raw_dict, f0_raw, f0_s, f1_s, f2_s, f3_s,
+                                vowel_raw, vowel_s, lpc_conf, stable, stability_score):
+        return {
+            "f0_raw": f0_raw,
+            "f0": f0_s,
+            "formants": (f1_s, f2_s, f3_s),
+            "hybrid_formants": raw_dict.get("hybrid_formants"),
+            "smoothed_formants": {"f1": f1_s, "f2": f2_s, "f3": f3_s},
+            "vowel": vowel_s,
+            "vowel_guess": vowel_raw,
+            "confidence": lpc_conf,
+            "vowel_score": raw_dict.get("vowel_score"),
+            "resonance_score": raw_dict.get("resonance_score"),
+            "overall": raw_dict.get("overall"),
+            "stable": stable,
+            "stability_score": stability_score,
+            "method": raw_dict.get("method"),
+            "roots": raw_dict.get("roots"),
+            "peaks": raw_dict.get("peaks"),
+            "lpc_order": raw_dict.get("lpc_order"),
+            "segment": raw_dict.get("segment"),
+        }
 
     # ------------------------------------------------------------------
     # RUNTIME: accepting audio and driving the engine
     # ------------------------------------------------------------------
 
     def pause(self):
-        self.paused = True
+        self._paused.set()
 
     def resume(self):
-        self.paused = False
+        self._paused.clear()
+
+    @property
+    def paused(self) -> bool:
+        return self._paused.is_set()
 
     def submit_audio_segment(self, segment: np.ndarray):
         """Called from the audio callback. Must be non-blocking."""
-        if self.paused:
+        if self._paused.is_set():
             return
         if segment is None:
             return
         try:
             self._audio_queue.put_nowait(segment)
         except queue.Full:
-            # Drop frames instead of blocking
-            pass
+            logger.debug("Audio queue full; dropping frame")
 
     def _worker_loop(self):
-        import traceback
         """Background thread: consume audio, run engine, push processed frames."""
         while not self._stop_flag.is_set():
             try:
@@ -213,9 +158,8 @@ class LiveAnalyzer:
             # Engine call: match FormantAnalysisEngine.process_frame signature
             try:
                 raw = self.engine.process_frame(segment, self.sample_rate)
-            except Exception as e:
-                print("[ENGINE ERROR]", e)
-                traceback.print_exc()
+            except Exception:
+                logger.exception("Engine error processing frame")
                 continue
 
             processed = self.process_raw(raw)
@@ -223,7 +167,8 @@ class LiveAnalyzer:
             # Keep only the most recent processed frame
             if self.processed_queue.full():
                 try:
-                    _ = self.processed_queue.get_nowait()
+                    self.processed_queue.get_nowait()
+                    logger.warning("Processed queue full; dropping oldest frame")
                 except queue.Empty:
                     pass
 
@@ -246,6 +191,8 @@ class LiveAnalyzer:
         self._stop_flag.set()
         if self._worker_thread is not None:
             self._worker_thread.join(timeout=0.5)
+            if self._worker_thread.is_alive():
+                logger.warning("Worker thread did not stop within timeout; may still be running")
             self._worker_thread = None
 
     # ------------------------------------------------------------------

@@ -4,7 +4,7 @@ from tuner.profile_controller import ProfileManager
 
 
 # ---------------------------------------------------------
-# Dummy objects aligned with the NEW Tuner architecture
+# Dummy objects
 # ---------------------------------------------------------
 class DummyEngine:
     def __init__(self):

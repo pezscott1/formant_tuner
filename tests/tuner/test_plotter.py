@@ -20,7 +20,7 @@ class FakeWindow:
         self.vowel_measured_artist = None
         self.vowel_line_artist = None
 
-        # Analyzer + smoother (MISSING BEFORE)
+        # Analyzer + smoother
         self.analyzer = MagicMock()
         self.analyzer.formant_smoother = MagicMock()
         self.analyzer.formant_smoother.formants_stable = True

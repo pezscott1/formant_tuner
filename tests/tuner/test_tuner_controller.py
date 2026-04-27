@@ -4,7 +4,7 @@ from tuner.controller import Tuner
 
 
 # ---------------------------------------------------------
-# Helpers for simple dummy objects (no nested MagicMocks)
+# Helpers for simple dummy objects
 # ---------------------------------------------------------
 def make_engine(raw=None, user_formants=None):
     """
@@ -128,7 +128,6 @@ def test_tuner_poll_latest_processed_passes_through_analyzer(
 
     out = t.poll_latest_processed()
 
-    # No active profile → return processed unchanged
     assert out == processed
 
 

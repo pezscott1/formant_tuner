@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import numpy as np
 from typing import Optional
 from analysis.pitch import estimate_pitch
@@ -6,14 +7,16 @@ import analysis.lpc as lpc_mod
 import analysis.vowel_classifier as vowel_mod
 import analysis.scoring as scoring_mod
 from analysis.hybrid_formants import estimate_formants_hybrid
+
+logger = logging.getLogger(__name__)
 VOWEL_GUESS_CONF_MIN = 0.1
+MIN_FRAME_SIZE = 256  # ~5 ms at 48 kHz; below this pitch/formant estimators are unreliable
 
 
 class FormantAnalysisEngine:
     def __init__(
             self,
             voice_type="bass",
-            debug=False,
             pitch_tracker=None,
             vowel_classifier=None,
             use_hybrid=False,
@@ -21,7 +24,6 @@ class FormantAnalysisEngine:
     ):
         self.profile_classifier = None
         self.voice_type = voice_type
-        self.debug = debug
         self.calibrating = False
         # Safe defaults
         self.pitch_tracker = pitch_tracker or estimate_pitch
@@ -41,32 +43,48 @@ class FormantAnalysisEngine:
         return self._latest_raw
 
     def process_frame(self, frame: np.ndarray, sr: int) -> dict:
-        f0, voiced = self._compute_pitch_and_voicing(frame, sr)
-        f1, f2, f3, conf, method, hybrid = self._compute_formants(frame, sr)
-        vowel, vowel_guess, vowel_confidence, vowel_score, resonance_score = \
-            self._compute_vowel_and_scores(f1, f2, f3, f0, conf)
+        if frame is None or frame.size < MIN_FRAME_SIZE:
+            return self._null_result("frame_too_short")
+        try:
+            f0, voiced = self._compute_pitch_and_voicing(frame, sr)
+            f1, f2, f3, conf, method, hybrid = self._compute_formants(frame, sr)
+            vowel, vowel_guess, vowel_confidence, vowel_score, resonance_score = \
+                self._compute_vowel_and_scores(f1, f2, f3, f0, conf)
 
-        overall = float(min(vowel_score, resonance_score))
+            overall = float(min(vowel_score, resonance_score))
 
-        out = self._build_result_dict(
-            f1=f1,
-            f2=f2,
-            f3=f3,
-            f0=f0,
-            conf=conf,
-            method=method,
-            vowel=vowel,
-            vowel_guess=vowel_guess,
-            vowel_confidence=vowel_confidence,
-            vowel_score=vowel_score,
-            resonance_score=resonance_score,
-            overall=overall,
-            voiced=voiced,
-            segment=frame,
-            hybrid_formants=hybrid,  # NEW
-        )
-        self._latest_raw = out
-        return out
+            out = self._build_result_dict(
+                f1=f1, f2=f2, f3=f3, f0=f0, conf=conf, method=method,
+                vowel=vowel, vowel_guess=vowel_guess, vowel_confidence=vowel_confidence,
+                vowel_score=vowel_score, resonance_score=resonance_score,
+                overall=overall, voiced=voiced, segment=frame, hybrid_formants=hybrid,
+            )
+            self._latest_raw = out
+            return out
+        except Exception:
+            logger.exception("Engine error in process_frame")
+            return self._null_result("exception")
+
+    @staticmethod
+    def _null_result(reason: str = "") -> dict:
+        if reason:
+            logger.debug("Returning null result: %s", reason)
+        return {
+            "f1": None, "f2": None, "f3": None,
+            "formants": (None, None, None),
+            "hybrid_formants": None,
+            "f0": None,
+            "confidence": 0.0,
+            "method": None,
+            "vowel": None,
+            "vowel_guess": None,
+            "vowel_confidence": 0.0,
+            "vowel_score": 0.0,
+            "resonance_score": 0.0,
+            "overall": 0.0,
+            "segment": None,
+            "voiced": False,
+        }
 
     def _compute_vowel_and_scores(
             self,
@@ -97,7 +115,7 @@ class FormantAnalysisEngine:
                 vowel = vowel_guess if (vowel_confidence >=
                                         VOWEL_GUESS_CONF_MIN) else None
             except Exception as e:
-                print("PROFILE CLASSIFIER ERROR:", e)
+                logger.warning("Profile classifier error: %s", e)
                 vowel = None
                 vowel_guess = None
                 vowel_confidence = 0.0
@@ -112,7 +130,7 @@ class FormantAnalysisEngine:
                     vowel = vowel_guess if (vowel_confidence >=
                                             VOWEL_GUESS_CONF_MIN) else None
             except Exception as e:
-                print("CLASSIFIER ERROR:", e)
+                logger.warning("Classifier error: %s", e)
                 vowel = None
                 vowel_guess = None
                 vowel_confidence = 0.0
@@ -156,7 +174,6 @@ class FormantAnalysisEngine:
 
     def _compute_formants(self, frame: np.ndarray, sr: int):
         if self.use_hybrid or self.calibrating:
-            print("[ENGINE] hybrid ON, vowel_hint=", self.vowel_hint)
             hres = estimate_formants_hybrid(frame, sr, vowel_hint=self.vowel_hint)
             f1 = hres.f1
             f2 = hres.f2
@@ -165,8 +182,7 @@ class FormantAnalysisEngine:
             method = hres.method  # "lpc", "te", or "hybrid_front"
             hybrid = (f1, f2, f3)
         else:
-            print("[ENGINE] else loop, not hybrid, vowel_hint=", self.vowel_hint)
-            lres = lpc_mod.estimate_formants(frame, sr, debug=True)
+            lres = lpc_mod.estimate_formants(frame, sr)
             f1 = lres.f1
             f2 = lres.f2
             f3 = lres.f3
@@ -199,9 +215,6 @@ class FormantAnalysisEngine:
             "vowel_score": vowel_score,
             "resonance_score": resonance_score,
             "overall": overall,
-            "fb_f1": f1,
-            "fb_f2": f2,
             "segment": segment,
-            "lpc_debug": {},
             "voiced": voiced,
         }

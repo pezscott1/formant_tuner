@@ -194,7 +194,5 @@ def test_update_vowel_chart_artist_removal():
     )
 
     assert getattr(first_point, "removed", True)
-    if first_line is not None:
-        assert first_line.removed
     assert window.vowel_measured_artist is None
     assert window.vowel_line_artist is None

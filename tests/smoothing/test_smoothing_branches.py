@@ -58,7 +58,6 @@ def test_pitch_smoother_branch_ema():
     assert out == pytest.approx(125)
 
 
-# MedianSmoother branches remain unchanged
 def test_median_smoother_branch_confidence_gate():
     ms = MedianSmoother(min_confidence=0.8)
     assert ms.update(500, 1500, 2500, confidence=0.2) == (None, None, None)

@@ -42,7 +42,7 @@ def test_handle_result_first_measurement():
 
 
 # ----------------------------------------------------------------------
-# 4. handle_result — weighted update with legacy fields missing
+# 4. handle_result
 # ----------------------------------------------------------------------
 
 def test_handle_result_weighted_update():
@@ -66,7 +66,7 @@ def test_handle_result_weighted_update():
     assert updated["weight"] == 2.0
     assert updated["f1"] == pytest.approx((400 + 600) / 2)
     assert updated["f2"] == pytest.approx((1400 + 1600) / 2)
-    assert updated["f0"] == 200  # old was None → new takes f0
+    assert updated["f0"] == 200
 
 
 # ----------------------------------------------------------------------

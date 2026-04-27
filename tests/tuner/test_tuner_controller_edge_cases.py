@@ -51,7 +51,7 @@ def test_poll_latest_processed_returns_none_when_analyzer_returns_none(
 
 
 # ---------------------------------------------------------
-# Case 3: processed dict missing "formants" → controller returns processed unchanged
+# Case 3: processed dict missing "formants"
 # ---------------------------------------------------------
 @patch("tuner.controller.ProfileManager")
 @patch("tuner.controller.LiveAnalyzer")

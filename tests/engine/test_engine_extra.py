@@ -63,7 +63,7 @@ def test_engine_low_confidence_disables_vowel_guess(mock_lpc, mock_pitch):
         f1=500.0,
         f2=1500.0,
         f3=2500.0,
-        confidence=0.05,  # too low for vowel guessing
+        confidence=0.05,
         method="lpc",
         lpc_order=10,
         peaks=[],
@@ -111,12 +111,9 @@ def test_engine_output_structure_is_stable(mock_lpc, mock_pitch):
         "vowel_score",
         "resonance_score",
         "overall",
-        "fb_f1",
-        "fb_f2",
         "segment",
         "confidence",
         "method",
-        "lpc_debug",
     }
     assert expected_keys.issubset(out.keys())
 

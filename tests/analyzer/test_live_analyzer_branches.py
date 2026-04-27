@@ -83,13 +83,10 @@ def test_process_raw_basic():
         "vowel_score": 0.9,
         "resonance_score": 0.7,
         "overall": 0.8,
-        "fb_f1": 111,
-        "fb_f2": 222,
         "method": "lpc",
         "roots": [1, 2],
         "peaks": [3, 4],
         "lpc_order": 12,
-        "lpc_debug": {"x": 1},
         "segment": np.zeros(10),
     }
 
@@ -110,10 +107,6 @@ def test_process_raw_basic():
     # Stability
     assert out["stable"] is True
     assert out["stability_score"] == 123.0
-
-    # Fallback fields
-    assert out["fb_f1"] == 111
-    assert out["fb_f2"] == 222
 
     # Debug fields
     assert out["method"] == "lpc"

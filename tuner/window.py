@@ -1,7 +1,10 @@
 # tuner/window.py
+import logging
 from collections import deque
 import time
 import numpy as np
+
+logger = logging.getLogger(__name__)
 import sounddevice as sd
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -72,13 +75,11 @@ class TunerWindow(QMainWindow):
         super().__init__(parent)
         self.headless = headless
         self.tuner = tuner
-        self.analyzer = tuner.engine
         self.profile_manager = tuner.profile_manager
-        self.live_analyzer = tuner.live_analyzer
         self.sample_rate = sample_rate
         # State
         self.current_tolerance = 50
-        self.voice_type = getattr(self.analyzer, "voice_type", "bass")
+        self.voice_type = self.tuner.voice_type
         self.stream = None
         self.vowel_chart_has_seen_valid = False
         self.spectrum_has_seen_valid = False
@@ -118,6 +119,11 @@ class TunerWindow(QMainWindow):
         palette.setColor(QPalette.ColorRole.HighlightedText, QColor("white"))
 
         self.setPalette(palette)
+
+    @property
+    def analyzer(self):
+        """Expose engine as 'analyzer' for tuner_plotter compatibility."""
+        return self.tuner.engine
 
     # ---------------------------------------------------------
     # UI construction
@@ -425,7 +431,7 @@ class TunerWindow(QMainWindow):
         items = self.profile_list.selectedItems()
         if not items:
             self.tuner.active_profile = None
-            self.tuner.engine.vowel_hint = None
+            self.tuner.vowel_hint = None
             self.active_label.setText("Active: None")
             return
 
@@ -447,12 +453,12 @@ class TunerWindow(QMainWindow):
         # Update analyzer’s user_formants
         merged = {**cal, **interp}
         user_formants = self.profile_manager.extract_formants(merged)
-        self.live_analyzer.user_formants = user_formants
+        self.tuner.set_user_formants(user_formants)
         # Update UI label
         self._set_active_profile(base)
         # Update vowel map
         self.vowel_map_view.set_vowel_status(cal, interp)
-        self.vowel_map_view.analyzer = self.live_analyzer
+        self.vowel_map_view.analyzer = self.tuner.live_analyzer
         self.vowel_map_view.compute_dynamic_ranges()
         self.vowel_map_view.vowel_colors = {
             vowel: vowel_color_for(vowel)
@@ -545,11 +551,8 @@ class TunerWindow(QMainWindow):
                                  f"Could not apply profile '{base}':\n{e}")
             return
 
-        # Store full profile for UI
-        self.tuner.active_profile = self.analyzer.active_profile
-
         self._set_active_profile(applied)
-        self.voice_type = getattr(self.analyzer, "voice_type", self.voice_type)
+        self.voice_type = self.tuner.voice_type
 
     def _on_calibrate_clicked(self):
         """
@@ -587,8 +590,8 @@ class TunerWindow(QMainWindow):
             self.calib_win = CalibrationWindow(
                 profile_name=name,
                 voice_type=voice_type,
-                engine=self.analyzer,
-                analyzer=self.live_analyzer,
+                engine=self.tuner.engine,
+                analyzer=self.tuner.live_analyzer,
                 profile_manager=self.profile_manager,
                 existing_profile=None,
                 parent=self,
@@ -605,7 +608,7 @@ class TunerWindow(QMainWindow):
             return
 
         # Existing profile
-        voice_type = getattr(self.analyzer, "voice_type", "bass")
+        voice_type = self.tuner.voice_type
         existing_data = self.profile_manager.load_profile(base) or {}
 
         # Determine optional vowels from existing profile or voice type
@@ -615,8 +618,8 @@ class TunerWindow(QMainWindow):
         self.calib_win = CalibrationWindow(
             profile_name=base,
             voice_type=voice_type,
-            engine=self.analyzer,
-            analyzer=self.live_analyzer,
+            engine=self.tuner.engine,
+            analyzer=self.tuner.live_analyzer,
             profile_manager=self.profile_manager,
             existing_profile=existing_data,
             parent=self,
@@ -625,7 +628,7 @@ class TunerWindow(QMainWindow):
         )
 
         self.update_timer.stop()
-        self.live_analyzer.pause()
+        self.tuner.pause_analyzer()
         ok = self._start_mic_ui()
         if not ok:
             QMessageBox.critical(self, "Mic error", "Could not start microphone.")
@@ -642,16 +645,15 @@ class TunerWindow(QMainWindow):
         self._apply_profile_base(base_name)
 
         # Reset smoothing state
-        self.live_analyzer.reset()
-        self.live_analyzer.resume()
+        self.tuner.reset_analyzer()
+        self.tuner.resume_analyzer()
         # Restart UI updates
         self.update_timer.start()
 
-        # Stop mic cleanly
         try:
             self.tuner.stop_mic()
         except Exception:
-            pass
+            logger.warning("stop_mic failed after calibration", exc_info=True)
 
     # ---------------------------------------------------------
     # Mic handling
@@ -660,12 +662,12 @@ class TunerWindow(QMainWindow):
     def _start_mic_ui(self):
         def callback(indata, _frames, _time, status):
             if status:
-                print("[AUDIO STATUS]", status)
+                logger.warning("Audio stream status: %s", status)
             mono = indata[:, 0].astype(np.float64, copy=False)
             # Store raw audio for spectrogram
             self.bus.audio.append(mono.copy())
             # Still feed analyzer
-            self.live_analyzer.submit_audio_segment(mono)
+            self.tuner.submit_audio(mono)
 
         def find_device():
             for idx, dev in enumerate(sd.query_devices()):
@@ -674,7 +676,7 @@ class TunerWindow(QMainWindow):
             return sd.default.device[0]
 
         device_index = find_device()
-        print("Using mic device:", device_index)
+        logger.info("Using mic device: %s", device_index)
 
         ok = self.tuner.start_mic(lambda: sd.InputStream(
             samplerate=self.sample_rate,
@@ -705,10 +707,6 @@ class TunerWindow(QMainWindow):
         # Only update if mic is running
         stream = self.tuner.stream
         if stream is None or not getattr(stream, "active", True):
-            return
-        # Skip UI updates if analyzer is paused
-        if (hasattr(self.live_analyzer, "is_running")
-                and not self.live_analyzer.is_running):
             return
 
         processed = self.tuner.poll_latest_processed()
@@ -744,38 +742,13 @@ class TunerWindow(QMainWindow):
             confidence=confidence,
         )
 
-        self.vowel_map_view.update_from_bus(self.bus, analyzer=self.analyzer)
+        self.vowel_map_view.update_from_bus(self.bus, analyzer=self.tuner.engine)
         self.spectrogram_view.update_from_bus(self.bus)
         hf = processed.get("hybrid_formants")
         if isinstance(hf, (list, tuple)) and len(hf) == 3:
             raw_f1, raw_f2, raw_f3 = hf
         else:
             raw_f1 = raw_f2 = raw_f3 = None
-
-        if smoothed:
-            smooth_f1 = smoothed.get("f1")
-            smooth_f2 = smoothed.get("f2")
-
-            if raw_f1 is not None and smooth_f1 is not None:
-                print(f"[F1 Δ] hybrid={raw_f1:.1f}  "
-                      f"smoothed={smooth_f1:.1f}  Δ={abs(raw_f1 - smooth_f1):.1f}")
-
-            if raw_f2 is not None and smooth_f2 is not None:
-                print(f"[F2 Δ] hybrid={raw_f2:.1f}  "
-                      f"smoothed={smooth_f2:.1f}  Δ={abs(raw_f2 - smooth_f2):.1f}")
-        print(
-            f"[TUNER] f0_raw={processed.get('f0_raw')}  "
-            f"f0_smooth={processed.get('f0')}  "
-            f"conf={processed.get('confidence')}  "
-            f"hybrid_f1={raw_f1}  "
-            f"hybrid_f2={raw_f2}  "
-            f"hybrid_f3={raw_f3}  "
-            f"vowel_raw={processed.get('vowel_guess')}  "
-            f"vowel_smooth={processed.get('vowel')}  "
-            f"vowel_score={processed.get('vowel_score')}  "
-            f"res_score={processed.get('resonance_score')}  "
-            f"overall={processed.get('overall')}"
-        )
 
         # Re‑extract for plotting (unchanged)
         hf = processed.get("hybrid_formants")
@@ -791,8 +764,8 @@ class TunerWindow(QMainWindow):
         resonance_score = processed["resonance_score"]
         overall = processed["overall"]
         # Pull active profile targets
-        if vowel_smooth in self.analyzer.user_formants:
-            entry = self.analyzer.user_formants[vowel_smooth]
+        if vowel_smooth in self.tuner.user_formants:
+            entry = self.tuner.user_formants[vowel_smooth]
             target_formants = {
                 "f1": entry.get("f1"),
                 "f2": entry.get("f2"),
@@ -811,8 +784,8 @@ class TunerWindow(QMainWindow):
                 pitch=f0,
                 _tolerance=self.current_tolerance,
             )
-        except Exception as e:
-            print("[TUNER] update_spectrum error:", e)
+        except Exception:
+            logger.exception("update_spectrum error")
 
         # Vowel chart
         try:
@@ -825,8 +798,8 @@ class TunerWindow(QMainWindow):
                 resonance_score=resonance_score,
                 overall=overall,
             )
-        except Exception as e:
-            print("[TUNER] update_vowel_chart error:", e)
+        except Exception:
+            logger.exception("update_vowel_chart error")
 
         self.canvas.draw_idle()
 

@@ -129,5 +129,4 @@ def test_calibration_session_save_profile_creates_new_file():
     assert call_base == base
     assert call_data["voice_type"] == "bass"
 
-    # NEW: vowel entries live inside calibrated_vowels
     assert "a" in call_data["calibrated_vowels"]

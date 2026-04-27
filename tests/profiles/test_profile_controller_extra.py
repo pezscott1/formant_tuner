@@ -116,7 +116,7 @@ def test_load_active_profile_malformed(tmp_path):
     bad.write_text("{not valid json")
 
     pm = ProfileManager(str(tmp_path), analyzer=MagicMock())
-    assert pm.active_profile_name is None  # gracefully ignored
+    assert pm.active_profile_name is None
 
 
 # ---------------------------------------------------------

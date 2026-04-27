@@ -11,8 +11,6 @@ from calibration.plotter import safe_spectrogram
 
 def test_safe_spectrogram_empty():
     f, t, S = safe_spectrogram([], sr=16000)
-
-    # Modern behavior: fixed 128-bin zero fallback
     assert f.size == 128
     assert t.size == 1
     assert S.shape == (128, 1)
@@ -29,8 +27,6 @@ def test_safe_spectrogram_too_short():
         warnings.simplefilter("ignore", UserWarning)
     y = np.random.randn(100)  # shorter than n_fft=1024
     f, t, S = safe_spectrogram(y, sr=16000)
-
-    # Modern behavior: fallback FFT with n_fft=1024
     assert f.size == 1024 // 2 + 1
     assert t.size == 1
     assert S.shape[1] == 1
@@ -66,8 +62,6 @@ def test_safe_spectrogram_fft_fallback(_mock_stft):
     y = np.random.randn(5000)
 
     f, t, S = safe_spectrogram(y, sr=16000)
-
-    # Modern fallback uses n_fft=1024
     assert f.size == 1024 // 2 + 1
     assert S.shape[0] == 1024 // 2 + 1
     assert t.size == S.shape[1]
@@ -83,8 +77,6 @@ def test_safe_spectrogram_total_failure(_mock_fft, _mock_stft):
     y = np.random.randn(5000)
 
     f, t, S = safe_spectrogram(y, sr=16000)
-
-    # Modern total-failure fallback
     assert f.size == 128
     assert t.size == 1
     assert S.shape == (128, 1)

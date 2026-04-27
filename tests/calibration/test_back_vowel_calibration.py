@@ -31,8 +31,7 @@ def synthetic_vowel(f1_hz, f2_hz, sr=44100, duration=0.3):
 # ---------------------------------------------------------
 def test_plausibility_accepts_back_vowel_region_structurally():
     """
-    We no longer assert *exact* numeric plausibility thresholds.
-    Instead we ensure that calling is_plausible_formants() on a
+    We ensure that calling is_plausible_formants() on a
     back-vowel-like region returns the expected (bool, str) shape
     and does not crash.
     """

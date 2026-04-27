@@ -185,7 +185,7 @@ def estimate_formants_te(
     # ----------------------------------------------------------------------
     try:
         from analysis.lpc import _extract_formants
-    except Exception:
+    except ImportError:
         def _extract_formants(freqs_sorted):
             freqs_sorted = np.asarray(freqs_sorted, float)
             if freqs_sorted.size == 0:

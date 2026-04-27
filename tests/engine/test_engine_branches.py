@@ -7,8 +7,8 @@ from analysis.engine import FormantAnalysisEngine
 
 @pytest.fixture
 def engine():
-    # Use a concrete voice type to keep classify_vowel happy
-    return FormantAnalysisEngine(voice_type="bass", debug=False)
+    # Use a concrete voice type
+    return FormantAnalysisEngine(voice_type="bass")
 
 
 # ---------------------------------------------------------
@@ -178,10 +178,8 @@ def test_vowel_guess_none_when_invalid_scalars(engine, monkeypatch):
     frame = np.ones(1024)
     out = engine.process_frame(frame, 44100)
 
-    # classifier should not be called because f1 is invalid
     # Classifier now runs even if f1 is None
     assert called["count"] == 1
-    # New behavior: classifier still runs even if f1 is None
     assert out["vowel"] == "a"
     assert out["vowel_guess"] == "a"
     assert out["vowel_confidence"] == 0.9

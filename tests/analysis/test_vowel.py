@@ -6,8 +6,6 @@ from analysis.plausibility import (
     is_plausible_formants,
     is_plausible_pitch,
 )
-print("IMPORTED FROM MODULE:", is_plausible_formants.__module__)
-print("IMPORTED FROM FILE:", is_plausible_formants.__code__.co_filename)
 
 
 # ----------------------------------------------------------------------

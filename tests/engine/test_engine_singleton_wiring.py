@@ -23,7 +23,7 @@ def test_engine_receives_calibrated_profile(mock_lpc, mock_pitch):
 
     eng = FormantAnalysisEngine()
 
-    # Modern dict-based calibrated profile
+    # dict-based calibrated profile
     eng.set_user_formants({
         "a": {"f1": 500, "f2": 1500, "f3": 2500}
     })

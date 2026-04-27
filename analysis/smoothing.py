@@ -80,7 +80,7 @@ class PitchSmoother:
 
         try:
             new = float(new)
-        except Exception:
+        except (ValueError, TypeError):
             return self.current
 
         # first frame: no normalization

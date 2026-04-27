@@ -55,7 +55,7 @@ def test_list_profiles_empty(pm):
 def test_list_profiles_multiple(pm, tmpdir_profiles):
     (tmpdir_profiles / "alpha_profile.json").write_text("{}")
     (tmpdir_profiles / "beta_profile.json").write_text("{}")
-    (tmpdir_profiles / "active_profile.json").write_text("{}")  # ignored
+    (tmpdir_profiles / "active_profile.json").write_text("{}")
     assert pm.list_profiles() == ["alpha", "beta"]
 
 
@@ -189,7 +189,7 @@ def test_apply_profile(pm, tmpdir_profiles, analyzer):
     # Voice type applied
     assert analyzer.voice_type == "tenor"
 
-    # Modern engine stores dict-based formants
+    # dict-based formants
     assert analyzer.user_formants["a"]["f1"] == 500
     assert analyzer.user_formants["a"]["f2"] == 1500
     assert analyzer.user_formants["a"]["f0"] == 100

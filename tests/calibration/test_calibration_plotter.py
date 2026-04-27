@@ -45,6 +45,5 @@ class FakePlotter:
         self._last_draw = 0
         self._min_draw_interval = 0
 
-        # Legacy attributes (silence PyCharm)
         self.spec = MagicMock()
         self.vowel_scatter = MagicMock()

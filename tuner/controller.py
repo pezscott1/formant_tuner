@@ -1,5 +1,8 @@
 # tuner/controller.py
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from analysis.engine import FormantAnalysisEngine
 from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother
@@ -39,8 +42,51 @@ class Tuner:
             profiles_dir=profiles_dir,
             analyzer=self.engine,
         )
-        self.voice_type = voice_type
         self.active_profile = None
+
+        # Centroid normalization cache: avoids recomputing mean/std every frame
+        self._centroid_cache_key = None   # id(profile)
+        self._centroid_cache = None       # (norm_centroids, f1_mean, f1_std, f2_mean, f2_std)
+        self._fallback_profiles: dict[str, dict] = {}  # voice_type -> stable profile dict
+
+    # ---------------------------------------------------------
+    # Engine / analyzer delegation
+    # ---------------------------------------------------------
+    @property
+    def voice_type(self) -> str:
+        return self.engine.voice_type
+
+    @voice_type.setter
+    def voice_type(self, value: str):
+        self.engine.voice_type = value
+
+    @property
+    def vowel_hint(self):
+        return self.engine.vowel_hint
+
+    @vowel_hint.setter
+    def vowel_hint(self, value):
+        self.engine.vowel_hint = value
+
+    @property
+    def user_formants(self) -> dict:
+        return self.engine.user_formants
+
+    def set_user_formants(self, user_formants: dict):
+        self.engine.user_formants = user_formants
+        self.live_analyzer.user_formants = user_formants
+
+    def pause_analyzer(self):
+        self.live_analyzer.pause()
+
+    def resume_analyzer(self):
+        self.live_analyzer.resume()
+
+    def reset_analyzer(self):
+        self.live_analyzer.reset()
+
+    def submit_audio(self, segment):
+        self.live_analyzer.submit_audio_segment(segment)
 
     # ---------------------------------------------------------
     # Profile operations
@@ -103,16 +149,42 @@ class Tuner:
         if f1 is None or f2 is None:
             return None, 0.0
 
-        if not self.active_profile:
-            # fallback to reference vowel centers
+        profile = self._get_active_profile()
+        cache = self._get_centroid_cache(profile)
+        if cache is None:
+            return None, 0.0
+
+        norm_centroids, f1_mean, f1_std, f2_mean, f2_std = cache
+        nf1 = (f1 - f1_mean) / f1_std
+        nf2 = (f2 - f2_mean) / f2_std
+
+        best_vowel = None
+        best_dist = float("inf")
+        for vowel, (d1, d2) in norm_centroids.items():
+            dist = (nf1 - d1) ** 2 + (nf2 - d2) ** 2
+            if dist < best_dist:
+                best_dist = dist
+                best_vowel = vowel
+
+        return best_vowel, float(np.exp(-best_dist))
+
+    def _get_active_profile(self) -> dict:
+        """Return the active profile, or a stable fallback dict for the current voice type."""
+        if self.active_profile:
+            return self.active_profile
+        if self.voice_type not in self._fallback_profiles:
             from analysis.vowel_data import VOWEL_CENTERS
             centers = VOWEL_CENTERS.get(self.voice_type, {})
-            # convert to same dict format as calibrated profiles
-            profile = {v: {"f1": c[0], "f2": c[1]} for v, c in centers.items()}
-        else:
-            profile = self.active_profile
+            self._fallback_profiles[self.voice_type] = {
+                v: {"f1": c[0], "f2": c[1]} for v, c in centers.items()
+            }
+        return self._fallback_profiles[self.voice_type]
 
-        # Collect centroids
+    def _get_centroid_cache(self, profile: dict):
+        """Return cached (norm_centroids, f1_mean, f1_std, f2_mean, f2_std), building if stale."""
+        if self._centroid_cache_key == id(profile) and self._centroid_cache is not None:
+            return self._centroid_cache
+
         centroids = {
             vowel: (data.get("f1"), data.get("f2"))
             for vowel, data in profile.items()
@@ -120,34 +192,24 @@ class Tuner:
             and data.get("f1") is not None
             and data.get("f2") is not None
         }
-
         if not centroids:
-            return None, 0.0
+            return None
 
-        # Normalize input using profile mean/std
         f1_vals = [v[0] for v in centroids.values()]
         f2_vals = [v[1] for v in centroids.values()]
+        f1_mean = float(np.mean(f1_vals))
+        f1_std = float(np.std(f1_vals) + 1e-6)
+        f2_mean = float(np.mean(f2_vals))
+        f2_std = float(np.std(f2_vals) + 1e-6)
 
-        f1_mean, f1_std = float(np.mean(f1_vals)), float(np.std(f1_vals) + 1e-6)
-        f2_mean, f2_std = float(np.mean(f2_vals)), float(np.std(f2_vals) + 1e-6)
+        norm_centroids = {
+            vowel: ((pf1 - f1_mean) / f1_std, (pf2 - f2_mean) / f2_std)
+            for vowel, (pf1, pf2) in centroids.items()
+        }
 
-        nf1 = (f1 - f1_mean) / f1_std
-        nf2 = (f2 - f2_mean) / f2_std
-
-        # Compute normalized distance to each vowel centroid
-        best_vowel = None
-        best_dist = float("inf")
-
-        for vowel, (pf1, pf2) in centroids.items():
-            d1 = (pf1 - f1_mean) / f1_std
-            d2 = (pf2 - f2_mean) / f2_std
-            dist = (nf1 - d1) ** 2 + (nf2 - d2) ** 2
-            if dist < best_dist:
-                best_dist = dist
-                best_vowel = vowel
-
-        confidence = float(np.exp(-best_dist))
-        return best_vowel, confidence
+        self._centroid_cache = (norm_centroids, f1_mean, f1_std, f2_mean, f2_std)
+        self._centroid_cache_key = id(profile)
+        return self._centroid_cache
 
     def update_tolerance(self, text: str) -> int:
         try:
@@ -155,7 +217,7 @@ class Tuner:
             if value <= 0:
                 raise ValueError
             self.current_tolerance = value
-        except Exception:
+        except (ValueError, TypeError):
             pass
         return self.current_tolerance
 
@@ -172,6 +234,7 @@ class Tuner:
             self.live_analyzer.start_worker()
             return True
         except Exception:
+            logger.exception("Failed to start mic stream")
             self.stream = None
             return False
 
@@ -185,7 +248,7 @@ class Tuner:
             stream.close()
             self.engine.vowel_hint = None
         except Exception:
-            pass
+            logger.warning("Error stopping mic stream", exc_info=True)
 
         self.stream = None
         self.live_analyzer.stop_worker()

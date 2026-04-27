@@ -22,7 +22,7 @@ def test_engine_scoring_with_user_formants(mock_lpc, mock_pitch):
 
     eng = FormantAnalysisEngine()
 
-    # Modern dict-based profile
+    # dict-based profile
     eng.set_user_formants({
         "a": {"f1": 500, "f2": 1500, "f3": 2500}
     })

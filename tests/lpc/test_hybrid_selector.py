@@ -12,7 +12,6 @@ def _ns(f1, f2, f3=None, confidence=1.0, method="lpc"):
 
 
 def test_front_i_prefers_lpc_when_te_collapses():
-    # LPC: good /i/ for your baritone (approx)
     lpc_res = _ns(f1=260.0, f2=2200.0, confidence=0.9, method="lpc")
 
     # TE: harmonic confusion (F2 too low for /i/)

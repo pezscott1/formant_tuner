@@ -1,7 +1,9 @@
 # calibration/window.py
+import logging
 import time
-import traceback
 import numpy as np
+
+logger = logging.getLogger(__name__)
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -82,7 +84,7 @@ class CalibrationWindow(QMainWindow):
         }
 
         self.state = CalibrationStateMachine(self.vowels_to_calibrate)
-        print("Calibrating vowels:", self.vowels_to_calibrate)
+        logger.debug("Calibrating vowels: %s", self.vowels_to_calibrate)
         # Smoothers
         self.pitch_smoother = PitchSmoother(min_confidence=0.25)
         self.formant_smoother = MedianSmoother(min_confidence=0.25)
@@ -357,7 +359,7 @@ class CalibrationWindow(QMainWindow):
 
         try:
             val = float(pitch_raw)
-        except Exception:
+        except (ValueError, TypeError):
             return pitch_raw, None
 
         if val <= 0:
@@ -366,8 +368,8 @@ class CalibrationWindow(QMainWindow):
         return pitch_raw, val
 
     def _extract_formants(self, raw, target, confidence):
-        raw_f1 = raw.get("f1") or raw.get("fb_f1")
-        raw_f2 = raw.get("f2") or raw.get("fb_f2")
+        raw_f1 = raw.get("f1")
+        raw_f2 = raw.get("f2")
 
         if target is not None:
             return raw_f1, raw_f2
@@ -468,8 +470,8 @@ class CalibrationWindow(QMainWindow):
         else:
             f0_cal = None
 
-        raw_f1 = raw.get("f1") or raw.get("fb_f1")
-        raw_f2 = raw.get("f2") or raw.get("fb_f2")
+        raw_f1 = raw.get("f1")
+        raw_f2 = raw.get("f2")
         f1, f2 = self._extract_formants(raw, target, confidence)
 
         self._maybe_capture(f1, f2, f0_cal, confidence, target, raw_f1, raw_f2)
@@ -719,28 +721,25 @@ class CalibrationWindow(QMainWindow):
         try:
             self.phase_timer.stop()
             self.poll_timer.stop()
-        except Exception:
-            pass
+        except RuntimeError:
+            logger.debug("Timer already destroyed during _finish", exc_info=True)
 
-        try:
-            self.engine.use_hybrid = True
-            self.engine.calibrating = False
-            self.engine.vowel_hint = None
-        except Exception:
-            pass
+        self.engine.use_hybrid = True
+        self.engine.calibrating = False
+        self.engine.vowel_hint = None
 
         if hasattr(self.engine, "stop_stream"):
             try:
                 self.engine.stop_stream()
             except Exception:
-                pass
+                logger.debug("stop_stream failed during _finish", exc_info=True)
 
         try:
             self.label_smoother.reset()
             self.pitch_smoother.reset()
             self.formant_smoother.reset()
-        except Exception:
-            pass
+        except AttributeError:
+            logger.debug("Smoother reset failed during _finish", exc_info=True)
 
         self._capture_buffer.clear()
         self._spec_buffer = np.array([], dtype=float)
@@ -749,31 +748,28 @@ class CalibrationWindow(QMainWindow):
             base_name = self.session.save_profile()
             self.status_panel.appendPlainText(f"Profile saved for {base_name}")
         except Exception:
-            traceback.print_exc()
+            logger.exception("Failed to save profile")
             self.status_panel.appendPlainText("Failed to save profile.")
             base_name = f"{self.session.profile_name}_{self.session.voice_type}"
 
         try:
             self.profile_calibrated.emit(base_name)  # type:ignore
         except Exception:
-            traceback.print_exc()
+            logger.exception("Failed to emit profile_calibrated signal")
 
     def closeEvent(self, event):
-        # Stop timers
         try:
             self.phase_timer.stop()
             self.poll_timer.stop()
-        except Exception:
-            pass
+        except RuntimeError:
+            logger.debug("Timer already destroyed during closeEvent", exc_info=True)
 
-        # Always stop the mic if calibration is aborted or force-closed
         try:
             if hasattr(self.engine, "stop_stream"):
                 self.engine.stop_stream()
         except Exception:
-            pass
+            logger.debug("stop_stream failed during closeEvent", exc_info=True)
 
-        # Reset analyzer state
         try:
             self.analyzer.pause()
             self.engine.calibrating = False
@@ -781,7 +777,7 @@ class CalibrationWindow(QMainWindow):
             self.label_smoother.reset()
             self.pitch_smoother.reset()
             self.formant_smoother.reset()
-        except Exception:
-            pass
+        except AttributeError:
+            logger.debug("Analyzer/smoother cleanup failed during closeEvent", exc_info=True)
 
         super().closeEvent(event)

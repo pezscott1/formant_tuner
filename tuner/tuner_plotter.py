@@ -1,6 +1,10 @@
 # tuner/plotter.py
+import logging
 import numpy as np
 from LEGACY.utils.music_utils import freq_to_note_name
+from analysis.utils import is_valid_frequency as _valid
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -21,9 +25,6 @@ def _normalize_formants(x):
     return {"f1": None, "f2": None, "f3": None}
 
 
-def _valid(x):
-    return x is not None and np.isfinite(x)
-
 
 def _extract_confidence_and_stability(window):
     analyzer = getattr(window, "analyzer", None)
@@ -32,7 +33,7 @@ def _extract_confidence_and_stability(window):
     if latest_raw is None and analyzer is not None:
         try:
             latest_raw = analyzer.get_latest_raw()
-        except Exception:
+        except AttributeError:
             latest_raw = None
 
     latest_raw = latest_raw or {}
@@ -56,19 +57,19 @@ def _draw_measured_point(ax, mf1, mf2):
         try:
             y = mf1 if _valid(mf1) else 300.0
             return ax.scatter([mf2], [y], c="red", s=40)
-        except Exception:
+        except (ValueError, RuntimeError):
             return None
     return None
 
 
 def _draw_target_line(ax, tf1, tf2, mf1, mf2):
-    if hasattr(ax, "plot") and _valid(tf2) and _valid(mf2):
+    if hasattr(ax, "plot") and _valid(tf2) and _valid(mf1) and _valid(mf2):
         try:
             y1 = tf1 if _valid(tf1) else (mf1 if _valid(mf1) else 300.0)
             y2 = mf1 if _valid(mf1) else 300.0
-            # Ellipsis keeps signature compatible with structural tests
-            return ax.plot([tf2, mf2], [y1, y2], ...)
-        except Exception:
+            lines = ax.plot([tf2, mf2], [y1, y2])
+            return lines[0] if lines else None
+        except (ValueError, RuntimeError):
             return None
     return None
 
@@ -79,7 +80,7 @@ def _remove_old_artists(window):
         if artist is not None:
             try:
                 artist.remove()
-            except Exception:
+            except ValueError:
                 pass
         setattr(window, attr, None)
 
@@ -182,7 +183,7 @@ def _safe_get_latest_raw(window):
         return None
     try:
         return analyzer.get_latest_raw()
-    except Exception:
+    except AttributeError:
         return None
 
 
@@ -201,7 +202,7 @@ def _draw_formant_lines(ax, formants, color, style, alpha):
     if not hasattr(ax, "axvline"):
         return
     for f in (formants.get("f1"), formants.get("f2"), formants.get("f3")):
-        if f is not None and np.isfinite(f):
+        if _valid(f):
             ax.axvline(f, color=color, linestyle=style, alpha=alpha)
 
 

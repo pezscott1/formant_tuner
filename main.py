@@ -1,17 +1,27 @@
 # main.py
+import os
+import sys
+import time
+import logging
 from analysis.engine import FormantAnalysisEngine
 from tuner.window import TunerWindow
 from tuner.controller import Tuner
 from PyQt6.QtWidgets import QApplication
-import os
+
+
 os.environ["QT_LOGGING_RULES"] = "qt.qpa.fonts=false"
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s %(name)s: %(message)s",
+)
 
 
 if __name__ == "__main__":
     app = QApplication([])
 
     # 1. Create shared engine
-    engine = FormantAnalysisEngine(voice_type="bass", debug=False, use_hybrid=True,)
+    engine = FormantAnalysisEngine(voice_type="bass", use_hybrid=True)
 
     # 2. Create shared tuner (owns LiveAnalyzer + ProfileManager)
     tuner = Tuner(engine=engine, voice_type="bass", profiles_dir="profiles")

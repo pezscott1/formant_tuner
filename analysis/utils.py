@@ -2,6 +2,11 @@
 import numpy as np
 
 
+def is_valid_frequency(x) -> bool:
+    """Return True if x is a real, finite number (not None, NaN, or inf)."""
+    return x is not None and np.isfinite(x)
+
+
 def safe_array(x):
     """
     Convert x into a safe 1D float64 numpy array.

@@ -1,7 +1,11 @@
+import logging
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 from analysis.true_envelope import estimate_formants_te
 from analysis.lpc import estimate_formants as lpc_formants
+from analysis.utils import is_valid_frequency as _valid_scalar
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,9 +34,6 @@ class HybridFormantResult:
 def estimate_formants(*args, **kwargs):
     return lpc_formants(*args, **kwargs)
 
-
-def _valid_scalar(x: Optional[float]) -> bool:
-    return x is not None and x == x  # not None and not NaN
 
 
 def _plausible_pair(f1: Optional[float], f2: Optional[float]) -> bool:
@@ -146,19 +147,17 @@ def _init_debug(vowel_hint, back, front):
 
 
 def _print_input_debug(lpc, te, vowel_hint):
-    print("\n--- HYBRID INPUT ---")
-    print(f"vowel_hint={vowel_hint}")
-    print(f"LPC: f1={lpc.f1}, f2={lpc.f2}, f3={lpc.f3}, conf={lpc.confidence}")
-    print(f"TE:  f1={te.f1},  f2={te.f2},  f3={te.f3},  conf={te.confidence}")
+    logger.debug(
+        "HYBRID INPUT vowel_hint=%s | LPC f1=%s f2=%s f3=%s conf=%s | TE f1=%s f2=%s f3=%s conf=%s",
+        vowel_hint, lpc.f1, lpc.f2, lpc.f3, lpc.confidence, te.f1, te.f2, te.f3, te.confidence,
+    )
 
 
 def _print_output_debug(chosen, primary, f1, f2, f3, confidence, dbg):
-    print("--- HYBRID OUTPUT ---")
-    print(f"chosen={chosen}, primary={primary}")
-    print(f"final f1={f1}, f2={f2}, f3={f3}, conf={confidence}")
-    print(f"selection_case={dbg.get('selection_case')}")
-    print(f"debug={dbg}")
-    print("----------------------\n")
+    logger.debug(
+        "HYBRID OUTPUT chosen=%s primary=%s f1=%s f2=%s f3=%s conf=%s case=%s",
+        chosen, primary, f1, f2, f3, confidence, dbg.get("selection_case"),
+    )
 
 
 def apply_te_vetoes(te, te_ok, dbg, back, front):
