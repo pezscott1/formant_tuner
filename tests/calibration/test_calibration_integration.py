@@ -21,6 +21,7 @@ def test_profile_application_uses_dict_formants(
     # Mock profile manager
     mock_profiles = MagicMock()
     mock_profiles.apply_profile.return_value = "my_profile"
+    mock_profiles.extract_formants.return_value = expected_profile
     mock_profiles_cls.return_value = mock_profiles
 
     # Mock analyzer

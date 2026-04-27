@@ -10,7 +10,7 @@ from analysis.hybrid_formants import estimate_formants_hybrid
 
 logger = logging.getLogger(__name__)
 VOWEL_GUESS_CONF_MIN = 0.1
-MIN_FRAME_SIZE = 256  # ~5 ms at 48 kHz; below this pitch/formant estimators are unreliable
+MIN_FRAME_SIZE = 256  # ~5 ms at 48 kHz; below this estimators are unreliable
 
 
 class FormantAnalysisEngine:

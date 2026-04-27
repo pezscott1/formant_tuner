@@ -1,14 +1,12 @@
 from unittest.mock import patch, MagicMock
 import numpy as np
 from analysis.engine import FormantAnalysisEngine
-import pytest
-import librosa
 
 
 def test_engine_handles_nan_frame():
     eng = FormantAnalysisEngine()
     frame = np.array([np.nan, np.nan, np.nan])
-    # Too short (< MIN_FRAME_SIZE) and all-NaN; engine should return null result, not raise
+    # Too short and all-NaN; engine should return null result, not raise
     result = eng.process_frame(frame, sr=48000)
     assert result["f0"] is None
     assert result["formants"] == (None, None, None)

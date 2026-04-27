@@ -69,7 +69,9 @@ class LiveAnalyzer:
         lpc_conf = float(raw_dict.get("confidence", 0.0))
 
         f0_s = self._smooth_pitch(f0_raw, lpc_conf)
-        f1_s, f2_s, f3_s = self._smooth_formants(raw_dict, f1_raw, f2_raw, f3_raw, lpc_conf)
+        f1_s, f2_s, f3_s = self._smooth_formants(
+            raw_dict, f1_raw, f2_raw, f3_raw, lpc_conf
+        )
         vowel_s = self.label_smoother.update(vowel_raw, confidence=lpc_conf)
         stable, stability_score = self._read_stability()
 
@@ -92,15 +94,21 @@ class LiveAnalyzer:
             f1_in, f2_in, f3_in = hf
         else:
             f1_in, f2_in, f3_in = f1_raw, f2_raw, f3_raw
-        return self.formant_smoother.update(f1=f1_in, f2=f2_in, f3=f3_in, confidence=lpc_conf)
+        return self.formant_smoother.update(
+            f1=f1_in, f2=f2_in, f3=f3_in, confidence=lpc_conf
+        )
 
     def _read_stability(self):
         stable = getattr(self.formant_smoother, "formants_stable", False)
-        stability_score = getattr(self.formant_smoother, "_stability_score", float("inf"))
+        stability_score = getattr(
+            self.formant_smoother, "_stability_score", float("inf")
+        )
         return stable, stability_score
 
-    def _build_processed_frame(self, raw_dict, f0_raw, f0_s, f1_s, f2_s, f3_s,
-                                vowel_raw, vowel_s, lpc_conf, stable, stability_score):
+    def _build_processed_frame(
+        self, raw_dict, f0_raw, f0_s, f1_s, f2_s, f3_s,
+        vowel_raw, vowel_s, lpc_conf, stable, stability_score,
+    ):
         return {
             "f0_raw": f0_raw,
             "f0": f0_s,
@@ -192,7 +200,7 @@ class LiveAnalyzer:
         if self._worker_thread is not None:
             self._worker_thread.join(timeout=0.5)
             if self._worker_thread.is_alive():
-                logger.warning("Worker thread did not stop within timeout; may still be running")
+                logger.warning("Worker thread did not stop within timeout")
             self._worker_thread = None
 
     # ------------------------------------------------------------------

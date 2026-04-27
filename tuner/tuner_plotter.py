@@ -25,7 +25,6 @@ def _normalize_formants(x):
     return {"f1": None, "f2": None, "f3": None}
 
 
-
 def _extract_confidence_and_stability(window):
     analyzer = getattr(window, "analyzer", None)
     latest_raw = getattr(window, "latest_raw", None)

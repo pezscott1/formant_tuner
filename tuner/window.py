@@ -746,13 +746,6 @@ class TunerWindow(QMainWindow):
         self.spectrogram_view.update_from_bus(self.bus)
         hf = processed.get("hybrid_formants")
         if isinstance(hf, (list, tuple)) and len(hf) == 3:
-            raw_f1, raw_f2, raw_f3 = hf
-        else:
-            raw_f1 = raw_f2 = raw_f3 = None
-
-        # Re‑extract for plotting (unchanged)
-        hf = processed.get("hybrid_formants")
-        if isinstance(hf, (list, tuple)) and len(hf) == 3:
             f1, f2, f3 = hf
         else:
             f1 = f2 = f3 = None

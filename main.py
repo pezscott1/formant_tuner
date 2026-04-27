@@ -1,7 +1,5 @@
 # main.py
 import os
-import sys
-import time
 import logging
 from analysis.engine import FormantAnalysisEngine
 from tuner.window import TunerWindow

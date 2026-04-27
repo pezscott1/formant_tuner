@@ -35,7 +35,6 @@ def estimate_formants(*args, **kwargs):
     return lpc_formants(*args, **kwargs)
 
 
-
 def _plausible_pair(f1: Optional[float], f2: Optional[float]) -> bool:
     """Very basic human-range plausibility for F1/F2."""
     if not _valid_scalar(f1) or not _valid_scalar(f2):
@@ -148,8 +147,8 @@ def _init_debug(vowel_hint, back, front):
 
 def _print_input_debug(lpc, te, vowel_hint):
     logger.debug(
-        "HYBRID INPUT vowel_hint=%s | LPC f1=%s f2=%s f3=%s conf=%s | TE f1=%s f2=%s f3=%s conf=%s",
-        vowel_hint, lpc.f1, lpc.f2, lpc.f3, lpc.confidence, te.f1, te.f2, te.f3, te.confidence,
+        "HYBRID INPUT vowel_hint=%s | LPC f1=%s f2=%s conf=%s | TE f1=%s f2=%s conf=%s",
+        vowel_hint, lpc.f1, lpc.f2, lpc.confidence, te.f1, te.f2, te.confidence,
     )
 
 

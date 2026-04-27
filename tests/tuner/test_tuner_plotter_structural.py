@@ -180,7 +180,6 @@ def test_update_vowel_chart_artist_removal():
     )
     assert window.vowel_measured_artist is not None
     first_point = window.vowel_measured_artist
-    first_line = window.vowel_line_artist
 
     # Second call → removes old artists, does NOT store new ones
     update_vowel_chart(

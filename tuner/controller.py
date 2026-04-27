@@ -1,13 +1,12 @@
 # tuner/controller.py
 import logging
 import numpy as np
-
-logger = logging.getLogger(__name__)
-
 from analysis.engine import FormantAnalysisEngine
 from analysis.smoothing import PitchSmoother, MedianSmoother, LabelSmoother
 from tuner.live_analyzer import LiveAnalyzer
 from tuner.profile_controller import ProfileManager
+
+logger = logging.getLogger(__name__)
 
 
 class Tuner:
@@ -45,9 +44,9 @@ class Tuner:
         self.active_profile = None
 
         # Centroid normalization cache: avoids recomputing mean/std every frame
-        self._centroid_cache_key = None   # id(profile)
-        self._centroid_cache = None       # (norm_centroids, f1_mean, f1_std, f2_mean, f2_std)
-        self._fallback_profiles: dict[str, dict] = {}  # voice_type -> stable profile dict
+        self._centroid_cache_key = None
+        self._centroid_cache = None
+        self._fallback_profiles: dict[str, dict] = {}
 
     # ---------------------------------------------------------
     # Engine / analyzer delegation
@@ -169,7 +168,7 @@ class Tuner:
         return best_vowel, float(np.exp(-best_dist))
 
     def _get_active_profile(self) -> dict:
-        """Return the active profile, or a stable fallback dict for the current voice type."""
+        """Return the active profile, or a stable fallback for the current voice type."""
         if self.active_profile:
             return self.active_profile
         if self.voice_type not in self._fallback_profiles:
@@ -181,7 +180,7 @@ class Tuner:
         return self._fallback_profiles[self.voice_type]
 
     def _get_centroid_cache(self, profile: dict):
-        """Return cached (norm_centroids, f1_mean, f1_std, f2_mean, f2_std), building if stale."""
+        """Return cached normalized centroids, recomputing if the profile changed."""
         if self._centroid_cache_key == id(profile) and self._centroid_cache is not None:
             return self._centroid_cache
 

@@ -56,7 +56,9 @@ class ProfileManager:
         if system == "Windows":
             base = Path(os.getenv("APPDATA")) / "Tuner" / "profiles"
         elif system == "Darwin":  # macOS
-            base = Path.home() / "Library" / "Application Support" / "Tuner" / "profiles"
+            base = (
+                Path.home() / "Library" / "Application Support" / "Tuner" / "profiles"
+            )
         else:  # Linux and others
             base = Path.home() / ".config" / "tuner" / "profiles"
 
@@ -212,7 +214,9 @@ class ProfileManager:
                 logger.warning("Could not load profile from path %s: %s", base_name, e)
                 return {}
             if not isinstance(data, dict):
-                logger.warning("Profile at %s is not a JSON object; ignoring", base_name)
+                logger.warning(
+                    "Profile at %s is not a JSON object; ignoring", base_name
+                )
                 return {}
             return data
 
@@ -262,10 +266,14 @@ class ProfileManager:
             except (ValueError, TypeError):
                 continue
             if f1 is not None and not (_F1_MIN <= f1 <= _F1_MAX):
-                logger.warning("Skipping vowel '%s': F1=%.1f outside plausible range", vowel, f1)
+                logger.warning(
+                    "Skipping vowel '%s': F1=%.1f outside plausible range", vowel, f1
+                )
                 continue
             if f2 is not None and not (_F2_MIN <= f2 <= _F2_MAX):
-                logger.warning("Skipping vowel '%s': F2=%.1f outside plausible range", vowel, f2)
+                logger.warning(
+                    "Skipping vowel '%s': F2=%.1f outside plausible range", vowel, f2
+                )
                 continue
             f0 = norm.get("f0")
             if f0 is None:
